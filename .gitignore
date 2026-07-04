@@ -17,3 +17,5 @@ Thumbs.db
 # Node (por si algún día se agrega tooling)
 node_modules/
 dist/
+samples/
+
