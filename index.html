@@ -118,6 +118,10 @@
         </div>
       </div>
       <div class="toast" id="toast"></div>
+      <pre id="dbg" style="position:absolute; left:14px; bottom:14px; margin:0; max-width:46ch;
+        background:rgba(13,17,23,.92); border:1px solid var(--line); border-radius:6px; padding:10px 12px;
+        font-family:var(--mono); font-size:11px; color:var(--ink-dim); line-height:1.5; display:none;
+        white-space:pre-wrap; pointer-events:none;"></pre>
     </section>
 
     <section class="view" id="vexport">
@@ -184,7 +188,9 @@ window.addEventListener("keydown",e=>{
   if(/input|textarea/i.test(document.activeElement.tagName)) return;
   if(m[e.key]) show(m[e.key]);
   if(e.key==="f"||e.key==="F") frameAll();
+  if(e.key==="d"||e.key==="D"){ DBG=!DBG; document.getElementById("dbg").style.display=DBG?"block":"none"; updateDbg(); }
 });
+let DBG=false;
 
 /* ============ Three.js base ============ */
 const canvas=document.getElementById("c3d");
@@ -232,11 +238,25 @@ function interpAtMD(st, md, wx){
 
 function clearWorld(){ Object.values(wellObjects).forEach(g=>world.remove(g)); wellObjects={}; shoesGroup.clear(); }
 
+let LAST_WARN="";
 function buildPad(pad){
   clearWorld(); PAD=pad;
   const wells=pad.pad.wells;
   document.getElementById("foot-pad").textContent=pad.pad.id;
   document.getElementById("foot-wells").textContent=wells.length;
+
+  // --- guarda de cordura: coordenadas anómalas (coords absolutas del CRS sin convertir) ---
+  LAST_WARN="";
+  wells.forEach(w=>{
+    const st=w.survey.stations;
+    for(const s of st){
+      if(Math.abs(s.ns||0)>1e5 || Math.abs(s.ew||0)>1e5){
+        LAST_WARN=`${w.id}: coords fuera de rango (NS/EW > 100km). ¿Survey con Northing/Easting absolutos en vez de offsets locales?`;
+        break;
+      }
+    }
+  });
+  if(LAST_WARN) toast("⚠ "+LAST_WARN);
 
   wells.forEach((w,idx)=>{
     const color=WELL_COLORS[idx%WELL_COLORS.length];
@@ -330,9 +350,21 @@ document.getElementById("cfg-vexag").addEventListener("input",e=>{
 
 /* ============ Cámara CAD ============ */
 function frameAll(){
-  const box=new THREE.Box3().setFromObject(world); if(box.isEmpty()) return;
+  // encuadre robusto: solo trayectorias, ignorando puntos absurdos (>100km) o NaN
+  const box=new THREE.Box3();
+  Object.values(wellObjects).forEach(g=>g.traverse(o=>{
+    if(o.userData.kind!=="traj"||!o.geometry) return;
+    const p=o.geometry.attributes.position; if(!p) return;
+    for(let i=0;i<p.count;i++){
+      const x=p.getX(i),y=p.getY(i),z=p.getZ(i);
+      if(!isFinite(x)||!isFinite(y)||!isFinite(z)) continue;
+      if(Math.abs(x)>1e5||Math.abs(y)>1e5||Math.abs(z)>1e5) continue;
+      box.expandByPoint(new THREE.Vector3(x,y,z));
+    }
+  }));
+  if(box.isEmpty()){ target.set(0,-1500,-1500); sph.radius=5000; return; }
   const c=box.getCenter(new THREE.Vector3()), size=box.getSize(new THREE.Vector3());
-  target.copy(c); sph.radius=Math.max(size.x,size.y,size.z)*1.1+500;
+  target.copy(c); sph.radius=Math.max(size.x,size.y,size.z,500)*1.1+500;
 }
 let dragging=null,px=0,py=0;
 canvas.addEventListener("mousedown",e=>{dragging=e.button;px=e.clientX;py=e.clientY;});
@@ -385,6 +417,29 @@ function updateSummary(){
     `<table class="tbl"><tr><th>Pozo</th><th>Est</th><th>MD final</th><th>Etapas</th><th>Casings (OD@zapato)</th></tr>${rows}</table>`;
 }
 
+/* ============ Debug panel ============ */
+function updateDbg(){
+  if(!DBG) return;
+  const box=new THREE.Box3().setFromObject(world);
+  const c=box.isEmpty()?null:box.getCenter(new THREE.Vector3());
+  const sz=box.isEmpty()?null:box.getSize(new THREE.Vector3());
+  let nObj=0; world.traverse(()=>nObj++);
+  const hasNaN=c&&(isNaN(c.x)||isNaN(c.y)||isNaN(c.z));
+  const wells=PAD?PAD.pad.wells.length:0;
+  const lines=[
+    `PAD: ${PAD?PAD.pad.id:"—"}  pozos:${wells}  objetos:${nObj}`,
+    `vexag:${vexag}×`,
+    `bbox center: ${c?`${c.x.toFixed(0)}, ${c.y.toFixed(0)}, ${c.z.toFixed(0)}`:"—"}`,
+    `bbox size:   ${sz?`${sz.x.toFixed(0)} × ${sz.y.toFixed(0)} × ${sz.z.toFixed(0)}`:"—"}`,
+    `cam target:  ${target.x.toFixed(0)}, ${target.y.toFixed(0)}, ${target.z.toFixed(0)}`,
+    `cam radius:  ${sph.radius.toFixed(0)}`,
+    hasNaN?"⚠ NaN en bounding box — geometría inválida":"",
+    LAST_WARN?("⚠ "+LAST_WARN):"",
+    `[D] cierra este panel · [F] encuadra`
+  ].filter(Boolean);
+  document.getElementById("dbg").textContent=lines.join("\n");
+}
+
 /* ============ Toast ============ */
 let toastT=null;
 function toast(msg){ const t=document.getElementById("toast"); t.textContent=msg; t.classList.add("show");
@@ -396,8 +451,11 @@ function onResize(){
   if(!w||!h) return; renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix();
 }
 window.addEventListener("resize",onResize);
+let dbgFrame=0;
 function tick(){ camera.position.copy(target).add(new THREE.Vector3().setFromSpherical(sph));
-  camera.lookAt(target); renderer.render(scene,camera); requestAnimationFrame(tick); }
+  camera.lookAt(target); renderer.render(scene,camera);
+  if(DBG && (dbgFrame++ %15===0)) updateDbg();
+  requestAnimationFrame(tick); }
 onResize(); tick();
 
 /* ============ Autocarga del pad de ejemplo ============ */
