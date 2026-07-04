@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<!--
+  Vaca Viewer — Visor 3D de pozos y pads (terminación no convencional)
+  Copyright (c) 2026 Gonzalo Carvallo. Todos los derechos reservados.
+  Ver LICENSE. Autor: Gonzalo Carvallo (gonzacarv).
+-->
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vaca Viewer</title>
+<style>
+  :root {
+    --bg:        #0d1117;
+    --panel:     #161b22;
+    --panel-2:   #1c232d;
+    --line:      #2a3441;
+    --ink:       #e6edf3;
+    --ink-dim:   #8b97a6;
+    --accent:    #4ea1d3;   /* azul geo-navegación */
+    --casing:    #d0d0d0;
+    --perf:      #f2a03d;
+    --plug:      #e5484d;
+    --stage:     #3fb950;
+    --mono: "SFMono-Regular", ui-monospace, "Cascadia Code", Consolas, monospace;
+    --sans: "Inter", system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--ink);
+    font-family:var(--sans); overflow:hidden; }
+
+  /* ---- Layout shell ---- */
+  #app { display:grid; grid-template-columns:210px 1fr; height:100vh; }
+
+  /* Sidebar / nav */
+  #nav { background:var(--panel); border-right:1px solid var(--line);
+    display:flex; flex-direction:column; }
+  .brand { padding:16px 16px 12px; border-bottom:1px solid var(--line); }
+  .brand h1 { font-size:14px; letter-spacing:.14em; text-transform:uppercase;
+    margin:0; font-weight:600; }
+  .brand .sub { font-family:var(--mono); font-size:10px; color:var(--ink-dim);
+    margin-top:4px; letter-spacing:.05em; }
+  nav button { display:flex; align-items:center; gap:10px; width:100%;
+    background:none; border:0; color:var(--ink-dim); text-align:left;
+    padding:11px 16px; font-size:13px; cursor:pointer; border-left:2px solid transparent; }
+  nav button:hover { color:var(--ink); background:var(--panel-2); }
+  nav button.active { color:var(--ink); border-left-color:var(--accent);
+    background:var(--panel-2); }
+  nav button .k { font-family:var(--mono); font-size:10px; color:var(--ink-dim); margin-left:auto; }
+  .nav-foot { margin-top:auto; padding:12px 16px; border-top:1px solid var(--line);
+    font-family:var(--mono); font-size:10px; color:var(--ink-dim); line-height:1.5; }
+
+  /* Main */
+  main { position:relative; overflow:hidden; }
+  .view { position:absolute; inset:0; display:none; }
+  .view.active { display:block; }
+
+  /* 3D view */
+  #c3d { width:100%; height:100%; display:block; }
+  .overlay { position:absolute; pointer-events:none; }
+  .hud-tl { top:14px; left:14px; }
+  .hud-tl .pill { font-family:var(--mono); font-size:11px; color:var(--ink-dim);
+    background:rgba(13,17,23,.7); border:1px solid var(--line); padding:4px 8px;
+    border-radius:4px; margin-bottom:6px; display:inline-block; }
+
+  /* floating layer panel */
+  .layers { position:absolute; top:14px; right:14px; width:230px;
+    background:rgba(22,27,34,.94); border:1px solid var(--line); border-radius:8px;
+    pointer-events:auto; backdrop-filter:blur(6px); }
+  .layers h3 { margin:0; font-size:11px; letter-spacing:.12em; text-transform:uppercase;
+    color:var(--ink-dim); padding:12px 14px 8px; }
+  .layers .grp { border-top:1px solid var(--line); padding:8px 14px; }
+  .layers .grp .lbl { font-family:var(--mono); font-size:10px; color:var(--ink-dim);
+    text-transform:uppercase; letter-spacing:.08em; margin-bottom:6px; }
+  .row { display:flex; align-items:center; gap:8px; padding:3px 0; font-size:12.5px; cursor:pointer; }
+  .row input { accent-color:var(--accent); }
+  .row .sw { width:10px; height:10px; border-radius:2px; }
+
+  /* generic content sections */
+  .pad { padding:28px 32px; height:100%; overflow:auto; }
+  .pad h2 { font-size:15px; letter-spacing:.1em; text-transform:uppercase;
+    font-weight:600; margin:0 0 4px; }
+  .pad .lead { color:var(--ink-dim); font-size:13px; max-width:60ch; margin:0 0 22px; line-height:1.6; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:8px;
+    padding:18px 20px; margin-bottom:16px; max-width:820px; }
+  .card h4 { margin:0 0 10px; font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-dim); }
+  .stub { font-family:var(--mono); font-size:12px; color:var(--ink-dim); line-height:1.7; }
+  .btn { background:var(--panel-2); color:var(--ink); border:1px solid var(--line);
+    padding:8px 14px; border-radius:6px; font-size:12.5px; cursor:pointer; font-family:var(--sans); }
+  .btn:hover { border-color:var(--accent); color:#fff; }
+  .btn.primary { background:var(--accent); border-color:var(--accent); color:#04141f; font-weight:600; }
+  kbd { font-family:var(--mono); font-size:10.5px; background:var(--panel-2);
+    border:1px solid var(--line); border-radius:3px; padding:1px 5px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <aside id="nav">
+    <div class="brand">
+      <h1>Vaca Viewer</h1>
+      <div class="sub">subsuelo · v0.1</div>
+    </div>
+    <nav>
+      <button data-view="v3d" class="active">Vista 3D <span class="k">1</span></button>
+      <button data-view="vexport">Exportar <span class="k">2</span></button>
+      <button data-view="vdata">Datos <span class="k">3</span></button>
+      <button data-view="vconfig">Configuración <span class="k">4</span></button>
+    </nav>
+    <div class="nav-foot">
+      PAD: <span id="foot-pad">demo</span><br>
+      pozos: <span id="foot-wells">—</span>
+    </div>
+  </aside>
+
+  <main>
+    <!-- ============ 3D ============ -->
+    <section class="view active" id="v3d">
+      <canvas id="c3d"></canvas>
+      <div class="overlay hud-tl">
+        <div class="pill" id="hud-cam">orbit · pan · zoom</div><br>
+        <div class="pill" id="hud-scale">escala real 1:1</div>
+      </div>
+      <div class="layers">
+        <h3>Capas</h3>
+        <div class="grp">
+          <div class="lbl">Pozos</div>
+          <div id="well-toggles"></div>
+        </div>
+        <div class="grp">
+          <div class="lbl">Elementos</div>
+          <label class="row"><input type="checkbox" id="t-traj" checked><span class="sw" style="background:var(--accent)"></span>Trayectoria</label>
+          <label class="row"><input type="checkbox" id="t-casing" checked><span class="sw" style="background:var(--casing)"></span>Cañería 5"</label>
+          <label class="row"><input type="checkbox" id="t-perf" checked><span class="sw" style="background:var(--perf)"></span>Punzados</label>
+          <label class="row"><input type="checkbox" id="t-plug" checked><span class="sw" style="background:var(--plug)"></span>Tapones</label>
+          <label class="row"><input type="checkbox" id="t-stage"><span class="sw" style="background:var(--stage)"></span>Etapas</label>
+        </div>
+        <div class="grp">
+          <div class="lbl">Medición</div>
+          <label class="row"><input type="checkbox" id="t-measure">Regla entre puntos</label>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ EXPORT ============ -->
+    <section class="view" id="vexport">
+      <div class="pad">
+        <h2>Exportar corte lateral</h2>
+        <p class="lead">Esquema 2D por pozo, fondo blanco, para correos y documentos.
+          El tramo vertical se comprime (solo zapatos y topes de cemento) y la rama
+          horizontal se escala para maximizar legibilidad. No usa el survey salvo para
+          distinguir arquitectura vertical u horizontal.</p>
+        <div class="card">
+          <h4>Próxima iteración</h4>
+          <div class="stub">Acá van los controles: elegir pozo, activar/desactivar
+            intermedias · guía · etapas · punzados · tapones, y botón "Exportar PNG/JPG".
+            Se construye una vez cargados tus datos reales del pad.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ DATA ============ -->
+    <section class="view" id="vdata">
+      <div class="pad">
+        <h2>Datos</h2>
+        <p class="lead">Importá survey (XLS), tally (PDF) y fracplan (XLS), o cargá/editá
+          a mano. Copiar y pegar campos o tablas enteras. Exportar por pozo o el pad
+          completo como ZIP (formato propio, solo compatible con esta app).</p>
+        <div class="card">
+          <h4>Importar</h4>
+          <button class="btn">Survey .xlsx</button>
+          <button class="btn">Tally .pdf</button>
+          <button class="btn">Fracplan .xlsx</button>
+          <div class="stub" style="margin-top:12px">Parsers a medida en la próxima iteración (ya mapeados a tus formatos reales).</div>
+        </div>
+        <div class="card">
+          <h4>Exportar</h4>
+          <button class="btn">Pozo actual (.json)</button>
+          <button class="btn primary">Pad completo (.zip)</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ CONFIG ============ -->
+    <section class="view" id="vconfig">
+      <div class="pad">
+        <h2>Configuración</h2>
+        <p class="lead">Colores, controles de cámara, preferencias de vista y de export.</p>
+        <div class="card">
+          <h4>Vista 3D</h4>
+          <label class="row" style="max-width:340px"><input type="checkbox" id="cfg-grid" checked> Mostrar grilla de referencia</label>
+          <label class="row" style="max-width:340px"><input type="checkbox" id="cfg-axes" checked> Mostrar ejes N/E/TVD</label>
+        </div>
+        <div class="card">
+          <h4>Atajos</h4>
+          <div class="stub"><kbd>1</kbd>–<kbd>4</kbd> cambiar sección · <kbd>rueda</kbd> zoom ·
+            <kbd>arrastrar</kbd> orbitar · <kbd>click derecho</kbd> desplazar</div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.module.min.js"
+}}
+</script>
+<script type="module">
+import * as THREE from "three";
+
+/* ---------------------------------------------------------------
+   Navegación entre secciones
+--------------------------------------------------------------- */
+const views = document.querySelectorAll(".view");
+const navBtns = document.querySelectorAll("nav button");
+function show(id){
+  views.forEach(v=>v.classList.toggle("active", v.id===id));
+  navBtns.forEach(b=>b.classList.toggle("active", b.dataset.view===id));
+  if(id==="v3d") onResize();
+}
+navBtns.forEach(b=>b.addEventListener("click",()=>show(b.dataset.view)));
+window.addEventListener("keydown",e=>{
+  const map={"1":"v3d","2":"vexport","3":"vdata","4":"vconfig"};
+  if(map[e.key] && !/input|textarea/i.test(document.activeElement.tagName)) show(map[e.key]);
+});
+
+/* ---------------------------------------------------------------
+   Demo pad — trayectoria sintética estilo horizontal Vaca Muerta.
+   Se reemplaza por el parser del survey real en la próxima iteración.
+   Coordenadas locales: x=E(+)/O(-), y=N(+)/S(-), z=TVD(+ hacia abajo).
+--------------------------------------------------------------- */
+function demoWell(offsetX, kop=380, build=520, tvdTarget=2820, lateral=3000){
+  // vertical → curva → lateral hacia el Sur (y negativo). A escala real (m).
+  const pts=[]; let md=0;
+  for(let z=0; z<=kop; z+=20) pts.push(new THREE.Vector3(offsetX, 0, z));
+  const r = build/(Math.PI/2);           // radio de la curva 90°
+  for(let a=0; a<=Math.PI/2; a+=0.06){
+    const z = kop + r*Math.sin(a);
+    const y = -(r - r*Math.cos(a));
+    pts.push(new THREE.Vector3(offsetX, y, Math.min(z, tvdTarget)));
+  }
+  const yCurveEnd = -(r);
+  for(let s=0; s<=lateral; s+=30)
+    pts.push(new THREE.Vector3(offsetX, yCurveEnd - s, tvdTarget));
+  return pts;
+}
+const PAD = {
+  id:"MMo-35", wells:[
+    { id:"MMo-2351h", x:0,  color:0x4ea1d3, pts:demoWell(0,   380,520,2820) },
+    { id:"MMo-2352",  x:10, color:0x6cc04a, pts:demoWell(10,  380,520,2835) },
+    { id:"MMo-2353",  x:20, color:0xe0a83d, pts:demoWell(20,  380,520,2810) },
+    { id:"MMo-2354",  x:30, color:0xc77dff, pts:demoWell(30,  380,520,2845) },
+  ]
+};
+document.getElementById("foot-pad").textContent = PAD.id;
+document.getElementById("foot-wells").textContent = PAD.wells.length;
+
+/* ---------------------------------------------------------------
+   Three.js — escena, cámara, luces, controles CAD
+--------------------------------------------------------------- */
+const canvas = document.getElementById("c3d");
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0d1117);
+
+// El mundo real usa z hacia abajo; convertimos a Y-up de three invirtiendo z.
+const world = new THREE.Group();          // todo lo del pozo entra acá
+world.scale.set(1,1,1);
+scene.add(world);
+
+const camera = new THREE.PerspectiveCamera(45, 1, 1, 40000);
+camera.position.set(1600, -900, 1400);
+
+// Luz
+scene.add(new THREE.HemisphereLight(0xbcd3ff, 0x0a0f14, 1.1));
+const dir = new THREE.DirectionalLight(0xffffff, 0.6); dir.position.set(1,2,3); scene.add(dir);
+
+// Grilla y ejes (en plano de superficie, z=0)
+const grid = new THREE.GridHelper(4000, 40, 0x2a3441, 0x1a2029);
+grid.rotation.x = Math.PI/2;              // llevar al plano XY (superficie)
+const gridGroup = new THREE.Group(); gridGroup.add(grid); world.add(gridGroup);
+const axes = new THREE.AxesHelper(300); world.add(axes);
+
+// Centro del pad para orbitar alrededor
+const target = new THREE.Vector3(15, -1400, 1400);
+
+/* Trayectorias + elementos por pozo */
+const wellObjects = {};
+function buildWell(w){
+  const g = new THREE.Group();
+  // convertir (x,y,z_down) → three (x, -z_down, y)  [Y-up]
+  const v3 = w.pts.map(p=>new THREE.Vector3(p.x, -p.z, p.y));
+  const curve = new THREE.CatmullRomCurve3(v3);
+
+  // trayectoria (línea)
+  const traj = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints(curve.getPoints(400)),
+    new THREE.LineBasicMaterial({color:w.color})
+  ); traj.userData.kind="traj"; g.add(traj);
+
+  // casing 5" (tubo delgado a lo largo de la curva)
+  const tube = new THREE.Mesh(
+    new THREE.TubeGeometry(curve, 300, 3.2, 8, false),
+    new THREE.MeshStandardMaterial({color:0xd0d0d0, metalness:.6, roughness:.5})
+  ); tube.userData.kind="casing"; g.add(tube);
+
+  // punzados demo: anillos sobre el lateral
+  const perfMat = new THREE.MeshBasicMaterial({color:0xf2a03d});
+  const plugMat = new THREE.MeshBasicMaterial({color:0xe5484d});
+  const n = v3.length;
+  for(let i=Math.floor(n*0.62); i<n; i+=6){
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(6,1.4,6,16), perfMat.clone());
+    ring.position.copy(v3[i]); ring.userData.kind="perf"; g.add(ring);
+    if(i % 30 === 0){
+      const plug = new THREE.Mesh(new THREE.CylinderGeometry(4.5,4.5,4,12), plugMat.clone());
+      plug.position.copy(v3[i]); plug.userData.kind="plug"; g.add(plug);
+    }
+  }
+  g.userData.well = w.id;
+  world.add(g);
+  wellObjects[w.id]=g;
+}
+PAD.wells.forEach(buildWell);
+
+/* Toggles por pozo (generados) */
+const wt = document.getElementById("well-toggles");
+PAD.wells.forEach(w=>{
+  const l=document.createElement("label"); l.className="row";
+  l.innerHTML=`<input type="checkbox" checked data-well="${w.id}">
+    <span class="sw" style="background:#${w.color.toString(16).padStart(6,'0')}"></span>${w.id}`;
+  wt.appendChild(l);
+  l.querySelector("input").addEventListener("change",e=>{
+    wellObjects[w.id].visible = e.target.checked;
+  });
+});
+
+/* Toggles de elementos */
+function setKind(kind, on){
+  Object.values(wellObjects).forEach(g=>
+    g.traverse(o=>{ if(o.userData.kind===kind) o.visible=on; }));
+}
+document.getElementById("t-traj").addEventListener("change",e=>setKind("traj",e.target.checked));
+document.getElementById("t-casing").addEventListener("change",e=>setKind("casing",e.target.checked));
+document.getElementById("t-perf").addEventListener("change",e=>setKind("perf",e.target.checked));
+document.getElementById("t-plug").addEventListener("change",e=>setKind("plug",e.target.checked));
+document.getElementById("cfg-grid").addEventListener("change",e=>gridGroup.visible=e.target.checked);
+document.getElementById("cfg-axes").addEventListener("change",e=>axes.visible=e.target.checked);
+
+/* ---------------------------------------------------------------
+   Controles de cámara estilo CAD (orbit / pan / zoom) sin dependencias
+--------------------------------------------------------------- */
+let sph = new THREE.Spherical();
+(function initSph(){
+  const off = camera.position.clone().sub(target);
+  sph.setFromVector3(off);
+})();
+let dragging=null, px=0, py=0;
+canvas.addEventListener("mousedown",e=>{ dragging=e.button; px=e.clientX; py=e.clientY; });
+window.addEventListener("mouseup",()=>dragging=null);
+window.addEventListener("mousemove",e=>{
+  if(dragging===null) return;
+  const dx=e.clientX-px, dy=e.clientY-py; px=e.clientX; py=e.clientY;
+  if(dragging===0){ // orbit
+    sph.theta -= dx*0.005; sph.phi -= dy*0.005;
+    sph.phi = Math.max(0.05, Math.min(Math.PI-0.05, sph.phi));
+  } else if(dragging===2){ // pan
+    const panX = new THREE.Vector3().setFromMatrixColumn(camera.matrix,0).multiplyScalar(-dx*sph.radius*0.0012);
+    const panY = new THREE.Vector3().setFromMatrixColumn(camera.matrix,1).multiplyScalar( dy*sph.radius*0.0012);
+    target.add(panX).add(panY);
+  }
+});
+canvas.addEventListener("contextmenu",e=>e.preventDefault());
+canvas.addEventListener("wheel",e=>{
+  e.preventDefault();
+  sph.radius *= (1 + Math.sign(e.deltaY)*0.08);
+  sph.radius = Math.max(80, Math.min(30000, sph.radius));
+},{passive:false});
+
+/* ---------------------------------------------------------------
+   Loop + resize
+--------------------------------------------------------------- */
+function onResize(){
+  const w=canvas.clientWidth||canvas.parentElement.clientWidth;
+  const h=canvas.clientHeight||canvas.parentElement.clientHeight;
+  if(!w||!h) return;
+  renderer.setSize(w,h,false);
+  camera.aspect=w/h; camera.updateProjectionMatrix();
+}
+window.addEventListener("resize",onResize);
+
+function tick(){
+  const off = new THREE.Vector3().setFromSpherical(sph);
+  camera.position.copy(target).add(off);
+  camera.lookAt(target);
+  renderer.render(scene,camera);
+  requestAnimationFrame(tick);
+}
+onResize(); tick();
+</script>
+</body>
+</html>
