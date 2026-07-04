@@ -11,189 +11,157 @@
 <title>Vaca Viewer</title>
 <style>
   :root {
-    --bg:        #0d1117;
-    --panel:     #161b22;
-    --panel-2:   #1c232d;
-    --line:      #2a3441;
-    --ink:       #e6edf3;
-    --ink-dim:   #8b97a6;
-    --accent:    #4ea1d3;   /* azul geo-navegación */
-    --casing:    #d0d0d0;
-    --perf:      #f2a03d;
-    --plug:      #e5484d;
-    --stage:     #3fb950;
-    --mono: "SFMono-Regular", ui-monospace, "Cascadia Code", Consolas, monospace;
-    --sans: "Inter", system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    --bg:#0d1117; --panel:#161b22; --panel-2:#1c232d; --line:#2a3441;
+    --ink:#e6edf3; --ink-dim:#8b97a6; --accent:#4ea1d3;
+    --casing:#d0d0d0; --perf:#f2a03d; --plug:#e5484d; --stage:#3fb950;
+    --mono:"SFMono-Regular",ui-monospace,"Cascadia Code",Consolas,monospace;
+    --sans:"Inter",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
   }
-  * { box-sizing: border-box; }
-  html, body { margin:0; height:100%; background:var(--bg); color:var(--ink);
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; background:var(--bg); color:var(--ink);
     font-family:var(--sans); overflow:hidden; }
-
-  /* ---- Layout shell ---- */
   #app { display:grid; grid-template-columns:210px 1fr; height:100vh; }
-
-  /* Sidebar / nav */
-  #nav { background:var(--panel); border-right:1px solid var(--line);
-    display:flex; flex-direction:column; }
+  #nav { background:var(--panel); border-right:1px solid var(--line); display:flex; flex-direction:column; }
   .brand { padding:16px 16px 12px; border-bottom:1px solid var(--line); }
-  .brand h1 { font-size:14px; letter-spacing:.14em; text-transform:uppercase;
-    margin:0; font-weight:600; }
-  .brand .sub { font-family:var(--mono); font-size:10px; color:var(--ink-dim);
-    margin-top:4px; letter-spacing:.05em; }
-  nav button { display:flex; align-items:center; gap:10px; width:100%;
-    background:none; border:0; color:var(--ink-dim); text-align:left;
-    padding:11px 16px; font-size:13px; cursor:pointer; border-left:2px solid transparent; }
+  .brand h1 { font-size:14px; letter-spacing:.14em; text-transform:uppercase; margin:0; font-weight:600; }
+  .brand .sub { font-family:var(--mono); font-size:10px; color:var(--ink-dim); margin-top:4px; letter-spacing:.05em; }
+  nav button { display:flex; align-items:center; gap:10px; width:100%; background:none; border:0;
+    color:var(--ink-dim); text-align:left; padding:11px 16px; font-size:13px; cursor:pointer; border-left:2px solid transparent; }
   nav button:hover { color:var(--ink); background:var(--panel-2); }
-  nav button.active { color:var(--ink); border-left-color:var(--accent);
-    background:var(--panel-2); }
+  nav button.active { color:var(--ink); border-left-color:var(--accent); background:var(--panel-2); }
   nav button .k { font-family:var(--mono); font-size:10px; color:var(--ink-dim); margin-left:auto; }
   .nav-foot { margin-top:auto; padding:12px 16px; border-top:1px solid var(--line);
     font-family:var(--mono); font-size:10px; color:var(--ink-dim); line-height:1.5; }
-
-  /* Main */
   main { position:relative; overflow:hidden; }
   .view { position:absolute; inset:0; display:none; }
   .view.active { display:block; }
-
-  /* 3D view */
   #c3d { width:100%; height:100%; display:block; }
   .overlay { position:absolute; pointer-events:none; }
   .hud-tl { top:14px; left:14px; }
   .hud-tl .pill { font-family:var(--mono); font-size:11px; color:var(--ink-dim);
-    background:rgba(13,17,23,.7); border:1px solid var(--line); padding:4px 8px;
-    border-radius:4px; margin-bottom:6px; display:inline-block; }
-
-  /* floating layer panel */
-  .layers { position:absolute; top:14px; right:14px; width:230px;
-    background:rgba(22,27,34,.94); border:1px solid var(--line); border-radius:8px;
-    pointer-events:auto; backdrop-filter:blur(6px); }
-  .layers h3 { margin:0; font-size:11px; letter-spacing:.12em; text-transform:uppercase;
-    color:var(--ink-dim); padding:12px 14px 8px; }
+    background:rgba(13,17,23,.7); border:1px solid var(--line); padding:4px 8px; border-radius:4px; margin-bottom:6px; display:inline-block; }
+  .layers { position:absolute; top:14px; right:14px; width:236px; max-height:calc(100vh - 28px); overflow:auto;
+    background:rgba(22,27,34,.94); border:1px solid var(--line); border-radius:8px; pointer-events:auto; backdrop-filter:blur(6px); }
+  .layers h3 { margin:0; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--ink-dim); padding:12px 14px 8px; }
   .layers .grp { border-top:1px solid var(--line); padding:8px 14px; }
-  .layers .grp .lbl { font-family:var(--mono); font-size:10px; color:var(--ink-dim);
-    text-transform:uppercase; letter-spacing:.08em; margin-bottom:6px; }
+  .layers .grp .lbl { font-family:var(--mono); font-size:10px; color:var(--ink-dim); text-transform:uppercase; letter-spacing:.08em; margin-bottom:6px; }
   .row { display:flex; align-items:center; gap:8px; padding:3px 0; font-size:12.5px; cursor:pointer; }
   .row input { accent-color:var(--accent); }
-  .row .sw { width:10px; height:10px; border-radius:2px; }
-
-  /* generic content sections */
+  .row .sw { width:10px; height:10px; border-radius:2px; flex:none; }
+  .row .meta { margin-left:auto; font-family:var(--mono); font-size:10px; color:var(--ink-dim); }
   .pad { padding:28px 32px; height:100%; overflow:auto; }
-  .pad h2 { font-size:15px; letter-spacing:.1em; text-transform:uppercase;
-    font-weight:600; margin:0 0 4px; }
-  .pad .lead { color:var(--ink-dim); font-size:13px; max-width:60ch; margin:0 0 22px; line-height:1.6; }
-  .card { background:var(--panel); border:1px solid var(--line); border-radius:8px;
-    padding:18px 20px; margin-bottom:16px; max-width:820px; }
+  .pad h2 { font-size:15px; letter-spacing:.1em; text-transform:uppercase; font-weight:600; margin:0 0 4px; }
+  .pad .lead { color:var(--ink-dim); font-size:13px; max-width:64ch; margin:0 0 22px; line-height:1.6; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:18px 20px; margin-bottom:16px; max-width:860px; }
   .card h4 { margin:0 0 10px; font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-dim); }
   .stub { font-family:var(--mono); font-size:12px; color:var(--ink-dim); line-height:1.7; }
-  .btn { background:var(--panel-2); color:var(--ink); border:1px solid var(--line);
-    padding:8px 14px; border-radius:6px; font-size:12.5px; cursor:pointer; font-family:var(--sans); }
+  .btn { background:var(--panel-2); color:var(--ink); border:1px solid var(--line); padding:8px 14px; border-radius:6px;
+    font-size:12.5px; cursor:pointer; font-family:var(--sans); margin:0 6px 6px 0; }
   .btn:hover { border-color:var(--accent); color:#fff; }
   .btn.primary { background:var(--accent); border-color:var(--accent); color:#04141f; font-weight:600; }
-  kbd { font-family:var(--mono); font-size:10.5px; background:var(--panel-2);
-    border:1px solid var(--line); border-radius:3px; padding:1px 5px; }
+  kbd { font-family:var(--mono); font-size:10.5px; background:var(--panel-2); border:1px solid var(--line); border-radius:3px; padding:1px 5px; }
+  table.tbl { border-collapse:collapse; font-size:12px; font-family:var(--mono); width:100%; }
+  table.tbl th, table.tbl td { border:1px solid var(--line); padding:4px 8px; text-align:right; }
+  table.tbl th { color:var(--ink-dim); text-align:left; font-weight:500; }
+  table.tbl td:first-child, table.tbl th:first-child { text-align:left; }
+  .toast { position:absolute; bottom:16px; left:50%; transform:translateX(-50%); background:var(--panel-2);
+    border:1px solid var(--line); border-radius:6px; padding:8px 16px; font-size:12.5px; opacity:0; transition:opacity .3s; pointer-events:none; }
+  .toast.show { opacity:1; }
+  .drop { border:1.5px dashed var(--line); border-radius:8px; padding:22px; text-align:center; color:var(--ink-dim); font-size:12.5px; }
+  .drop.hot { border-color:var(--accent); color:var(--ink); }
 </style>
 </head>
 <body>
 <div id="app">
   <aside id="nav">
-    <div class="brand">
-      <h1>Vaca Viewer</h1>
-      <div class="sub">subsuelo · v0.1</div>
-    </div>
+    <div class="brand"><h1>Vaca Viewer</h1><div class="sub">subsuelo · v0.2</div></div>
     <nav>
       <button data-view="v3d" class="active">Vista 3D <span class="k">1</span></button>
       <button data-view="vexport">Exportar <span class="k">2</span></button>
       <button data-view="vdata">Datos <span class="k">3</span></button>
       <button data-view="vconfig">Configuración <span class="k">4</span></button>
     </nav>
-    <div class="nav-foot">
-      PAD: <span id="foot-pad">demo</span><br>
-      pozos: <span id="foot-wells">—</span>
-    </div>
+    <div class="nav-foot">PAD: <span id="foot-pad">—</span><br>pozos: <span id="foot-wells">—</span></div>
   </aside>
 
   <main>
-    <!-- ============ 3D ============ -->
     <section class="view active" id="v3d">
       <canvas id="c3d"></canvas>
       <div class="overlay hud-tl">
         <div class="pill" id="hud-cam">orbit · pan · zoom</div><br>
-        <div class="pill" id="hud-scale">escala real 1:1</div>
+        <div class="pill" id="hud-scale">escala real 1:1</div><br>
+        <div class="pill" id="hud-sel">F = encuadrar</div>
       </div>
       <div class="layers">
         <h3>Capas</h3>
-        <div class="grp">
-          <div class="lbl">Pozos</div>
-          <div id="well-toggles"></div>
-        </div>
+        <div class="grp"><div class="lbl">Pozos</div><div id="well-toggles"></div></div>
         <div class="grp">
           <div class="lbl">Elementos</div>
           <label class="row"><input type="checkbox" id="t-traj" checked><span class="sw" style="background:var(--accent)"></span>Trayectoria</label>
-          <label class="row"><input type="checkbox" id="t-casing" checked><span class="sw" style="background:var(--casing)"></span>Cañería 5"</label>
+          <label class="row"><input type="checkbox" id="t-casing" checked><span class="sw" style="background:var(--casing)"></span>Cañerías (todas)</label>
           <label class="row"><input type="checkbox" id="t-perf" checked><span class="sw" style="background:var(--perf)"></span>Punzados</label>
           <label class="row"><input type="checkbox" id="t-plug" checked><span class="sw" style="background:var(--plug)"></span>Tapones</label>
-          <label class="row"><input type="checkbox" id="t-stage"><span class="sw" style="background:var(--stage)"></span>Etapas</label>
+          <label class="row"><input type="checkbox" id="t-stage"><span class="sw" style="background:var(--stage)"></span>Etapas (marcas)</label>
         </div>
         <div class="grp">
-          <div class="lbl">Medición</div>
-          <label class="row"><input type="checkbox" id="t-measure">Regla entre puntos</label>
+          <div class="lbl">Cañerías por fase</div>
+          <label class="row"><input type="checkbox" data-phase="guia" checked><span class="meta">guía 13⅜"</span></label>
+          <label class="row"><input type="checkbox" data-phase="intermedia1" checked><span class="meta">int-1 9⅝"</span></label>
+          <label class="row"><input type="checkbox" data-phase="intermedia2" checked><span class="meta">int-2 7⅝"</span></label>
+          <label class="row"><input type="checkbox" data-phase="produccion" checked><span class="meta">prod 5"</span></label>
+        </div>
+        <div class="grp">
+          <div class="lbl">Referencia</div>
+          <label class="row"><input type="checkbox" id="cfg-grid" checked>Grilla de superficie</label>
+          <label class="row"><input type="checkbox" id="cfg-axes" checked>Ejes N/E/TVD</label>
+          <label class="row"><input type="checkbox" id="cfg-shoes" checked>Marcas de zapato</label>
         </div>
       </div>
+      <div class="toast" id="toast"></div>
     </section>
 
-    <!-- ============ EXPORT ============ -->
     <section class="view" id="vexport">
       <div class="pad">
         <h2>Exportar corte lateral</h2>
-        <p class="lead">Esquema 2D por pozo, fondo blanco, para correos y documentos.
-          El tramo vertical se comprime (solo zapatos y topes de cemento) y la rama
-          horizontal se escala para maximizar legibilidad. No usa el survey salvo para
-          distinguir arquitectura vertical u horizontal.</p>
-        <div class="card">
-          <h4>Próxima iteración</h4>
-          <div class="stub">Acá van los controles: elegir pozo, activar/desactivar
-            intermedias · guía · etapas · punzados · tapones, y botón "Exportar PNG/JPG".
-            Se construye una vez cargados tus datos reales del pad.</div>
-        </div>
+        <p class="lead">Esquema 2D por pozo, fondo blanco, para correos y documentos. Tramo vertical comprimido
+          (zapatos y topes de cemento) y rama horizontal escalada para maximizar legibilidad. Próxima iteración (v0.3).</p>
+        <div class="card"><h4>En construcción</h4><div class="stub">Controles de pozo y capas + botón Exportar PNG/JPG.</div></div>
       </div>
     </section>
 
-    <!-- ============ DATA ============ -->
     <section class="view" id="vdata">
       <div class="pad">
         <h2>Datos</h2>
-        <p class="lead">Importá survey (XLS), tally (PDF) y fracplan (XLS), o cargá/editá
-          a mano. Copiar y pegar campos o tablas enteras. Exportar por pozo o el pad
-          completo como ZIP (formato propio, solo compatible con esta app).</p>
+        <p class="lead">Cargá un pad (<span class="stub">pad.json</span>) o arrastralo acá. La importación directa de
+          survey/tally/fracplan y la edición en tabla llegan en v0.3.</p>
         <div class="card">
-          <h4>Importar</h4>
-          <button class="btn">Survey .xlsx</button>
-          <button class="btn">Tally .pdf</button>
-          <button class="btn">Fracplan .xlsx</button>
-          <div class="stub" style="margin-top:12px">Parsers a medida en la próxima iteración (ya mapeados a tus formatos reales).</div>
+          <h4>Cargar pad</h4>
+          <div class="drop" id="drop">Arrastrá <b>pad_MMo-35.json</b> aquí, o
+            <label style="color:var(--accent); cursor:pointer; text-decoration:underline">elegí archivo<input type="file" id="file-json" accept=".json" hidden></label>.
+          </div>
         </div>
+        <div class="card" id="data-summary"><h4>Pad cargado</h4><div class="stub" id="summary-body">—</div></div>
         <div class="card">
           <h4>Exportar</h4>
-          <button class="btn">Pozo actual (.json)</button>
-          <button class="btn primary">Pad completo (.zip)</button>
+          <button class="btn" id="ex-json">Descargar pad.json</button>
+          <span class="stub">El ZIP de pad y export por pozo llegan en v0.3.</span>
         </div>
       </div>
     </section>
 
-    <!-- ============ CONFIG ============ -->
     <section class="view" id="vconfig">
       <div class="pad">
         <h2>Configuración</h2>
-        <p class="lead">Colores, controles de cámara, preferencias de vista y de export.</p>
-        <div class="card">
-          <h4>Vista 3D</h4>
-          <label class="row" style="max-width:340px"><input type="checkbox" id="cfg-grid" checked> Mostrar grilla de referencia</label>
-          <label class="row" style="max-width:340px"><input type="checkbox" id="cfg-axes" checked> Mostrar ejes N/E/TVD</label>
+        <p class="lead">Preferencias de vista y controles.</p>
+        <div class="card"><h4>Exageración vertical</h4>
+          <label class="row" style="max-width:420px">Factor TVD
+            <input type="range" id="cfg-vexag" min="1" max="8" step="0.5" value="1" style="flex:1; accent-color:var(--accent)">
+            <span class="meta" id="vexag-val">1.0×</span></label>
+          <div class="stub" style="margin-top:8px">Los pozos horizontales son "chatos"; exagerar TVD ayuda a leer la curva. 1× = escala real.</div>
         </div>
-        <div class="card">
-          <h4>Atajos</h4>
-          <div class="stub"><kbd>1</kbd>–<kbd>4</kbd> cambiar sección · <kbd>rueda</kbd> zoom ·
-            <kbd>arrastrar</kbd> orbitar · <kbd>click derecho</kbd> desplazar</div>
+        <div class="card"><h4>Atajos</h4>
+          <div class="stub"><kbd>1</kbd>–<kbd>4</kbd> secciones · <kbd>rueda</kbd> zoom · <kbd>arrastrar</kbd> orbitar ·
+            <kbd>click derecho</kbd> desplazar · <kbd>F</kbd> encuadrar</div>
         </div>
       </div>
     </section>
@@ -201,202 +169,241 @@
 </div>
 
 <script type="importmap">
-{ "imports": {
-  "three": "https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.module.min.js"
-}}
+{ "imports": { "three": "https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.module.min.js" }}
 </script>
 <script type="module">
 import * as THREE from "three";
 
-/* ---------------------------------------------------------------
-   Navegación entre secciones
---------------------------------------------------------------- */
-const views = document.querySelectorAll(".view");
-const navBtns = document.querySelectorAll("nav button");
-function show(id){
-  views.forEach(v=>v.classList.toggle("active", v.id===id));
-  navBtns.forEach(b=>b.classList.toggle("active", b.dataset.view===id));
-  if(id==="v3d") onResize();
-}
+/* ============ Navegación ============ */
+const views=document.querySelectorAll(".view"), navBtns=document.querySelectorAll("nav button");
+function show(id){ views.forEach(v=>v.classList.toggle("active",v.id===id));
+  navBtns.forEach(b=>b.classList.toggle("active",b.dataset.view===id)); if(id==="v3d") onResize(); }
 navBtns.forEach(b=>b.addEventListener("click",()=>show(b.dataset.view)));
 window.addEventListener("keydown",e=>{
-  const map={"1":"v3d","2":"vexport","3":"vdata","4":"vconfig"};
-  if(map[e.key] && !/input|textarea/i.test(document.activeElement.tagName)) show(map[e.key]);
+  const m={"1":"v3d","2":"vexport","3":"vdata","4":"vconfig"};
+  if(/input|textarea/i.test(document.activeElement.tagName)) return;
+  if(m[e.key]) show(m[e.key]);
+  if(e.key==="f"||e.key==="F") frameAll();
 });
 
-/* ---------------------------------------------------------------
-   Demo pad — trayectoria sintética estilo horizontal Vaca Muerta.
-   Se reemplaza por el parser del survey real en la próxima iteración.
-   Coordenadas locales: x=E(+)/O(-), y=N(+)/S(-), z=TVD(+ hacia abajo).
---------------------------------------------------------------- */
-function demoWell(offsetX, kop=380, build=520, tvdTarget=2820, lateral=3000){
-  // vertical → curva → lateral hacia el Sur (y negativo). A escala real (m).
-  const pts=[]; let md=0;
-  for(let z=0; z<=kop; z+=20) pts.push(new THREE.Vector3(offsetX, 0, z));
-  const r = build/(Math.PI/2);           // radio de la curva 90°
-  for(let a=0; a<=Math.PI/2; a+=0.06){
-    const z = kop + r*Math.sin(a);
-    const y = -(r - r*Math.cos(a));
-    pts.push(new THREE.Vector3(offsetX, y, Math.min(z, tvdTarget)));
-  }
-  const yCurveEnd = -(r);
-  for(let s=0; s<=lateral; s+=30)
-    pts.push(new THREE.Vector3(offsetX, yCurveEnd - s, tvdTarget));
-  return pts;
-}
-const PAD = {
-  id:"MMo-35", wells:[
-    { id:"MMo-2351h", x:0,  color:0x4ea1d3, pts:demoWell(0,   380,520,2820) },
-    { id:"MMo-2352",  x:10, color:0x6cc04a, pts:demoWell(10,  380,520,2835) },
-    { id:"MMo-2353",  x:20, color:0xe0a83d, pts:demoWell(20,  380,520,2810) },
-    { id:"MMo-2354",  x:30, color:0xc77dff, pts:demoWell(30,  380,520,2845) },
-  ]
-};
-document.getElementById("foot-pad").textContent = PAD.id;
-document.getElementById("foot-wells").textContent = PAD.wells.length;
-
-/* ---------------------------------------------------------------
-   Three.js — escena, cámara, luces, controles CAD
---------------------------------------------------------------- */
-const canvas = document.getElementById("c3d");
-const renderer = new THREE.WebGLRenderer({canvas, antialias:true});
+/* ============ Three.js base ============ */
+const canvas=document.getElementById("c3d");
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true,preserveDrawingBuffer:true});
 renderer.setPixelRatio(Math.min(devicePixelRatio,2));
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x0d1117);
+const scene=new THREE.Scene(); scene.background=new THREE.Color(0x0d1117);
+const world=new THREE.Group(); scene.add(world);
+const camera=new THREE.PerspectiveCamera(45,1,1,60000);
+scene.add(new THREE.HemisphereLight(0xbcd3ff,0x0a0f14,1.1));
+const dir=new THREE.DirectionalLight(0xffffff,0.6); dir.position.set(1,2,3); scene.add(dir);
 
-// El mundo real usa z hacia abajo; convertimos a Y-up de three invirtiendo z.
-const world = new THREE.Group();          // todo lo del pozo entra acá
-world.scale.set(1,1,1);
-scene.add(world);
+const gridGroup=new THREE.Group();
+const grid=new THREE.GridHelper(6000,60,0x2a3441,0x1a2029); grid.rotation.x=Math.PI/2; gridGroup.add(grid); world.add(gridGroup);
+const axes=new THREE.AxesHelper(400); world.add(axes);
+const shoesGroup=new THREE.Group(); world.add(shoesGroup);
 
-const camera = new THREE.PerspectiveCamera(45, 1, 1, 40000);
-camera.position.set(1600, -900, 1400);
+let target=new THREE.Vector3(0,0,0), sph=new THREE.Spherical(3000,1.1,0.6);
 
-// Luz
-scene.add(new THREE.HemisphereLight(0xbcd3ff, 0x0a0f14, 1.1));
-const dir = new THREE.DirectionalLight(0xffffff, 0.6); dir.position.set(1,2,3); scene.add(dir);
+/* Colores por pozo */
+const WELL_COLORS=[0x4ea1d3,0x6cc04a,0xe0a83d,0xc77dff,0xff7b72,0x39c5cf];
+/* Radio visual por fase (m, exagerado para ver; no es escala real de diámetro) */
+const PHASE_RADIUS={guia:9,intermedia1:6.5,intermedia2:4.5,produccion:2.8};
 
-// Grilla y ejes (en plano de superficie, z=0)
-const grid = new THREE.GridHelper(4000, 40, 0x2a3441, 0x1a2029);
-grid.rotation.x = Math.PI/2;              // llevar al plano XY (superficie)
-const gridGroup = new THREE.Group(); gridGroup.add(grid); world.add(gridGroup);
-const axes = new THREE.AxesHelper(300); world.add(axes);
+let PAD=null, wellObjects={}, vexag=1;
 
-// Centro del pad para orbitar alrededor
-const target = new THREE.Vector3(15, -1400, 1400);
+/* world transform: (x=E/O, y=N/S, tvd abajo) → three Y-up (x, -tvd*vexag, y) */
+function toThree(x,y,tvd){ return new THREE.Vector3(x, -tvd*vexag, y); }
 
-/* Trayectorias + elementos por pozo */
-const wellObjects = {};
-function buildWell(w){
-  const g = new THREE.Group();
-  // convertir (x,y,z_down) → three (x, -z_down, y)  [Y-up]
-  const v3 = w.pts.map(p=>new THREE.Vector3(p.x, -p.z, p.y));
-  const curve = new THREE.CatmullRomCurve3(v3);
-
-  // trayectoria (línea)
-  const traj = new THREE.Line(
-    new THREE.BufferGeometry().setFromPoints(curve.getPoints(400)),
-    new THREE.LineBasicMaterial({color:w.color})
-  ); traj.userData.kind="traj"; g.add(traj);
-
-  // casing 5" (tubo delgado a lo largo de la curva)
-  const tube = new THREE.Mesh(
-    new THREE.TubeGeometry(curve, 300, 3.2, 8, false),
-    new THREE.MeshStandardMaterial({color:0xd0d0d0, metalness:.6, roughness:.5})
-  ); tube.userData.kind="casing"; g.add(tube);
-
-  // punzados demo: anillos sobre el lateral
-  const perfMat = new THREE.MeshBasicMaterial({color:0xf2a03d});
-  const plugMat = new THREE.MeshBasicMaterial({color:0xe5484d});
-  const n = v3.length;
-  for(let i=Math.floor(n*0.62); i<n; i+=6){
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(6,1.4,6,16), perfMat.clone());
-    ring.position.copy(v3[i]); ring.userData.kind="perf"; g.add(ring);
-    if(i % 30 === 0){
-      const plug = new THREE.Mesh(new THREE.CylinderGeometry(4.5,4.5,4,12), plugMat.clone());
-      plug.position.copy(v3[i]); plug.userData.kind="plug"; g.add(plug);
+/* interpola X,Y,TVD (coords locales del pad) a un MD dado desde las stations */
+function interpAtMD(st, md, wx){
+  if(md<=st[0].md) return {x:wx+(st[0].ew||0), y:st[0].ns||0, tvd:st[0].tvd};
+  for(let i=1;i<st.length;i++){
+    if(md<=st[i].md){
+      const a=st[i-1], b=st[i], t=(md-a.md)/(b.md-a.md||1);
+      return {
+        x: wx + ((a.ew||0)+((b.ew||0)-(a.ew||0))*t),
+        y: (a.ns||0)+((b.ns||0)-(a.ns||0))*t,
+        tvd: a.tvd+(b.tvd-a.tvd)*t
+      };
     }
   }
-  g.userData.well = w.id;
-  world.add(g);
-  wellObjects[w.id]=g;
+  const last=st.at(-1);
+  return {x:wx+(last.ew||0), y:last.ns||0, tvd:last.tvd};
 }
-PAD.wells.forEach(buildWell);
 
-/* Toggles por pozo (generados) */
-const wt = document.getElementById("well-toggles");
-PAD.wells.forEach(w=>{
-  const l=document.createElement("label"); l.className="row";
-  l.innerHTML=`<input type="checkbox" checked data-well="${w.id}">
-    <span class="sw" style="background:#${w.color.toString(16).padStart(6,'0')}"></span>${w.id}`;
-  wt.appendChild(l);
-  l.querySelector("input").addEventListener("change",e=>{
-    wellObjects[w.id].visible = e.target.checked;
+function clearWorld(){ Object.values(wellObjects).forEach(g=>world.remove(g)); wellObjects={}; shoesGroup.clear(); }
+
+function buildPad(pad){
+  clearWorld(); PAD=pad;
+  const wells=pad.pad.wells;
+  document.getElementById("foot-pad").textContent=pad.pad.id;
+  document.getElementById("foot-wells").textContent=wells.length;
+
+  wells.forEach((w,idx)=>{
+    const color=WELL_COLORS[idx%WELL_COLORS.length];
+    const wx=w.wellhead.x||0, st=w.survey.stations;
+    const g=new THREE.Group(); g.userData.well=w.id;
+
+    const pts=st.map(s=>toThree(wx+(s.ew||0), s.ns||0, s.tvd));
+    const curve=new THREE.CatmullRomCurve3(pts);
+
+    const traj=new THREE.Line(new THREE.BufferGeometry().setFromPoints(curve.getPoints(Math.max(400,st.length*2))),
+      new THREE.LineBasicMaterial({color}));
+    traj.userData.kind="traj"; g.add(traj);
+
+    (w.casings||[]).forEach(cas=>{
+      if(cas.shoe_md==null) return;
+      const seg=[]; for(const s of st){ if(s.md<=cas.shoe_md) seg.push(toThree(wx+(s.ew||0),s.ns||0,s.tvd)); }
+      const sp=interpAtMD(st,cas.shoe_md,wx); seg.push(toThree(sp.x,sp.y,sp.tvd));
+      if(seg.length<2) return;
+      const c2=new THREE.CatmullRomCurve3(seg);
+      const r=PHASE_RADIUS[cas.phase]||3;
+      const tube=new THREE.Mesh(
+        new THREE.TubeGeometry(c2, Math.max(80,seg.length), r, 10, false),
+        new THREE.MeshStandardMaterial({color:0xd0d0d0, metalness:.5, roughness:.55,
+          transparent:true, opacity:cas.phase==="produccion"?1:0.28}));
+      tube.userData.kind="casing"; tube.userData.phase=cas.phase; g.add(tube);
+      const shoe=new THREE.Mesh(new THREE.RingGeometry(r,r+3,20),
+        new THREE.MeshBasicMaterial({color, side:THREE.DoubleSide}));
+      shoe.position.copy(toThree(sp.x,sp.y,sp.tvd)); shoe.userData.kind="shoe"; shoesGroup.add(shoe);
+    });
+
+    const perfMat=new THREE.MeshBasicMaterial({color:0xf2a03d});
+    const plugMat=new THREE.MeshBasicMaterial({color:0xe5484d});
+    const stageMat=new THREE.MeshBasicMaterial({color:0x3fb950});
+    (w.frac?.stages||[]).forEach(stg=>{
+      (stg.clusters||[]).forEach(cl=>{
+        const md=(cl.top_md!=null?cl.top_md:cl.bottom_md); if(md==null) return;
+        const p=interpAtMD(st,md,wx);
+        const ring=new THREE.Mesh(new THREE.TorusGeometry(5,1.3,6,14), perfMat);
+        ring.position.copy(toThree(p.x,p.y,p.tvd)); ring.userData.kind="perf"; g.add(ring);
+      });
+      if(stg.plug_md!=null){
+        const p=interpAtMD(st,stg.plug_md,wx);
+        const plug=new THREE.Mesh(new THREE.CylinderGeometry(4,4,5,12), plugMat);
+        plug.position.copy(toThree(p.x,p.y,p.tvd)); plug.userData.kind="plug"; g.add(plug);
+        const mk=new THREE.Mesh(new THREE.SphereGeometry(6,10,10), stageMat);
+        mk.position.copy(toThree(p.x,p.y,p.tvd)); mk.userData.kind="stage"; mk.visible=false; g.add(mk);
+      }
+    });
+
+    world.add(g); wellObjects[w.id]=g;
   });
-});
 
-/* Toggles de elementos */
-function setKind(kind, on){
-  Object.values(wellObjects).forEach(g=>
-    g.traverse(o=>{ if(o.userData.kind===kind) o.visible=on; }));
+  buildWellToggles(wells); applyAllToggles(); frameAll(); updateSummary();
 }
-document.getElementById("t-traj").addEventListener("change",e=>setKind("traj",e.target.checked));
-document.getElementById("t-casing").addEventListener("change",e=>setKind("casing",e.target.checked));
-document.getElementById("t-perf").addEventListener("change",e=>setKind("perf",e.target.checked));
-document.getElementById("t-plug").addEventListener("change",e=>setKind("plug",e.target.checked));
+
+/* ============ Toggles ============ */
+function buildWellToggles(wells){
+  const wt=document.getElementById("well-toggles"); wt.innerHTML="";
+  wells.forEach((w,idx)=>{
+    const color=WELL_COLORS[idx%WELL_COLORS.length];
+    const l=document.createElement("label"); l.className="row";
+    const ne=w.frac?.total_stages||0;
+    l.innerHTML=`<input type="checkbox" checked data-well="${w.id}">
+      <span class="sw" style="background:#${color.toString(16).padStart(6,"0")}"></span>${w.id}
+      <span class="meta">${ne} et</span>`;
+    wt.appendChild(l);
+    l.querySelector("input").addEventListener("change",e=>{ wellObjects[w.id].visible=e.target.checked; });
+  });
+}
+const q=id=>{ const el=document.getElementById(id); return el?el.checked:true; };
+function setKind(kind,on){ Object.values(wellObjects).forEach(g=>g.traverse(o=>{ if(o.userData.kind===kind) o.visible=on; })); }
+function setPhase(phase,on){ Object.values(wellObjects).forEach(g=>g.traverse(o=>{ if(o.userData.kind==="casing"&&o.userData.phase===phase) o.visible=on; })); }
+function applyAllToggles(){
+  setKind("traj",q("t-traj")); setKind("perf",q("t-perf")); setKind("plug",q("t-plug")); setKind("stage",q("t-stage"));
+  document.querySelectorAll("[data-phase]").forEach(cb=>setPhase(cb.dataset.phase,cb.checked));
+  if(!q("t-casing")) setKind("casing",false);
+  gridGroup.visible=q("cfg-grid"); axes.visible=q("cfg-axes"); shoesGroup.visible=q("cfg-shoes");
+}
+["t-traj","t-perf","t-plug","t-stage"].forEach(id=>document.getElementById(id).addEventListener("change",e=>setKind(id.slice(2),e.target.checked)));
+document.getElementById("t-casing").addEventListener("change",e=>{ setKind("casing",e.target.checked);
+  if(e.target.checked) document.querySelectorAll("[data-phase]").forEach(cb=>setPhase(cb.dataset.phase,cb.checked)); });
+document.querySelectorAll("[data-phase]").forEach(cb=>cb.addEventListener("change",()=>setPhase(cb.dataset.phase,cb.checked)));
 document.getElementById("cfg-grid").addEventListener("change",e=>gridGroup.visible=e.target.checked);
 document.getElementById("cfg-axes").addEventListener("change",e=>axes.visible=e.target.checked);
+document.getElementById("cfg-shoes").addEventListener("change",e=>shoesGroup.visible=e.target.checked);
 
-/* ---------------------------------------------------------------
-   Controles de cámara estilo CAD (orbit / pan / zoom) sin dependencias
---------------------------------------------------------------- */
-let sph = new THREE.Spherical();
-(function initSph(){
-  const off = camera.position.clone().sub(target);
-  sph.setFromVector3(off);
-})();
-let dragging=null, px=0, py=0;
-canvas.addEventListener("mousedown",e=>{ dragging=e.button; px=e.clientX; py=e.clientY; });
+document.getElementById("cfg-vexag").addEventListener("input",e=>{
+  vexag=parseFloat(e.target.value); document.getElementById("vexag-val").textContent=vexag.toFixed(1)+"×";
+  if(PAD) buildPad(PAD);
+});
+
+/* ============ Cámara CAD ============ */
+function frameAll(){
+  const box=new THREE.Box3().setFromObject(world); if(box.isEmpty()) return;
+  const c=box.getCenter(new THREE.Vector3()), size=box.getSize(new THREE.Vector3());
+  target.copy(c); sph.radius=Math.max(size.x,size.y,size.z)*1.1+500;
+}
+let dragging=null,px=0,py=0;
+canvas.addEventListener("mousedown",e=>{dragging=e.button;px=e.clientX;py=e.clientY;});
 window.addEventListener("mouseup",()=>dragging=null);
 window.addEventListener("mousemove",e=>{
   if(dragging===null) return;
-  const dx=e.clientX-px, dy=e.clientY-py; px=e.clientX; py=e.clientY;
-  if(dragging===0){ // orbit
-    sph.theta -= dx*0.005; sph.phi -= dy*0.005;
-    sph.phi = Math.max(0.05, Math.min(Math.PI-0.05, sph.phi));
-  } else if(dragging===2){ // pan
-    const panX = new THREE.Vector3().setFromMatrixColumn(camera.matrix,0).multiplyScalar(-dx*sph.radius*0.0012);
-    const panY = new THREE.Vector3().setFromMatrixColumn(camera.matrix,1).multiplyScalar( dy*sph.radius*0.0012);
-    target.add(panX).add(panY);
+  const dx=e.clientX-px,dy=e.clientY-py; px=e.clientX; py=e.clientY;
+  if(dragging===0){ sph.theta-=dx*0.005; sph.phi-=dy*0.005; sph.phi=Math.max(0.05,Math.min(Math.PI-0.05,sph.phi)); }
+  else if(dragging===2){
+    const pX=new THREE.Vector3().setFromMatrixColumn(camera.matrix,0).multiplyScalar(-dx*sph.radius*0.0012);
+    const pY=new THREE.Vector3().setFromMatrixColumn(camera.matrix,1).multiplyScalar(dy*sph.radius*0.0012);
+    target.add(pX).add(pY);
   }
 });
 canvas.addEventListener("contextmenu",e=>e.preventDefault());
-canvas.addEventListener("wheel",e=>{
-  e.preventDefault();
-  sph.radius *= (1 + Math.sign(e.deltaY)*0.08);
-  sph.radius = Math.max(80, Math.min(30000, sph.radius));
-},{passive:false});
+canvas.addEventListener("wheel",e=>{ e.preventDefault(); sph.radius*=(1+Math.sign(e.deltaY)*0.08);
+  sph.radius=Math.max(60,Math.min(50000,sph.radius)); },{passive:false});
 
-/* ---------------------------------------------------------------
-   Loop + resize
---------------------------------------------------------------- */
+/* ============ Loader de JSON ============ */
+function loadPadObject(obj){
+  if(!obj||obj.schema_version!==1||!obj.pad){ toast("JSON no compatible (se esperaba schema_version 1)"); return; }
+  buildPad(obj); toast(`Pad ${obj.pad.id} cargado · ${obj.pad.wells.length} pozos`); show("v3d");
+}
+function readFile(file){
+  const r=new FileReader();
+  r.onload=()=>{ try{ loadPadObject(JSON.parse(r.result)); }catch(err){ toast("Error leyendo JSON: "+err.message); } };
+  r.readAsText(file);
+}
+document.getElementById("file-json").addEventListener("change",e=>{ if(e.target.files[0]) readFile(e.target.files[0]); });
+const drop=document.getElementById("drop");
+["dragenter","dragover"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add("hot");}));
+["dragleave","drop"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove("hot");}));
+drop.addEventListener("drop",e=>{ const f=e.dataTransfer.files[0]; if(f) readFile(f); });
+
+document.getElementById("ex-json").addEventListener("click",()=>{
+  if(!PAD){ toast("No hay pad cargado"); return; }
+  const blob=new Blob([JSON.stringify(PAD)],{type:"application/json"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
+  a.download=`pad_${PAD.pad.id}.json`; a.click(); URL.revokeObjectURL(a.href);
+});
+
+function updateSummary(){
+  if(!PAD) return;
+  const rows=PAD.pad.wells.map(w=>{
+    const cs=(w.casings||[]).map(c=>`${c.od_in}"@${Math.round(c.shoe_md)}`).join(" · ")||"—";
+    const mdf=w.survey.stations.at(-1).md;
+    return `<tr><td>${w.id}</td><td>${w.survey.stations.length}</td><td>${Math.round(mdf)}</td><td>${w.frac?.total_stages||0}</td><td>${cs}</td></tr>`;
+  }).join("");
+  document.getElementById("summary-body").innerHTML=
+    `<table class="tbl"><tr><th>Pozo</th><th>Est</th><th>MD final</th><th>Etapas</th><th>Casings (OD@zapato)</th></tr>${rows}</table>`;
+}
+
+/* ============ Toast ============ */
+let toastT=null;
+function toast(msg){ const t=document.getElementById("toast"); t.textContent=msg; t.classList.add("show");
+  clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove("show"),2600); }
+
+/* ============ Loop ============ */
 function onResize(){
-  const w=canvas.clientWidth||canvas.parentElement.clientWidth;
-  const h=canvas.clientHeight||canvas.parentElement.clientHeight;
-  if(!w||!h) return;
-  renderer.setSize(w,h,false);
-  camera.aspect=w/h; camera.updateProjectionMatrix();
+  const w=canvas.clientWidth||canvas.parentElement.clientWidth, h=canvas.clientHeight||canvas.parentElement.clientHeight;
+  if(!w||!h) return; renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix();
 }
 window.addEventListener("resize",onResize);
-
-function tick(){
-  const off = new THREE.Vector3().setFromSpherical(sph);
-  camera.position.copy(target).add(off);
-  camera.lookAt(target);
-  renderer.render(scene,camera);
-  requestAnimationFrame(tick);
-}
+function tick(){ camera.position.copy(target).add(new THREE.Vector3().setFromSpherical(sph));
+  camera.lookAt(target); renderer.render(scene,camera); requestAnimationFrame(tick); }
 onResize(); tick();
+
+/* ============ Autocarga del pad de ejemplo ============ */
+fetch("samples/pad_MMo-35.json").then(r=>{ if(!r.ok) throw new Error("no encontrado"); return r.json(); })
+  .then(loadPadObject)
+  .catch(()=>{ toast("Cargá un pad.json desde la sección Datos (3)"); show("vdata"); });
 </script>
 </body>
 </html>
