@@ -1,0 +1,19 @@
+# Datos reales de pozos — nunca commitear data operativa de la empresa
+/data/
+*.real.json
+*.real.zip
+
+# Archivos de origen sin anonimizar
+*_REAL_*
+uploads/
+
+# SO / editores
+.DS_Store
+Thumbs.db
+.vscode/
+*.swp
+*~
+
+# Node (por si algún día se agrega tooling)
+node_modules/
+dist/
