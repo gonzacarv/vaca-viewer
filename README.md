@@ -20,6 +20,8 @@
 
 **Vaca Viewer** es una aplicación web de **un solo archivo** para visualizar la geometría de subsuelo de pozos horizontales de fractura (plug-and-perf). Se abre con el navegador, **no requiere instalar nada**, funciona **offline**, y los datos operativos **nunca se suben a ningún servidor** — todo se procesa localmente en tu máquina.
 
+![vv-screenshot](img/vv.png)
+
 > 💡 Pensada para el flujo real de campo: survey de geonavegación, tallys de entubado, y fracplan de punzados y tapones — los formatos que ya exportás de OpenWells y Excel.
 
 ---

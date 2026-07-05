@@ -42,9 +42,20 @@
     background:rgba(13,17,23,.7); border:1px solid var(--line); padding:4px 8px; border-radius:4px; margin-bottom:6px; display:inline-block; }
   .layers { position:absolute; top:14px; right:14px; width:236px; max-height:calc(100vh - 28px); overflow:auto;
     background:rgba(22,27,34,.94); border:1px solid var(--line); border-radius:8px; pointer-events:auto; backdrop-filter:blur(6px); }
-  .layers h3 { margin:0; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--ink-dim); padding:12px 14px 8px; }
-  .layers .grp { border-top:1px solid var(--line); padding:8px 14px; }
-  .layers .grp .lbl { font-family:var(--mono); font-size:10px; color:var(--ink-dim); text-transform:uppercase; letter-spacing:.08em; margin-bottom:6px; }
+  .layers h3 { margin:0; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--ink-dim);
+    padding:10px 14px; cursor:move; user-select:none; display:flex; align-items:center; gap:8px;
+    position:sticky; top:0; background:rgba(22,27,34,.98); z-index:2; border-bottom:1px solid var(--line); }
+  .layers h3 .grip { font-size:13px; color:var(--ink-dim); letter-spacing:0; }
+  .layers h3 .collapse-all { margin-left:auto; font-family:var(--mono); font-size:9px; letter-spacing:.06em;
+    border:1px solid var(--line); border-radius:4px; padding:2px 6px; cursor:pointer; }
+  .layers h3 .collapse-all:hover { color:#fff; border-color:var(--accent); }
+  .layers .grp { border-top:1px solid var(--line); padding:0; }
+  .layers .grp .lbl { font-family:var(--mono); font-size:10px; color:var(--ink-dim); text-transform:uppercase;
+    letter-spacing:.08em; padding:8px 14px; margin:0; cursor:pointer; user-select:none; display:flex; align-items:center; gap:6px; }
+  .layers .grp .lbl::before { content:"▾"; font-size:9px; width:8px; display:inline-block; transition:transform .12s; }
+  .layers .grp.collapsed .lbl::before { transform:rotate(-90deg); }
+  .layers .grp .grp-body { padding:0 14px 8px; }
+  .layers .grp.collapsed .grp-body { display:none; }
   .row { display:flex; align-items:center; gap:8px; padding:3px 0; font-size:12.5px; cursor:pointer; }
   .row input { accent-color:var(--accent); }
   .row .sw { width:10px; height:10px; border-radius:2px; flex:none; }
@@ -74,19 +85,25 @@
     border:1px solid var(--line); will-change:transform,left,top; }
   .lbl3d.tpn { color:#ff9d9d; } .lbl3d.stage { color:#8fe6a5; }
   .lbl3d.shoe { color:#e6edf3; font-size:10px; }
-  .viewcube { position:absolute; bottom:16px; right:16px; display:flex; flex-direction:column;
+  .viewcube { position:absolute; bottom:16px; left:16px; display:flex; flex-direction:column;
     align-items:center; gap:3px; pointer-events:auto; }
   .viewcube .vc-mid { display:flex; gap:3px; }
   .viewcube button { width:34px; height:28px; background:rgba(22,27,34,.94); color:var(--ink-dim);
     border:1px solid var(--line); border-radius:5px; font-family:var(--mono); font-size:11px; cursor:pointer; }
   .viewcube button:hover { color:#fff; border-color:var(--accent); background:var(--panel-2); }
   .viewcube .vc-iso { width:auto; padding:0 10px; margin-top:2px; }
+  #hover-tip { position:absolute; pointer-events:none; z-index:5; display:none;
+    font-family:var(--mono); font-size:11px; line-height:1.45; color:var(--ink);
+    background:rgba(13,17,23,.92); border:1px solid var(--accent); border-radius:5px; padding:5px 8px;
+    white-space:nowrap; transform:translate(12px,12px); }
+  #hover-tip .w { color:var(--accent); }
+  #hover-tip .d { color:var(--ink-dim); }
 </style>
 </head>
 <body>
 <div id="app">
   <aside id="nav">
-    <div class="brand"><h1>Vaca Viewer</h1><div class="sub">subsuelo · v0.2d-D</div></div>
+    <div class="brand"><h1>Vaca Viewer</h1><div class="sub">subsuelo · v0.2d-E</div></div>
     <nav>
       <button data-view="v3d" class="active">Vista 3D <span class="k">1</span></button>
       <button data-view="vexport">Exportar <span class="k">2</span></button>
@@ -103,7 +120,7 @@
       <div class="overlay hud-tl">
         <div class="pill" id="hud-cam">orbit · pan · zoom</div><br>
         <div class="pill" id="hud-scale">escala real 1:1</div><br>
-        <div class="pill" id="hud-sel">F = encuadrar</div>
+        <div class="pill" id="hud-sel">F = encuadrar · doble-click = enfocar</div>
       </div>
       <div class="viewcube" id="viewcube">
         <button data-view3d="top">Arriba</button>
@@ -115,36 +132,56 @@
         </div>
         <button data-view3d="iso" class="vc-iso">ISO</button>
       </div>
-      <div class="layers">
-        <h3>Capas</h3>
-        <div class="grp"><div class="lbl">Pozos</div><div id="well-toggles"></div></div>
+      <div class="layers" id="layers">
+        <h3 id="layers-head"><span class="grip">⠿</span>Capas<span class="collapse-all" id="collapse-all">plegar</span></h3>
+        <div class="grp"><div class="lbl">Pozos</div><div class="grp-body"><div id="well-toggles"></div></div></div>
         <div class="grp">
           <div class="lbl">Elementos</div>
+          <div class="grp-body">
           <label class="row"><input type="checkbox" id="t-traj" checked><span class="sw" style="background:var(--accent)"></span>Trayectoria</label>
           <label class="row"><input type="checkbox" id="t-casing" checked><span class="sw" style="background:var(--casing)"></span>Cañerías (todas)</label>
           <label class="row"><input type="checkbox" id="t-perf" checked><span class="sw" style="background:var(--perf)"></span>Punzados</label>
           <label class="row"><input type="checkbox" id="t-plug" checked><span class="sw" style="background:var(--plug)"></span>Tapones</label>
+          </div>
         </div>
         <div class="grp">
           <div class="lbl">Cañerías por fase</div>
+          <div class="grp-body">
           <label class="row"><input type="checkbox" data-phase="guia" checked><span class="meta">Guía</span></label>
           <label class="row"><input type="checkbox" data-phase="intermedia1" checked><span class="meta">Intermedia 1</span></label>
           <label class="row"><input type="checkbox" data-phase="intermedia2" checked><span class="meta">Intermedia 2</span></label>
           <label class="row"><input type="checkbox" data-phase="produccion" checked><span class="meta">Aislación</span></label>
+          </div>
+        </div>
+        <div class="grp">
+          <div class="lbl">Modo aislación</div>
+          <div class="grp-body">
+          <label class="row"><input type="radio" name="isomode" value="normal" checked>Normal (gris)</label>
+          <label class="row"><input type="radio" name="isomode" value="stages"><span class="sw" style="background:#18d94a"></span>Por etapas</label>
+          <label class="row"><input type="radio" name="isomode" value="dogleg_lateral"><span class="sw" style="background:linear-gradient(90deg,#00e33a,#ffe500,#ff1e1e)"></span>Dogleg · lateral</label>
+          <label class="row"><input type="radio" name="isomode" value="dogleg_build"><span class="sw" style="background:linear-gradient(90deg,#00e33a,#ffe500,#ff1e1e)"></span>Dogleg · curva</label>
+          <div class="stub" style="font-size:10px; margin-top:4px; line-height:1.4">Lateral: última→primera etapa (resalta dogleg fino). Curva: superficie→última etapa (resalta la curva de asentamiento).</div>
+          </div>
         </div>
         <div class="grp">
           <div class="lbl">Etiquetas</div>
+          <div class="grp-body">
           <label class="row"><input type="checkbox" id="lbl-stage"><span class="sw" style="background:var(--stage)"></span>Etapas</label>
           <label class="row"><input type="checkbox" id="lbl-tpn" checked><span class="sw" style="background:var(--plug)"></span>Tapones</label>
           <label class="row"><input type="checkbox" id="lbl-shoe" checked><span class="sw" style="background:var(--casing)"></span>Zapatos (datos)</label>
+          <label class="row"><input type="checkbox" id="lbl-cursor" checked><span class="sw" style="background:var(--accent)"></span>Cursor MD/TVD (hover)</label>
+          </div>
         </div>
         <div class="grp">
           <div class="lbl">Referencia</div>
+          <div class="grp-body">
           <label class="row"><input type="checkbox" id="cfg-grid" checked>Grilla de superficie</label>
           <label class="row"><input type="checkbox" id="cfg-axes" checked>Ejes N/E/TVD</label>
           <label class="row"><input type="checkbox" id="cfg-shoes" checked>Marcas de zapato</label>
+          </div>
         </div>
       </div>
+      <div id="hover-tip"></div>
       <div class="toast" id="toast"></div>
       <pre id="dbg" style="position:absolute; left:14px; bottom:14px; margin:0; max-width:46ch;
         background:rgba(13,17,23,.92); border:1px solid var(--line); border-radius:6px; padding:10px 12px;
@@ -193,6 +230,8 @@
           <div class="stub" style="margin-top:8px">Los pozos horizontales son "chatos"; exagerar TVD ayuda a leer la curva. 1× = escala real.</div>
         </div>
         <div class="card"><h4>Exageración de diámetro de cañerías</h4>
+          <label class="row" style="max-width:420px"><input type="checkbox" id="cfg-autodiam"> Auto-escala según zoom</label>
+          <div class="stub" style="margin-top:4px 0 10px">Ajusta el diámetro solo para que las cañerías se vean a cualquier distancia, respetando la proporción entre fases. Al activarlo, el slider de abajo queda gobernado por el zoom.</div>
           <label class="row" style="max-width:420px">Factor Ø
             <input type="range" id="cfg-dexag" min="10" max="120" step="5" value="40" style="flex:1; accent-color:var(--accent)">
             <span class="meta" id="dexag-val">40×</span></label>
@@ -238,8 +277,8 @@ renderer.setPixelRatio(Math.min(devicePixelRatio,2));
 const scene=new THREE.Scene(); scene.background=new THREE.Color(0x0d1117);
 const world=new THREE.Group(); scene.add(world);
 const camera=new THREE.PerspectiveCamera(45,1,1,60000);
-scene.add(new THREE.HemisphereLight(0xbcd3ff,0x0a0f14,1.1));
-const dir=new THREE.DirectionalLight(0xffffff,0.6); dir.position.set(1,2,3); scene.add(dir);
+scene.add(new THREE.HemisphereLight(0xcfe0ff,0x121820,1.5));
+const dir=new THREE.DirectionalLight(0xffffff,0.85); dir.position.set(1,2,3); scene.add(dir);
 
 const gridGroup=new THREE.Group();
 const grid=new THREE.GridHelper(6000,60,0x2a3441,0x1a2029); grid.rotation.x=Math.PI/2; gridGroup.add(grid); world.add(gridGroup);
@@ -256,11 +295,51 @@ const OD_IN={guia:13.375,intermedia1:9.625,intermedia2:7.625,produccion:5.0};
    De externo a interno: guía (arena claro), int1 (celeste), int2 (lavanda), aislación (blanco cálido). */
 const CASING_COLOR={guia:0xe8c96a, intermedia1:0x7fc7e0, intermedia2:0xb79fe0, produccion:0xf2ede2};
 /* Punzados: turquesa que alterna claro/oscuro entre etapas consecutivas */
-const PERF_LIGHT=0x6ff5e8, PERF_DARK=0x0e8f86;
+const PERF_LIGHT=0x6ff5e8, PERF_DARK=0x17c4b0;
 /* Nombres de fase para la leyenda (sin medidas, la fase es lo estable) */
 const PHASE_LABEL={guia:"Guía", intermedia1:"Intermedia 1", intermedia2:"Intermedia 2", produccion:"Aislación"};
 
 let PAD=null, wellObjects={}, vexag=1, diamExag=40, plugCountInverted=false;
+let autoDiam=false;              // auto-escala de diámetro según distancia de cámara
+const AUTO_TARGET_PX=18;         // tamaño aparente deseado de la aislación (px de diámetro)
+const AUTO_MIN=15, AUTO_MAX=1600;// límites del multiplicador efectivo
+/* recalcula diamExag según la distancia de cámara para que la aislación tenga ~AUTO_TARGET_PX
+   en pantalla. Regenera solo cuando el objetivo difiere >18% del actual (evita regenerar por frame). */
+function updateAutoDiam(){
+  const H=canvas.clientHeight||900;
+  const k=H/(2*Math.tan((camera.fov*Math.PI/360)));
+  const prodBaseR=(5/2)*0.0254;          // radio real aislación (m) a exageración 1×
+  let want=(AUTO_TARGET_PX*sph.radius)/(2*prodBaseR*k);
+  want=Math.max(AUTO_MIN, Math.min(AUTO_MAX, want));
+  if(Math.abs(want-diamExag)/diamExag > 0.18){
+    diamExag=want;
+    const s=document.getElementById("cfg-dexag");
+    document.getElementById("dexag-val").textContent=Math.round(diamExag)+"× (auto)";
+    if(PAD) buildPad(PAD);
+  }
+}
+
+/* ===== Modos de coloreo de la aislación (mutuamente excluyentes) =====
+   "normal": color de fase (gris) · "stages": 2 verdes alternados por etapa
+   · "dogleg_lateral": DLS en el tramo de etapas (última→primera), normalizado a su propio máximo
+     → resalta el dogleg fino del lateral sin que lo tape el rojo de la curva.
+   · "dogleg_build": DLS en el tramo de curva (superficie→última etapa) → resalta la curva de asentamiento.
+   El coloreo se hace con vertex colors sobre el MISMO tubo (sin geometría extra). */
+let isoMode="normal";
+const ISO_BASE=new THREE.Color(0xf2ede2);          // gris cálido casi blanco (fase produccion)
+const STAGE_GREEN_A=new THREE.Color(0x18d94a);     // verde etapa par (vivo)
+const STAGE_GREEN_B=new THREE.Color(0xa6ff2e);     // verde-lima etapa impar (vivo)
+/* rampa dogleg SATURADA: 0→verde puro, medio→amarillo intenso, max→rojo puro.
+   El máximo se pasa por parámetro: cada sub-modo usa el máximo real de SU tramo (auto-normalizado),
+   así el gradiente ocupa todo el rango de color aunque los dos tramos tengan escalas muy distintas. */
+const DLS_LOW=new THREE.Color(0x00e33a), DLS_MID=new THREE.Color(0xffe500), DLS_HIGH=new THREE.Color(0xff1e1e);
+function dlsColor(dls, dmax){
+  const t=Math.max(0,Math.min(1,(dls||0)/(dmax||8)));
+  const c=new THREE.Color();
+  if(t<0.5) c.lerpColors(DLS_LOW,DLS_MID,t/0.5);
+  else       c.lerpColors(DLS_MID,DLS_HIGH,(t-0.5)/0.5);
+  return c;
+}
 
 /* radio visual (m) de una cañería según su OD real y la exageración de diámetro */
 function casingRadius(phase, od_in){
@@ -315,7 +394,7 @@ function updateLabels(){
     l.el.style.left=x+"px"; l.el.style.top=y+"px";
   }
 }
-let SHOW_TPN_LABELS=true, SHOW_STAGE_LABELS=false, SHOW_SHOE_LABELS=true;
+let SHOW_TPN_LABELS=true, SHOW_STAGE_LABELS=false, SHOW_SHOE_LABELS=true, SHOW_CURSOR_TIP=true;
 
 /* interpola X,Y,TVD (coords locales del pad) a un MD dado desde las stations */
 function interpAtMD(st, md, wx){
@@ -335,6 +414,74 @@ function interpAtMD(st, md, wx){
 }
 
 function clearWorld(){ Object.values(wellObjects).forEach(g=>world.remove(g)); wellObjects={}; shoesGroup.clear(); clearLabels(); }
+
+/* Pinta un tubo de aislación con vertex colors según isoMode.
+   normal → sin vertex colors (usa el color del material). stages/dogleg → color por anillo. */
+function applyIsoColors(tube){
+  const iso=tube.userData.iso; if(!iso) return;
+  const geo=tube.geometry, mat=tube.material;
+  const ringVerts=iso.radial+1;                 // vértices por anillo (radialSegments+1)
+  const nRings=iso.tubSeg+1;
+  if(isoMode==="normal"){
+    mat.vertexColors=false; mat.color.set(ISO_BASE); geo.deleteAttribute("color");
+    mat.emissive.set(0x000000); mat.emissiveIntensity=1; mat.metalness=.15; mat.roughness=.65;
+    if(mat.userData._emissivePatched){ mat.onBeforeCompile=()=>{}; mat.userData._emissivePatched=false; mat.needsUpdate=true; }
+    mat.needsUpdate=true; return;
+  }
+  const isDogleg = isoMode==="dogleg_lateral" || isoMode==="dogleg_build";
+  // frontera curva/lateral = MD del inicio de la primera etapa (primer cluster de la etapa más somera)
+  let firstStageMD=Infinity, lastStageMD=-Infinity;
+  iso.stageRanges.forEach(r=>{ firstStageMD=Math.min(firstStageMD,r.md0); lastStageMD=Math.max(lastStageMD,r.md1); });
+  if(!isFinite(firstStageMD)){ firstStageMD=0; lastStageMD=iso.ringMD(iso.tubSeg); }
+  // para dogleg: máximo DLS DENTRO del tramo activo, para auto-normalizar el gradiente a ese tramo
+  let segMax=0;
+  if(isDogleg){
+    for(let i=0;i<=iso.tubSeg;i++){
+      const md=iso.ringMD(i);
+      const inSeg = isoMode==="dogleg_build" ? (md<firstStageMD) : (md>=firstStageMD);
+      if(inSeg) segMax=Math.max(segMax, iso.dlsAtMD(md));
+    }
+    if(segMax<=0) segMax=1;
+  }
+  tube.userData.dlsSegMax = isDogleg ? segMax : null;   // lo lee el hover-tip para contexto
+  const colors=new Float32Array(nRings*ringVerts*3);
+  const c=new THREE.Color();
+  for(let i=0;i<nRings;i++){
+    const md=iso.ringMD(i);
+    if(isoMode==="stages"){
+      const sr=iso.stageRanges.find(r=>md>=r.md0 && md<=r.md1);
+      if(sr) c.copy(sr.stage%2===0?STAGE_GREEN_A:STAGE_GREEN_B);
+      else   c.copy(ISO_BASE);                  // fuera de etapas (arriba del 1er cluster)
+    } else { // dogleg_lateral | dogleg_build
+      const inSeg = isoMode==="dogleg_build" ? (md<firstStageMD) : (md>=firstStageMD);
+      if(inSeg) c.copy(dlsColor(iso.dlsAtMD(md), segMax));
+      else      c.copy(ISO_BASE);               // el otro tramo queda en gris, no compite
+    }
+    for(let j=0;j<ringVerts;j++){ const o=(i*ringVerts+j)*3; colors[o]=c.r; colors[o+1]=c.g; colors[o+2]=c.b; }
+  }
+  geo.setAttribute("color", new THREE.BufferAttribute(colors,3));
+  // material plano y luminoso para que el dato se lea vivo sin depender de la luz de escena:
+  // emissive sigue el vertex color (emissiveIntensity>0 con vertexColors ilumina el propio color).
+  mat.vertexColors=true; mat.color.set(0xffffff);
+  mat.metalness=0; mat.roughness=1;
+  mat.emissive.set(0x000000); mat.emissiveIntensity=1;
+  // el emissive sigue el vertex color: el dato se ve vivo aunque la cara esté en sombra o de lejos.
+  if(!mat.userData._emissivePatched){
+    mat.userData._emissivePatched=true;
+    mat.onBeforeCompile=(shader)=>{
+      shader.fragmentShader=shader.fragmentShader.replace(
+        "vec3 totalEmissiveRadiance = emissive;",
+        "vec3 totalEmissiveRadiance = emissive + vColor * 0.6;"
+      );
+    };
+  }
+  mat.needsUpdate=true;
+}
+function refreshIsoColors(){
+  Object.values(wellObjects).forEach(g=>g.traverse(o=>{
+    if(o.userData.kind==="casing" && o.userData.phase==="produccion" && o.userData.iso) applyIsoColors(o);
+  }));
+}
 
 let LAST_WARN="";
 function buildPad(pad){
@@ -366,7 +513,7 @@ function buildPad(pad){
 
     const traj=new THREE.Line(new THREE.BufferGeometry().setFromPoints(curve.getPoints(Math.max(400,st.length*2))),
       new THREE.LineBasicMaterial({color}));
-    traj.userData.kind="traj"; g.add(traj);
+    traj.userData.kind="traj"; traj.userData.wellId=w.id; g.add(traj);
 
     (w.casings||[]).forEach(cas=>{
       if(cas.shoe_md==null) return;
@@ -377,11 +524,44 @@ function buildPad(pad){
       const r=casingRadius(cas.phase, cas.od_in);
       const isProd=cas.phase==="produccion";
       const col=CASING_COLOR[cas.phase]||0xd0d0d0;
-      const tube=new THREE.Mesh(
-        new THREE.TubeGeometry(c2, Math.max(80,seg.length), r, 14, false),
-        new THREE.MeshStandardMaterial({color:col, metalness:.15, roughness:.65,
-          transparent:!isProd, opacity:isProd?1:0.42, side:THREE.DoubleSide}));
-      tube.userData.kind="casing"; tube.userData.phase=cas.phase; tube.userData.radius=r; g.add(tube);
+      // aislación: más segmentos para que el coloreo por etapa/dogleg tenga bordes nítidos
+      // (cada etapa mide ~100m; con ~600 anillos sobre ~6600m hay ~8 anillos/etapa).
+      const tubSeg=isProd ? Math.max(600,seg.length*3) : Math.max(80,seg.length);
+      const geo=new THREE.TubeGeometry(c2, tubSeg, r, 14, false);
+      const mat=new THREE.MeshStandardMaterial({color:col, metalness:.15, roughness:.65,
+          transparent:!isProd, opacity:isProd?1:0.42, side:THREE.DoubleSide});
+      const tube=new THREE.Mesh(geo, mat);
+      tube.userData.kind="casing"; tube.userData.phase=cas.phase; tube.userData.radius=r;
+      if(isProd){
+        // tabla arc-length→MD: cada anillo del tubo se ubica por longitud de arco de c2.
+        // Recorremos los puntos de seg acumulando distancia 3D y su MD paralelo.
+        const segMDs=[]; for(const s of st){ if(s.md<=cas.shoe_md) segMDs.push(s.md); } segMDs.push(cas.shoe_md);
+        const cum=[0]; for(let i=1;i<seg.length;i++) cum.push(cum[i-1]+seg[i].distanceTo(seg[i-1]));
+        const total=cum.at(-1)||1;
+        const ringMD=i=>{                 // MD del anillo i (0..tubSeg) por arc-length
+          const d=(i/tubSeg)*total;
+          let k=1; while(k<cum.length-1 && cum[k]<d) k++;
+          const t=(d-cum[k-1])/((cum[k]-cum[k-1])||1);
+          return segMDs[k-1]+(segMDs[k]-segMDs[k-1])*t;
+        };
+        // rangos MD de cada etapa (primer top al último bottom de sus clusters)
+        const stageRanges=(w.frac?.stages||[]).map(s=>{
+          const mds=(s.clusters||[]).flatMap(c=>[c.top_md,c.bottom_md]).filter(x=>x!=null);
+          return mds.length?{stage:s.stage,md0:Math.min(...mds),md1:Math.max(...mds)}:null;
+        }).filter(Boolean);
+        // dls interpolable por MD desde el survey
+        const dlsAtMD=md=>{
+          if(md<=st[0].md) return st[0].dls||0;
+          for(let i=1;i<st.length;i++) if(md<=st[i].md){
+            const a=st[i-1],b=st[i],t=(md-a.md)/((b.md-a.md)||1);
+            return (a.dls||0)+((b.dls||0)-(a.dls||0))*t;
+          }
+          return st.at(-1).dls||0;
+        };
+        tube.userData.iso={tubSeg, radial:14, ringMD, stageRanges, dlsAtMD};
+        applyIsoColors(tube);            // pinta según isoMode actual
+      }
+      g.add(tube);
       // triángulo de zapato + leyenda MD/TVD (se completa en v0.2d con clipping; marca base acá)
       // zapato: disco sólido del color de la fase, orientado normal al eje del pozo
       const shoeTan=(function(){
@@ -394,9 +574,9 @@ function buildPad(pad){
       const sq=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0), shoeTan);
       shoe.quaternion.copy(sq); shoe.position.copy(toThree(sp.x,sp.y,sp.tvd));
       shoe.userData.kind="shoe"; shoesGroup.add(shoe);
-      // etiqueta de zapato con datos: OD libraje grado + MD/TVD
+      // etiqueta de zapato: OD, libraje (lb/ft) y acero  →  ej.  5" 21.4 lb/ft P110 · MD 6650 · TVD 3070
       const specs=[`${cas.od_in}"`];
-      if(cas.weight_ppf!=null) specs.push(`${cas.weight_ppf}#`);
+      if(cas.weight_ppf!=null) specs.push(`${cas.weight_ppf} lb/ft`);
       if(cas.grade) specs.push(cas.grade);
       const shoeTvd=sp.tvd.toFixed(0);
       addLabel(`${specs.join(" ")} · MD ${Math.round(cas.shoe_md)} · TVD ${shoeTvd}`,
@@ -456,13 +636,15 @@ function buildPad(pad){
       if(stg.plug_md!=null){
         const p=interpAtMD(st,stg.plug_md,wx); const center=toThree(p.x,p.y,p.tvd);
         const tan=tangentAtMD(stg.plug_md);
-        const plug=new THREE.Mesh(new THREE.CylinderGeometry(prodR,prodR,prodR*3,16), plugMat);
+        // tapón: anillo que sobresale 10% del casing de aislación, alto acotado (banda, no salchicha)
+        const plugR=prodR*1.10, plugH=prodR*0.9;
+        const plug=new THREE.Mesh(new THREE.CylinderGeometry(plugR,plugR,plugH,20), plugMat);
         const q=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0), tan);
         plug.quaternion.copy(q); plug.position.copy(center);
         plug.userData.kind="plug"; g.add(plug);
         const num=plugCountInverted ? (stagesWithPlug.length - plugNumber.get(stg.stage) + 1)
                                     : plugNumber.get(stg.stage);
-        addLabel(`TPN N° ${num}`, center.clone().add(new THREE.Vector3(0, prodR*6, 0)), "tpn", w.id);
+        addLabel(`TPN N° ${num} · MD ${Math.round(stg.plug_md)}`, center.clone().add(new THREE.Vector3(0, prodR*6, 0)), "tpn", w.id);
       }
     });
 
@@ -506,7 +688,7 @@ function applyAllToggles(){
   document.querySelectorAll("[data-phase]").forEach(cb=>setPhase(cb.dataset.phase,cb.checked));
   if(!q("t-casing")) setKind("casing",false);
   gridGroup.visible=q("cfg-grid"); axes.visible=q("cfg-axes"); shoesGroup.visible=q("cfg-shoes");
-  SHOW_STAGE_LABELS=q("lbl-stage"); SHOW_TPN_LABELS=q("lbl-tpn"); SHOW_SHOE_LABELS=q("lbl-shoe");
+  SHOW_STAGE_LABELS=q("lbl-stage"); SHOW_TPN_LABELS=q("lbl-tpn"); SHOW_SHOE_LABELS=q("lbl-shoe"); SHOW_CURSOR_TIP=q("lbl-cursor");
 }
 document.getElementById("lbl-stage").addEventListener("change",e=>SHOW_STAGE_LABELS=e.target.checked);
 document.getElementById("lbl-tpn").addEventListener("change",e=>SHOW_TPN_LABELS=e.target.checked);
@@ -515,17 +697,103 @@ document.getElementById("lbl-shoe").addEventListener("change",e=>SHOW_SHOE_LABEL
 document.getElementById("t-casing").addEventListener("change",e=>{ setKind("casing",e.target.checked);
   if(e.target.checked) document.querySelectorAll("[data-phase]").forEach(cb=>setPhase(cb.dataset.phase,cb.checked)); });
 document.querySelectorAll("[data-phase]").forEach(cb=>cb.addEventListener("change",()=>setPhase(cb.dataset.phase,cb.checked)));
+document.querySelectorAll("input[name='isomode']").forEach(r=>r.addEventListener("change",e=>{
+  if(e.target.checked){ isoMode=e.target.value; refreshIsoColors(); }
+}));
 document.getElementById("cfg-grid").addEventListener("change",e=>gridGroup.visible=e.target.checked);
 document.getElementById("cfg-axes").addEventListener("change",e=>axes.visible=e.target.checked);
 document.getElementById("cfg-shoes").addEventListener("change",e=>shoesGroup.visible=e.target.checked);
+document.getElementById("lbl-cursor").addEventListener("change",e=>{ SHOW_CURSOR_TIP=e.target.checked;
+  if(!SHOW_CURSOR_TIP) document.getElementById("hover-tip").style.display="none"; });
+
+/* ---- Panel Capas: grupos colapsables + colapsar todo + arrastrable ---- */
+document.querySelectorAll("#layers .grp .lbl").forEach(lbl=>{
+  lbl.addEventListener("click",()=>lbl.parentElement.classList.toggle("collapsed"));
+});
+document.getElementById("collapse-all").addEventListener("click",e=>{
+  e.stopPropagation();
+  const grps=[...document.querySelectorAll("#layers .grp")];
+  const anyOpen=grps.some(g=>!g.classList.contains("collapsed"));
+  grps.forEach(g=>g.classList.toggle("collapsed",anyOpen));
+  e.target.textContent=anyOpen?"expandir":"plegar";
+});
+(function(){                    // arrastrar el panel por su header
+  const panel=document.getElementById("layers"), head=document.getElementById("layers-head");
+  let drag=false,ox=0,oy=0;
+  head.addEventListener("mousedown",e=>{
+    if(e.target.id==="collapse-all") return;
+    drag=true; const r=panel.getBoundingClientRect();
+    ox=e.clientX-r.left; oy=e.clientY-r.top;
+    panel.style.right="auto"; panel.style.left=r.left+"px"; panel.style.top=r.top+"px";
+    e.preventDefault();
+  });
+  window.addEventListener("mousemove",e=>{ if(!drag) return;
+    const mainR=document.querySelector("main").getBoundingClientRect();
+    let x=e.clientX-ox-mainR.left, y=e.clientY-oy-mainR.top;
+    x=Math.max(0,Math.min(mainR.width-60,x)); y=Math.max(0,Math.min(mainR.height-40,y));
+    panel.style.left=x+"px"; panel.style.top=y+"px";
+  });
+  window.addEventListener("mouseup",()=>drag=false);
+})();
+
+/* ---- Mouse-over MD/TVD en vivo ----
+   raycast a las trayectorias; del punto de hit se recupera el MD proyectando sobre los
+   segmentos de station del pozo (mínima distancia), y el TVD por interpolación de ese MD. */
+const _hray=new THREE.Raycaster();
+const hoverTip=document.getElementById("hover-tip");
+const _vA=new THREE.Vector3(), _vB=new THREE.Vector3(), _vP=new THREE.Vector3(), _vAB=new THREE.Vector3(), _vAP=new THREE.Vector3();
+function mdFromPoint(wellId, pt){
+  const w=PAD?.pad.wells.find(x=>x.id===wellId); if(!w) return null;
+  const st=w.survey.stations, wx=w.wellhead.x||0;
+  let best=Infinity, bestMD=null, bestTVD=null;
+  for(let i=1;i<st.length;i++){
+    const a=st[i-1], b=st[i];
+    _vA.copy(toThree(wx+(a.ew||0),a.ns||0,a.tvd));
+    _vB.copy(toThree(wx+(b.ew||0),b.ns||0,b.tvd));
+    _vAB.subVectors(_vB,_vA); _vAP.subVectors(pt,_vA);
+    const len2=_vAB.lengthSq()||1; let t=_vAP.dot(_vAB)/len2; t=Math.max(0,Math.min(1,t));
+    _vP.copy(_vA).addScaledVector(_vAB,t);
+    const d=_vP.distanceToSquared(pt);
+    if(d<best){ best=d; bestMD=a.md+(b.md-a.md)*t; bestTVD=a.tvd+(b.tvd-a.tvd)*t; }
+  }
+  return bestMD==null?null:{md:bestMD,tvd:bestTVD,well:wellId};
+}
+canvas.addEventListener("mousemove",e=>{
+  if(!SHOW_CURSOR_TIP || !PAD || dragging!==null){ hoverTip.style.display="none"; return; }
+  camera.updateMatrixWorld();
+  const rect=canvas.getBoundingClientRect();
+  const ndc=new THREE.Vector2(((e.clientX-rect.left)/rect.width)*2-1, -(((e.clientY-rect.top)/rect.height)*2-1));
+  _hray.setFromCamera(ndc,camera);
+  _hray.params.Line.threshold=sph.radius*0.015;
+  const trajs=[]; Object.values(wellObjects).forEach(g=>{ if(!g.visible) return;
+    g.traverse(o=>{ if(o.userData.kind==="traj"&&o.visible) trajs.push(o); }); });
+  const hits=_hray.intersectObjects(trajs,false);
+  if(!hits.length){ hoverTip.style.display="none"; return; }
+  const wellId=hits[0].object.userData.wellId;
+  const info=mdFromPoint(wellId, hits[0].point);
+  if(!info){ hoverTip.style.display="none"; return; }
+  hoverTip.innerHTML=`<span class="w">${info.well}</span><br>MD <b>${Math.round(info.md)}</b> m · TVD <b>${Math.round(info.tvd)}</b> m`;
+  hoverTip.style.display="block";
+  hoverTip.style.left=(e.clientX-rect.left)+"px";
+  hoverTip.style.top=(e.clientY-rect.top)+"px";
+});
+canvas.addEventListener("mouseleave",()=>hoverTip.style.display="none");
 
 document.getElementById("cfg-vexag").addEventListener("input",e=>{
   vexag=parseFloat(e.target.value); document.getElementById("vexag-val").textContent=vexag.toFixed(1)+"×";
   if(PAD) buildPad(PAD);
 });
 document.getElementById("cfg-dexag").addEventListener("input",e=>{
+  if(autoDiam) return;             // gobernado por zoom
   diamExag=parseFloat(e.target.value); document.getElementById("dexag-val").textContent=diamExag+"×";
   if(PAD) buildPad(PAD);
+});
+document.getElementById("cfg-autodiam").addEventListener("change",e=>{
+  autoDiam=e.target.checked;
+  document.getElementById("cfg-dexag").disabled=autoDiam;
+  if(autoDiam){ updateAutoDiam(); }
+  else { diamExag=parseFloat(document.getElementById("cfg-dexag").value);
+    document.getElementById("dexag-val").textContent=diamExag+"×"; if(PAD) buildPad(PAD); }
 });
 document.getElementById("cfg-pluginv").addEventListener("change",e=>{
   plugCountInverted=e.target.checked; if(PAD) buildPad(PAD);
@@ -545,9 +813,10 @@ function frameAll(){
       box.expandByPoint(new THREE.Vector3(x,y,z));
     }
   }));
-  if(box.isEmpty()){ target.set(0,-1500,-1500); sph.radius=5000; return; }
+  if(box.isEmpty()){ target.set(0,-1500,-1500); sph.radius=5000; _sceneRadius=8000; return; }
   const c=box.getCenter(new THREE.Vector3()), size=box.getSize(new THREE.Vector3());
-  target.copy(c); sph.radius=Math.max(size.x,size.y,size.z,500)*1.1+500;
+  _sceneRadius=Math.max(size.x,size.y,size.z,500);
+  target.copy(c); sph.radius=_sceneRadius*1.1+500;
 }
 /* Vistas cardinales. Sistema three: x=Este, z=Norte, y=arriba (-TVD).
    sph.theta = azimut (0 = mirando desde +Z/Norte), sph.phi = inclinación desde arriba. */
@@ -578,21 +847,48 @@ window.addEventListener("mousemove",e=>{
   const dx=e.clientX-px,dy=e.clientY-py; px=e.clientX; py=e.clientY;
   if(dragging===0){ sph.theta-=dx*0.005; sph.phi-=dy*0.005; sph.phi=Math.max(0.05,Math.min(Math.PI-0.05,sph.phi)); }
   else if(dragging===2){
-    const pX=new THREE.Vector3().setFromMatrixColumn(camera.matrix,0).multiplyScalar(-dx*sph.radius*0.0012);
-    const pY=new THREE.Vector3().setFromMatrixColumn(camera.matrix,1).multiplyScalar(dy*sph.radius*0.0012);
+    // pan proporcional al tamaño en pantalla: 1px de mouse = 1px de escena a la distancia del target.
+    // Usa el FOV y la altura del viewport, así el pan "se siente" igual a toda distancia (estilo CAD).
+    const h=canvas.clientHeight||1;
+    const worldPerPx=(2*Math.tan((camera.fov*Math.PI/180)/2)*sph.radius)/h;
+    const pX=new THREE.Vector3().setFromMatrixColumn(camera.matrix,0).multiplyScalar(-dx*worldPerPx);
+    const pY=new THREE.Vector3().setFromMatrixColumn(camera.matrix,1).multiplyScalar(dy*worldPerPx);
     target.add(pX).add(pY);
   }
 });
 canvas.addEventListener("contextmenu",e=>e.preventDefault());
-// Zoom al centro (target fijo), paso acotado, rango amplio. near/far dinámicos en el loop.
+/* Zoom al centro (target fijo, estable, sin deriva). El paso es multiplicativo y parejo a
+   toda distancia. Para inspeccionar un punto puntual (ej. un zapato en vista Sur), doble-click
+   ahí reubica el target y después el zoom siempre avanza hacia ese punto. */
 canvas.addEventListener("wheel",e=>{
   e.preventDefault();
   let d=e.deltaY;
   if(e.deltaMode===1) d*=16; else if(e.deltaMode===2) d*=100;
-  const step=Math.max(-0.2, Math.min(0.2, d*0.0015));
-  sph.radius = sph.radius*(1+step);
-  sph.radius = Math.max(2, Math.min(300000, sph.radius));
+  let f=Math.exp(d*0.0011);
+  f=Math.max(0.5, Math.min(1.7, f));
+  sph.radius=Math.max(2, Math.min(300000, sph.radius*f));
 },{passive:false});
+/* Doble-click: reubica el target sobre el punto de escena bajo el cursor (raycast a las
+   trayectorias, que son las líneas maestras). Así "acercarse a los zapatos" siempre funciona. */
+const _ray=new THREE.Raycaster(); _ray.params.Line.threshold=undefined;
+canvas.addEventListener("dblclick",e=>{
+  camera.updateMatrixWorld();
+  const rect=canvas.getBoundingClientRect();
+  const ndc=new THREE.Vector2(((e.clientX-rect.left)/rect.width)*2-1, -(((e.clientY-rect.top)/rect.height)*2-1));
+  _ray.setFromCamera(ndc, camera);
+  // umbral de línea proporcional a la distancia para que "enganche" trayectorias finas
+  _ray.params.Line.threshold=sph.radius*0.02;
+  const trajs=[]; Object.values(wellObjects).forEach(g=>{ if(!g.visible) return;
+    g.traverse(o=>{ if(o.userData.kind==="traj"&&o.visible) trajs.push(o); }); });
+  const hits=_ray.intersectObjects(trajs, false);
+  if(hits.length){
+    target.copy(hits[0].point);
+    sph.radius=Math.max(60, sph.radius*0.5);   // acerca al reubicar
+    document.getElementById("hud-cam").textContent="target reubicado (doble-click)";
+  } else {
+    toast("Doble-click sobre una trayectoria para centrar ahí");
+  }
+});
 
 /* ============ Loader de JSON ============ */
 /* ============ Persistencia local (IndexedDB) ============ */
@@ -696,12 +992,16 @@ function onResize(){
 }
 window.addEventListener("resize",onResize);
 let dbgFrame=0;
+let _sceneRadius=8000;   // radio aprox de la escena, se actualiza en frameAll
 function tick(){ camera.position.copy(target).add(new THREE.Vector3().setFromSpherical(sph));
   camera.lookAt(target);
-  // planos near/far dinámicos: se adaptan al radio actual para no recortar la escena a ningún zoom
-  camera.near=Math.max(0.1, sph.radius*0.01);
-  camera.far=sph.radius*50 + 20000;
+  // near chico y far amplio, basados en distancia de cámara + tamaño de escena.
+  // Evita recorte al acercarse (near fijo bajo) y al alejarse (far cubre toda la escena).
+  const camDist=sph.radius;
+  camera.near=Math.max(0.05, camDist*0.0015);
+  camera.far=camDist + _sceneRadius*4 + 20000;
   camera.updateProjectionMatrix();
+  if(autoDiam) updateAutoDiam();
   renderer.render(scene,camera);
   updateLabels();
   if(DBG && (dbgFrame++ %15===0)) updateDbg();
