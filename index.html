@@ -69,12 +69,24 @@
   .toast.show { opacity:1; }
   .drop { border:1.5px dashed var(--line); border-radius:8px; padding:22px; text-align:center; color:var(--ink-dim); font-size:12.5px; }
   .drop.hot { border-color:var(--accent); color:var(--ink); }
+  .lbl3d { position:absolute; transform:translate(-50%,-50%); font-family:var(--mono); font-size:11px;
+    padding:2px 6px; border-radius:4px; background:rgba(13,17,23,.82); white-space:nowrap; pointer-events:none;
+    border:1px solid var(--line); will-change:transform,left,top; }
+  .lbl3d.tpn { color:#ff9d9d; } .lbl3d.stage { color:#8fe6a5; }
+  .lbl3d.shoe { color:#e6edf3; font-size:10px; }
+  .viewcube { position:absolute; bottom:16px; right:16px; display:flex; flex-direction:column;
+    align-items:center; gap:3px; pointer-events:auto; }
+  .viewcube .vc-mid { display:flex; gap:3px; }
+  .viewcube button { width:34px; height:28px; background:rgba(22,27,34,.94); color:var(--ink-dim);
+    border:1px solid var(--line); border-radius:5px; font-family:var(--mono); font-size:11px; cursor:pointer; }
+  .viewcube button:hover { color:#fff; border-color:var(--accent); background:var(--panel-2); }
+  .viewcube .vc-iso { width:auto; padding:0 10px; margin-top:2px; }
 </style>
 </head>
 <body>
 <div id="app">
   <aside id="nav">
-    <div class="brand"><h1>Vaca Viewer</h1><div class="sub">subsuelo · v0.2</div></div>
+    <div class="brand"><h1>Vaca Viewer</h1><div class="sub">subsuelo · v0.2d-D</div></div>
     <nav>
       <button data-view="v3d" class="active">Vista 3D <span class="k">1</span></button>
       <button data-view="vexport">Exportar <span class="k">2</span></button>
@@ -87,10 +99,21 @@
   <main>
     <section class="view active" id="v3d">
       <canvas id="c3d"></canvas>
+      <div id="labels" style="position:absolute; inset:0; overflow:hidden; pointer-events:none;"></div>
       <div class="overlay hud-tl">
         <div class="pill" id="hud-cam">orbit · pan · zoom</div><br>
         <div class="pill" id="hud-scale">escala real 1:1</div><br>
         <div class="pill" id="hud-sel">F = encuadrar</div>
+      </div>
+      <div class="viewcube" id="viewcube">
+        <button data-view3d="top">Arriba</button>
+        <div class="vc-mid">
+          <button data-view3d="west">O</button>
+          <button data-view3d="south" title="rama navegando">S</button>
+          <button data-view3d="north">N</button>
+          <button data-view3d="east">E</button>
+        </div>
+        <button data-view3d="iso" class="vc-iso">ISO</button>
       </div>
       <div class="layers">
         <h3>Capas</h3>
@@ -101,14 +124,19 @@
           <label class="row"><input type="checkbox" id="t-casing" checked><span class="sw" style="background:var(--casing)"></span>Cañerías (todas)</label>
           <label class="row"><input type="checkbox" id="t-perf" checked><span class="sw" style="background:var(--perf)"></span>Punzados</label>
           <label class="row"><input type="checkbox" id="t-plug" checked><span class="sw" style="background:var(--plug)"></span>Tapones</label>
-          <label class="row"><input type="checkbox" id="t-stage"><span class="sw" style="background:var(--stage)"></span>Etapas (marcas)</label>
         </div>
         <div class="grp">
           <div class="lbl">Cañerías por fase</div>
-          <label class="row"><input type="checkbox" data-phase="guia" checked><span class="meta">guía 13⅜"</span></label>
-          <label class="row"><input type="checkbox" data-phase="intermedia1" checked><span class="meta">int-1 9⅝"</span></label>
-          <label class="row"><input type="checkbox" data-phase="intermedia2" checked><span class="meta">int-2 7⅝"</span></label>
-          <label class="row"><input type="checkbox" data-phase="produccion" checked><span class="meta">prod 5"</span></label>
+          <label class="row"><input type="checkbox" data-phase="guia" checked><span class="meta">Guía</span></label>
+          <label class="row"><input type="checkbox" data-phase="intermedia1" checked><span class="meta">Intermedia 1</span></label>
+          <label class="row"><input type="checkbox" data-phase="intermedia2" checked><span class="meta">Intermedia 2</span></label>
+          <label class="row"><input type="checkbox" data-phase="produccion" checked><span class="meta">Aislación</span></label>
+        </div>
+        <div class="grp">
+          <div class="lbl">Etiquetas</div>
+          <label class="row"><input type="checkbox" id="lbl-stage"><span class="sw" style="background:var(--stage)"></span>Etapas</label>
+          <label class="row"><input type="checkbox" id="lbl-tpn" checked><span class="sw" style="background:var(--plug)"></span>Tapones</label>
+          <label class="row"><input type="checkbox" id="lbl-shoe" checked><span class="sw" style="background:var(--casing)"></span>Zapatos (datos)</label>
         </div>
         <div class="grp">
           <div class="lbl">Referencia</div>
@@ -148,6 +176,7 @@
         <div class="card">
           <h4>Exportar</h4>
           <button class="btn" id="ex-json">Descargar pad.json</button>
+          <button class="btn" id="forget">Olvidar pad guardado</button>
           <span class="stub">El ZIP de pad y export por pozo llegan en v0.3.</span>
         </div>
       </div>
@@ -162,6 +191,16 @@
             <input type="range" id="cfg-vexag" min="1" max="8" step="0.5" value="1" style="flex:1; accent-color:var(--accent)">
             <span class="meta" id="vexag-val">1.0×</span></label>
           <div class="stub" style="margin-top:8px">Los pozos horizontales son "chatos"; exagerar TVD ayuda a leer la curva. 1× = escala real.</div>
+        </div>
+        <div class="card"><h4>Exageración de diámetro de cañerías</h4>
+          <label class="row" style="max-width:420px">Factor Ø
+            <input type="range" id="cfg-dexag" min="10" max="120" step="5" value="40" style="flex:1; accent-color:var(--accent)">
+            <span class="meta" id="dexag-val">40×</span></label>
+          <div class="stub" style="margin-top:8px">Los diámetros reales (5"–13⅜") son invisibles sobre 6600 m de pozo. Este factor los agranda de forma proporcional entre sí. No afecta la escala de profundidad.</div>
+        </div>
+        <div class="card"><h4>Numeración de tapones</h4>
+          <label class="row" style="max-width:420px"><input type="checkbox" id="cfg-pluginv"> Invertir conteo (N°1 = más somero)</label>
+          <div class="stub" style="margin-top:8px">Por defecto los TPN se numeran en orden de bajada: N°1 = más profundo (primera etapa). Invertir es útil para el rotado.</div>
         </div>
         <div class="card"><h4>Atajos</h4>
           <div class="stub"><kbd>1</kbd>–<kbd>4</kbd> secciones · <kbd>rueda</kbd> zoom · <kbd>arrastrar</kbd> orbitar ·
@@ -211,13 +250,72 @@ let target=new THREE.Vector3(0,0,0), sph=new THREE.Spherical(3000,1.1,0.6);
 
 /* Colores por pozo */
 const WELL_COLORS=[0x4ea1d3,0x6cc04a,0xe0a83d,0xc77dff,0xff7b72,0x39c5cf];
-/* Radio visual por fase (m, exagerado para ver; no es escala real de diámetro) */
-const PHASE_RADIUS={guia:9,intermedia1:6.5,intermedia2:4.5,produccion:2.8};
+/* OD real en pulgadas → radio base en metros, luego escalado por diamExag. */
+const OD_IN={guia:13.375,intermedia1:9.625,intermedia2:7.625,produccion:5.0};
+/* Colores de cañería bien diferenciables entre sí y del fondo oscuro.
+   De externo a interno: guía (arena claro), int1 (celeste), int2 (lavanda), aislación (blanco cálido). */
+const CASING_COLOR={guia:0xe8c96a, intermedia1:0x7fc7e0, intermedia2:0xb79fe0, produccion:0xf2ede2};
+/* Punzados: turquesa que alterna claro/oscuro entre etapas consecutivas */
+const PERF_LIGHT=0x6ff5e8, PERF_DARK=0x0e8f86;
+/* Nombres de fase para la leyenda (sin medidas, la fase es lo estable) */
+const PHASE_LABEL={guia:"Guía", intermedia1:"Intermedia 1", intermedia2:"Intermedia 2", produccion:"Aislación"};
 
-let PAD=null, wellObjects={}, vexag=1;
+let PAD=null, wellObjects={}, vexag=1, diamExag=40, plugCountInverted=false;
+
+/* radio visual (m) de una cañería según su OD real y la exageración de diámetro */
+function casingRadius(phase, od_in){
+  const od=(od_in!=null?od_in:(OD_IN[phase]||5));
+  return (od/2)*0.0254*diamExag;   // metros, exagerado
+}
 
 /* world transform: (x=E/O, y=N/S, tvd abajo) → three Y-up (x, -tvd*vexag, y) */
 function toThree(x,y,tvd){ return new THREE.Vector3(x, -tvd*vexag, y); }
+
+/* ===== Etiquetas HTML overlay (tamaño fijo en pantalla, umbral de zoom + LOD) =====
+   Cada etiqueta = {pos:Vector3, el:div, kind:'tpn'|'stage', wellId, visible}.
+   Se proyectan a pantalla cada frame; se ocultan si la cámara está lejos o por LOD. */
+const labelsLayer=document.getElementById("labels");
+let LABELS=[];
+function clearLabels(){ LABELS.forEach(l=>l.el.remove()); LABELS=[]; }
+function addLabel(text, pos3, kind, wellId){
+  const el=document.createElement("div");
+  el.className="lbl3d "+kind; el.textContent=text;
+  labelsLayer.appendChild(el);
+  LABELS.push({pos:pos3.clone(), el, kind, wellId, idx:LABELS.length});
+}
+/* Distancia de cámara a partir de la cual se muestran; y cada cuántas etiquetas
+   mostrar según zoom (LOD por conteo, sin cálculo de colisiones). */
+function labelStep(radius){
+  // radius = distancia orbital de cámara. Cuanto más lejos, más salteo.
+  if(radius>4500) return 0;      // muy lejos: ninguna
+  if(radius>2600) return 8;      // lejos: 1 de cada 8
+  if(radius>1500) return 4;
+  if(radius>800)  return 2;
+  return 1;                       // cerca: todas
+}
+const _projV=new THREE.Vector3();
+function updateLabels(){
+  const step=labelStep(sph.radius);
+  const W=canvas.clientWidth, H=canvas.clientHeight;
+  let shownStage=0, shownTpn=0;
+  for(const l of LABELS){
+    const wellVisible = wellObjects[l.wellId] ? wellObjects[l.wellId].visible : true;
+    const kindOn = l.kind==="tpn" ? SHOW_TPN_LABELS : (l.kind==="stage" ? SHOW_STAGE_LABELS : SHOW_SHOE_LABELS);
+    if(!wellVisible || !kindOn){ l.el.style.display="none"; continue; }
+    // zapatos: siempre visibles (son pocos, 4 por pozo). Etapas/tapones: LOD por zoom.
+    if(l.kind!=="shoe"){
+      if(step===0){ l.el.style.display="none"; continue; }
+      const counter = l.kind==="tpn" ? shownTpn++ : shownStage++;
+      if(counter % step !== 0){ l.el.style.display="none"; continue; }
+    }
+    _projV.copy(l.pos).project(camera);
+    if(_projV.z>1){ l.el.style.display="none"; continue; }
+    const x=(_projV.x*0.5+0.5)*W, y=(-_projV.y*0.5+0.5)*H;
+    l.el.style.display="block";
+    l.el.style.left=x+"px"; l.el.style.top=y+"px";
+  }
+}
+let SHOW_TPN_LABELS=true, SHOW_STAGE_LABELS=false, SHOW_SHOE_LABELS=true;
 
 /* interpola X,Y,TVD (coords locales del pad) a un MD dado desde las stations */
 function interpAtMD(st, md, wx){
@@ -236,7 +334,7 @@ function interpAtMD(st, md, wx){
   return {x:wx+(last.ew||0), y:last.ns||0, tvd:last.tvd};
 }
 
-function clearWorld(){ Object.values(wellObjects).forEach(g=>world.remove(g)); wellObjects={}; shoesGroup.clear(); }
+function clearWorld(){ Object.values(wellObjects).forEach(g=>world.remove(g)); wellObjects={}; shoesGroup.clear(); clearLabels(); }
 
 let LAST_WARN="";
 function buildPad(pad){
@@ -276,34 +374,106 @@ function buildPad(pad){
       const sp=interpAtMD(st,cas.shoe_md,wx); seg.push(toThree(sp.x,sp.y,sp.tvd));
       if(seg.length<2) return;
       const c2=new THREE.CatmullRomCurve3(seg);
-      const r=PHASE_RADIUS[cas.phase]||3;
+      const r=casingRadius(cas.phase, cas.od_in);
+      const isProd=cas.phase==="produccion";
+      const col=CASING_COLOR[cas.phase]||0xd0d0d0;
       const tube=new THREE.Mesh(
-        new THREE.TubeGeometry(c2, Math.max(80,seg.length), r, 10, false),
-        new THREE.MeshStandardMaterial({color:0xd0d0d0, metalness:.5, roughness:.55,
-          transparent:true, opacity:cas.phase==="produccion"?1:0.28}));
-      tube.userData.kind="casing"; tube.userData.phase=cas.phase; g.add(tube);
-      const shoe=new THREE.Mesh(new THREE.RingGeometry(r,r+3,20),
-        new THREE.MeshBasicMaterial({color, side:THREE.DoubleSide}));
-      shoe.position.copy(toThree(sp.x,sp.y,sp.tvd)); shoe.userData.kind="shoe"; shoesGroup.add(shoe);
+        new THREE.TubeGeometry(c2, Math.max(80,seg.length), r, 14, false),
+        new THREE.MeshStandardMaterial({color:col, metalness:.15, roughness:.65,
+          transparent:!isProd, opacity:isProd?1:0.42, side:THREE.DoubleSide}));
+      tube.userData.kind="casing"; tube.userData.phase=cas.phase; tube.userData.radius=r; g.add(tube);
+      // triángulo de zapato + leyenda MD/TVD (se completa en v0.2d con clipping; marca base acá)
+      // zapato: disco sólido del color de la fase, orientado normal al eje del pozo
+      const shoeTan=(function(){
+        const d=5, a=interpAtMD(st,Math.max(0,cas.shoe_md-d),wx), b=interpAtMD(st,cas.shoe_md,wx);
+        const va=toThree(a.x,a.y,a.tvd), vb=toThree(b.x,b.y,b.tvd);
+        const t=vb.sub(va); return t.lengthSq()>1e-9?t.normalize():new THREE.Vector3(0,-1,0);
+      })();
+      const shoe=new THREE.Mesh(new THREE.CylinderGeometry(r*1.35, r*1.35, r*0.6, 20),
+        new THREE.MeshStandardMaterial({color:col, metalness:.3, roughness:.5}));
+      const sq=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0), shoeTan);
+      shoe.quaternion.copy(sq); shoe.position.copy(toThree(sp.x,sp.y,sp.tvd));
+      shoe.userData.kind="shoe"; shoesGroup.add(shoe);
+      // etiqueta de zapato con datos: OD libraje grado + MD/TVD
+      const specs=[`${cas.od_in}"`];
+      if(cas.weight_ppf!=null) specs.push(`${cas.weight_ppf}#`);
+      if(cas.grade) specs.push(cas.grade);
+      const shoeTvd=sp.tvd.toFixed(0);
+      addLabel(`${specs.join(" ")} · MD ${Math.round(cas.shoe_md)} · TVD ${shoeTvd}`,
+        toThree(sp.x,sp.y,sp.tvd).add(new THREE.Vector3(0, r*2, 0)), "shoe", w.id);
     });
 
-    const perfMat=new THREE.MeshBasicMaterial({color:0xf2a03d});
-    const plugMat=new THREE.MeshBasicMaterial({color:0xe5484d});
-    const stageMat=new THREE.MeshBasicMaterial({color:0x3fb950});
-    (w.frac?.stages||[]).forEach(stg=>{
+    // helper: tangente del pozo en un MD (para orientar rayos perpendiculares al eje)
+    function tangentAtMD(md){
+      const d=5;
+      const a=interpAtMD(st, Math.max(0,md-d), wx), b=interpAtMD(st, md+d, wx);
+      const va=toThree(a.x,a.y,a.tvd), vb=toThree(b.x,b.y,b.tvd);
+      const t=vb.sub(va); return t.lengthSq()>1e-9? t.normalize() : new THREE.Vector3(0,-1,0);
+    }
+    // dos ejes perpendiculares al eje del pozo (para el disco radial de punzados)
+    function perpBasis(tan){
+      let up=new THREE.Vector3(0,1,0);
+      if(Math.abs(tan.dot(up))>0.95) up=new THREE.Vector3(1,0,0);
+      const u=new THREE.Vector3().crossVectors(tan,up).normalize();
+      const v=new THREE.Vector3().crossVectors(tan,u).normalize();
+      return [u,v];
+    }
+
+    const prodR=casingRadius("produccion", 5.0);   // radio de referencia (aislación)
+    const perfMatLight=new THREE.LineBasicMaterial({color:PERF_LIGHT});
+    const perfMatDark=new THREE.LineBasicMaterial({color:PERF_DARK});
+    const plugMat=new THREE.MeshStandardMaterial({color:0xe5484d, metalness:.2, roughness:.5});
+
+    // numeración de tapones en orden de bajada: N°1 = más profundo.
+    const stagesWithPlug=(w.frac?.stages||[]).filter(s=>s.plug_md!=null)
+        .slice().sort((a,b)=>b.plug_md-a.plug_md);
+    const plugNumber=new Map();
+    stagesWithPlug.forEach((s,i)=>plugNumber.set(s.stage, i+1)); // 1 = más profundo
+
+    (w.frac?.stages||[]).forEach((stg,si)=>{
+      // punzados: color turquesa que alterna claro/oscuro por etapa
+      const perfMat = (stg.stage % 2 === 0) ? perfMatLight : perfMatDark;
       (stg.clusters||[]).forEach(cl=>{
         const md=(cl.top_md!=null?cl.top_md:cl.bottom_md); if(md==null) return;
-        const p=interpAtMD(st,md,wx);
-        const ring=new THREE.Mesh(new THREE.TorusGeometry(5,1.3,6,14), perfMat);
-        ring.position.copy(toThree(p.x,p.y,p.tvd)); ring.userData.kind="perf"; g.add(ring);
+        const p=interpAtMD(st,md,wx); const center=toThree(p.x,p.y,p.tvd);
+        const tan=tangentAtMD(md); const [u,v]=perpBasis(tan);
+        const rIn=prodR, rOut=prodR*5;
+        const nRays=12; const pos=[];
+        for(let k=0;k<nRays;k++){
+          const ang=(k/nRays)*Math.PI*2;
+          const d=u.clone().multiplyScalar(Math.cos(ang)).add(v.clone().multiplyScalar(Math.sin(ang)));
+          const a=center.clone().add(d.clone().multiplyScalar(rIn));
+          const b=center.clone().add(d.clone().multiplyScalar(rOut));
+          pos.push(a.x,a.y,a.z, b.x,b.y,b.z);
+        }
+        const geo=new THREE.BufferGeometry();
+        geo.setAttribute("position", new THREE.Float32BufferAttribute(pos,3));
+        const rays=new THREE.LineSegments(geo, perfMat);
+        rays.userData.kind="perf"; g.add(rays);
       });
+
+      // tapones: cilindro rojo + etiqueta HTML "TPN N° x"
       if(stg.plug_md!=null){
-        const p=interpAtMD(st,stg.plug_md,wx);
-        const plug=new THREE.Mesh(new THREE.CylinderGeometry(4,4,5,12), plugMat);
-        plug.position.copy(toThree(p.x,p.y,p.tvd)); plug.userData.kind="plug"; g.add(plug);
-        const mk=new THREE.Mesh(new THREE.SphereGeometry(6,10,10), stageMat);
-        mk.position.copy(toThree(p.x,p.y,p.tvd)); mk.userData.kind="stage"; mk.visible=false; g.add(mk);
+        const p=interpAtMD(st,stg.plug_md,wx); const center=toThree(p.x,p.y,p.tvd);
+        const tan=tangentAtMD(stg.plug_md);
+        const plug=new THREE.Mesh(new THREE.CylinderGeometry(prodR,prodR,prodR*3,16), plugMat);
+        const q=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0), tan);
+        plug.quaternion.copy(q); plug.position.copy(center);
+        plug.userData.kind="plug"; g.add(plug);
+        const num=plugCountInverted ? (stagesWithPlug.length - plugNumber.get(stg.stage) + 1)
+                                    : plugNumber.get(stg.stage);
+        addLabel(`TPN N° ${num}`, center.clone().add(new THREE.Vector3(0, prodR*6, 0)), "tpn", w.id);
       }
+    });
+
+    // etapas: etiqueta HTML "Etapa X" en el medio de la etapa
+    (w.frac?.stages||[]).forEach(stg=>{
+      const cls=stg.clusters||[]; if(!cls.length) return;
+      const mds=cls.map(c=>c.top_md!=null?c.top_md:c.bottom_md).filter(x=>x!=null);
+      if(!mds.length) return;
+      const mid=mds.reduce((a,b)=>a+b,0)/mds.length;
+      const p=interpAtMD(st,mid,wx);
+      addLabel(`Etapa ${stg.stage}`, toThree(p.x,p.y,p.tvd).add(new THREE.Vector3(0, prodR*9, 0)), "stage", w.id);
     });
 
     world.add(g); wellObjects[w.id]=g;
@@ -327,15 +497,21 @@ function buildWellToggles(wells){
   });
 }
 const q=id=>{ const el=document.getElementById(id); return el?el.checked:true; };
-function setKind(kind,on){ Object.values(wellObjects).forEach(g=>g.traverse(o=>{ if(o.userData.kind===kind) o.visible=on; })); }
+function setKind(kind,on){
+  Object.values(wellObjects).forEach(g=>g.traverse(o=>{ if(o.userData.kind===kind) o.visible=on; }));
+}
 function setPhase(phase,on){ Object.values(wellObjects).forEach(g=>g.traverse(o=>{ if(o.userData.kind==="casing"&&o.userData.phase===phase) o.visible=on; })); }
 function applyAllToggles(){
-  setKind("traj",q("t-traj")); setKind("perf",q("t-perf")); setKind("plug",q("t-plug")); setKind("stage",q("t-stage"));
+  setKind("traj",q("t-traj")); setKind("perf",q("t-perf")); setKind("plug",q("t-plug"));
   document.querySelectorAll("[data-phase]").forEach(cb=>setPhase(cb.dataset.phase,cb.checked));
   if(!q("t-casing")) setKind("casing",false);
   gridGroup.visible=q("cfg-grid"); axes.visible=q("cfg-axes"); shoesGroup.visible=q("cfg-shoes");
+  SHOW_STAGE_LABELS=q("lbl-stage"); SHOW_TPN_LABELS=q("lbl-tpn"); SHOW_SHOE_LABELS=q("lbl-shoe");
 }
-["t-traj","t-perf","t-plug","t-stage"].forEach(id=>document.getElementById(id).addEventListener("change",e=>setKind(id.slice(2),e.target.checked)));
+document.getElementById("lbl-stage").addEventListener("change",e=>SHOW_STAGE_LABELS=e.target.checked);
+document.getElementById("lbl-tpn").addEventListener("change",e=>SHOW_TPN_LABELS=e.target.checked);
+document.getElementById("lbl-shoe").addEventListener("change",e=>SHOW_SHOE_LABELS=e.target.checked);
+["t-traj","t-perf","t-plug"].forEach(id=>document.getElementById(id).addEventListener("change",e=>setKind(id.slice(2),e.target.checked)));
 document.getElementById("t-casing").addEventListener("change",e=>{ setKind("casing",e.target.checked);
   if(e.target.checked) document.querySelectorAll("[data-phase]").forEach(cb=>setPhase(cb.dataset.phase,cb.checked)); });
 document.querySelectorAll("[data-phase]").forEach(cb=>cb.addEventListener("change",()=>setPhase(cb.dataset.phase,cb.checked)));
@@ -346,6 +522,13 @@ document.getElementById("cfg-shoes").addEventListener("change",e=>shoesGroup.vis
 document.getElementById("cfg-vexag").addEventListener("input",e=>{
   vexag=parseFloat(e.target.value); document.getElementById("vexag-val").textContent=vexag.toFixed(1)+"×";
   if(PAD) buildPad(PAD);
+});
+document.getElementById("cfg-dexag").addEventListener("input",e=>{
+  diamExag=parseFloat(e.target.value); document.getElementById("dexag-val").textContent=diamExag+"×";
+  if(PAD) buildPad(PAD);
+});
+document.getElementById("cfg-pluginv").addEventListener("change",e=>{
+  plugCountInverted=e.target.checked; if(PAD) buildPad(PAD);
 });
 
 /* ============ Cámara CAD ============ */
@@ -366,6 +549,27 @@ function frameAll(){
   const c=box.getCenter(new THREE.Vector3()), size=box.getSize(new THREE.Vector3());
   target.copy(c); sph.radius=Math.max(size.x,size.y,size.z,500)*1.1+500;
 }
+/* Vistas cardinales. Sistema three: x=Este, z=Norte, y=arriba (-TVD).
+   sph.theta = azimut (0 = mirando desde +Z/Norte), sph.phi = inclinación desde arriba. */
+function setView(name){
+  const eps=0.001;
+  const V={
+    top:    {phi:eps,        theta:0},           // desde arriba, mirando abajo
+    bottom: {phi:Math.PI-eps,theta:0},           // desde abajo
+    north:  {phi:Math.PI/2,  theta:0},           // desde el Norte (+Z)
+    south:  {phi:Math.PI/2,  theta:Math.PI},     // desde el Sur (rama navegando)
+    east:   {phi:Math.PI/2,  theta:Math.PI/2},   // desde el Este (+X)
+    west:   {phi:Math.PI/2,  theta:-Math.PI/2},  // desde el Oeste (-X)
+    iso:    {phi:1.05,       theta:0.7},         // isométrica
+  };
+  const v=V[name]||V.iso;
+  sph.phi=v.phi; sph.theta=v.theta;
+  frameAll();  // reencuadra manteniendo la nueva orientación
+  document.getElementById("hud-cam").textContent="vista: "+name;
+}
+document.querySelectorAll("[data-view3d]").forEach(b=>
+  b.addEventListener("click",()=>setView(b.dataset.view3d)));
+
 let dragging=null,px=0,py=0;
 canvas.addEventListener("mousedown",e=>{dragging=e.button;px=e.clientX;py=e.clientY;});
 window.addEventListener("mouseup",()=>dragging=null);
@@ -380,14 +584,53 @@ window.addEventListener("mousemove",e=>{
   }
 });
 canvas.addEventListener("contextmenu",e=>e.preventDefault());
-canvas.addEventListener("wheel",e=>{ e.preventDefault(); sph.radius*=(1+Math.sign(e.deltaY)*0.08);
-  sph.radius=Math.max(60,Math.min(50000,sph.radius)); },{passive:false});
+// Zoom al centro (target fijo), paso acotado, rango amplio. near/far dinámicos en el loop.
+canvas.addEventListener("wheel",e=>{
+  e.preventDefault();
+  let d=e.deltaY;
+  if(e.deltaMode===1) d*=16; else if(e.deltaMode===2) d*=100;
+  const step=Math.max(-0.2, Math.min(0.2, d*0.0015));
+  sph.radius = sph.radius*(1+step);
+  sph.radius = Math.max(2, Math.min(300000, sph.radius));
+},{passive:false});
 
 /* ============ Loader de JSON ============ */
-function loadPadObject(obj){
+/* ============ Persistencia local (IndexedDB) ============ */
+const IDB={ db:null,
+  open(){ return new Promise((res,rej)=>{
+    const rq=indexedDB.open("vaca-viewer",1);
+    rq.onupgradeneeded=()=>rq.result.createObjectStore("pads",{keyPath:"id"});
+    rq.onsuccess=()=>{ this.db=rq.result; res(); };
+    rq.onerror=()=>rej(rq.error);
+  }); },
+  save(pad){ if(!this.db) return;
+    const tx=this.db.transaction("pads","readwrite");
+    tx.objectStore("pads").put({id:"current", pad, ts:Date.now()});
+  },
+  load(){ return new Promise(res=>{ if(!this.db) return res(null);
+    const rq=this.db.transaction("pads","readonly").objectStore("pads").get("current");
+    rq.onsuccess=()=>res(rq.result?rq.result.pad:null); rq.onerror=()=>res(null);
+  }); },
+  clear(){ if(!this.db) return; this.db.transaction("pads","readwrite").objectStore("pads").delete("current"); }
+};
+
+/* ============ Loader + autocarga con persistencia ============ */
+function loadPadObject(obj, persist=true){
   if(!obj||obj.schema_version!==1||!obj.pad){ toast("JSON no compatible (se esperaba schema_version 1)"); return; }
-  buildPad(obj); toast(`Pad ${obj.pad.id} cargado · ${obj.pad.wells.length} pozos`); show("v3d");
+  buildPad(obj); if(persist) IDB.save(obj);
+  toast(`Pad ${obj.pad.id} cargado · ${obj.pad.wells.length} pozos`); show("v3d");
 }
+
+IDB.open().then(()=>IDB.load()).then(saved=>{
+  if(saved){ loadPadObject(saved, false); toast("Pad restaurado de sesión anterior"); return; }
+  // sin pad guardado: intentar el de ejemplo (solo funciona servido por HTTP)
+  fetch("samples/pad_MMo-35.json").then(r=>{ if(!r.ok) throw 0; return r.json(); })
+    .then(o=>loadPadObject(o))
+    .catch(()=>{ toast("Cargá un pad.json desde la sección Datos (3)"); show("vdata"); });
+}).catch(()=>{
+  fetch("samples/pad_MMo-35.json").then(r=>r.json()).then(o=>loadPadObject(o))
+    .catch(()=>{ toast("Cargá un pad.json desde Datos"); show("vdata"); });
+});
 function readFile(file){
   const r=new FileReader();
   r.onload=()=>{ try{ loadPadObject(JSON.parse(r.result)); }catch(err){ toast("Error leyendo JSON: "+err.message); } };
@@ -405,6 +648,7 @@ document.getElementById("ex-json").addEventListener("click",()=>{
   const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
   a.download=`pad_${PAD.pad.id}.json`; a.click(); URL.revokeObjectURL(a.href);
 });
+document.getElementById("forget").addEventListener("click",()=>{ IDB.clear(); toast("Pad guardado borrado. Al recargar, la app pedirá cargar uno."); });
 
 function updateSummary(){
   if(!PAD) return;
@@ -453,15 +697,16 @@ function onResize(){
 window.addEventListener("resize",onResize);
 let dbgFrame=0;
 function tick(){ camera.position.copy(target).add(new THREE.Vector3().setFromSpherical(sph));
-  camera.lookAt(target); renderer.render(scene,camera);
+  camera.lookAt(target);
+  // planos near/far dinámicos: se adaptan al radio actual para no recortar la escena a ningún zoom
+  camera.near=Math.max(0.1, sph.radius*0.01);
+  camera.far=sph.radius*50 + 20000;
+  camera.updateProjectionMatrix();
+  renderer.render(scene,camera);
+  updateLabels();
   if(DBG && (dbgFrame++ %15===0)) updateDbg();
   requestAnimationFrame(tick); }
 onResize(); tick();
-
-/* ============ Autocarga del pad de ejemplo ============ */
-fetch("samples/pad_MMo-35.json").then(r=>{ if(!r.ok) throw new Error("no encontrado"); return r.json(); })
-  .then(loadPadObject)
-  .catch(()=>{ toast("Cargá un pad.json desde la sección Datos (3)"); show("vdata"); });
 </script>
 </body>
 </html>
