@@ -148,9 +148,7 @@ Especificación completa en [`docs/data-schema.md`](docs/data-schema.md).
 ## 👤 Autor
 
 **Gonzalo Carvallo**
-📧 [gonzacarv@gmail.com](mailto:gonzacarv@gmail.com) · 🐙 [@gonzacarv](https://github.com/gonzacarv)
-
-Ingeniero Electrónico. Desarrollado de forma independiente, en tiempo propio y con recursos propios.
+📧 [gonzacarv@gmail.com](mailto:gonzacarv@gmail.com) · 🐙 [@gonzacarv](https://github.com/gonzacarv) · gonzacarv · GonXa
 
 ---
 
