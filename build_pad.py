@@ -47,11 +47,20 @@ GOTCHAS IMPORTANTES (ya resueltos acá, NO re-romper)
    aparece en las guías y no es la cañería (que es 13⅜").
 3. GRADO de acero de la aislación 5": a veces no está en el tally (usan designación de
    rosca W461/W463), entonces grade=None. Es correcto, no es un bug.
+4. CAÑOS CORTOS (pup joints) de la aislación: se leen de "2.2 Run Tally". Regla del campo:
+   caño NORMAL >10 m, caño corto <10 m. Su fila NO trae "N° Tally" (columna vacía), por eso el
+   parser ubica los 3 decimales consecutivos (Longitud, Cum.Length, Set Depth) sin asumir cuántos
+   enteros van antes. Set Depth = MD del TOPE del caño (≈ TD − Cum.Length) ⇒ bottom = Set Depth +
+   Longitud. Si tu tally usa otra convención de Set Depth, ajustá parse_short_joints.
 """
 import openpyxl, pdfplumber, re, json, warnings
 from collections import Counter
 from datetime import datetime, timezone
 warnings.filterwarnings("ignore")
+
+# ODs estándar de casing (pulg) y OD esperado por fase — para "encajar" candidatos y descartar ruido
+STD_OD=[4.5,5.0,5.5,7.0,7.625,8.625,9.625,10.75,11.75,13.375]
+PHASE_OD_EXP={"guia":13.375,"intermedia1":9.625,"intermedia2":7.625,"produccion":5.0}
 
 def parse_survey(path):
     wb=openpyxl.load_workbook(path, data_only=True); ws=wb[wb.sheetnames[0]]
@@ -127,23 +136,75 @@ def parse_fracplan(path):
             "horizontal_ext_m":hdr["horizontal_ext_m"],"planned_vs_actual":"planned",
             "stages":[stages[s] for s in order]}
 
-def parse_tally(path):
+def parse_run_tally(text, max_len=10.0, edge_m=150):
+    """Del '2.2 Run Tally' separa las piezas cortas (<10 m; los caños normales miden >10 m):
+      - shorts: casing corto / XOVER del TRAMO MEDIO (se ignoran primeros/últimos `edge_m` m:
+        cabezal/colgador arriba, shoetrack abajo).
+      - shoetrack: piezas cortas de los últimos `edge_m` m (zapato, collar flotador, camisas, cortos).
+    Cada fila trae 3 decimales consecutivos = Longitud, Cum.Length, Set Depth. La fila corta NO trae
+    'N° Tally', por eso ubicamos los 3 decimales sin asumir cuántos enteros van antes. Set Depth = MD
+    del TOPE (≈ TD − Cum.Length) ⇒ bottom = Set Depth + Longitud.
+    """
+    m=re.search(r'2\.2\s+Run\s+Tally(.*?)(?:\n\s*2\.3|\n\s*3\.|\Z)', text, re.S|re.I)
+    block=m.group(1) if m else text
+    dec=r'\d+(?:,\d{3})*\.\d+'
+    row_re=re.compile(rf'({dec})\s+({dec})\s+({dec})')
+    rows=[]
+    for line in block.splitlines():
+        if not re.match(r'\s*\d', line): continue        # fila de tally: empieza con el N° de junta
+        mm=row_re.search(line)
+        if not mm: continue
+        length=float(mm.group(1).replace(",",""))
+        setd=float(mm.group(3).replace(",",""))
+        if length<=0 or setd<=0 or length>30: continue
+        rows.append({"length":length, "setd":setd, "desc":line[mm.end():].strip()})
+    if not rows: return [], None
+    max_md=max(r["setd"]+r["length"] for r in rows)      # fondo de la sarta (≈ zapato)
+    shorts=[]; st_els=[]
+    for r in rows:
+        if r["length"]>=max_len: continue                # caño normal
+        top=round(r["setd"],3); bottom=round(r["setd"]+r["length"],3)
+        if top<edge_m: continue                          # primeros 150 m (cabezal/colgador): se ignora
+        if bottom>max_md-edge_m:                          # últimos 150 m: shoetrack
+            st_els.append({"desc":r["desc"] or "elemento", "length_m":round(r["length"],3),
+                           "top_md":top, "bottom_md":bottom})
+            continue
+        is_xo=bool(re.search(r'\bXO\b|X-?OVER|CROSS', r["desc"], re.I))
+        shorts.append({"desc":r["desc"] or "caño corto", "xover":is_xo,
+                       "length_m":round(r["length"],3), "top_md":top, "bottom_md":bottom})
+    shorts.sort(key=lambda x:x["top_md"])
+    st_els.sort(key=lambda x:x["top_md"])
+    return shorts, ({"elements":st_els} if st_els else None)
+
+def parse_tally(path, phase=None):
     with pdfplumber.open(path) as pdf:
         text="\n".join((pg.extract_text() or "") for pg in pdf.pages)
-    m=re.search(r'2\.1 Pipe Sections(.*?)2\.2 Run Tally', text, re.S)
-    block=m.group(1) if m else ""
-    vals=[float(x) for x in re.findall(r'\b(\d{1,2}\.\d{3})\b', block) if 4.0<=float(x)<=13.5]
-    od=Counter(vals).most_common(1)[0][0] if vals else None
-    wts=[float(x) for x in re.findall(r'\b(\d{2,3}\.\d{2})\b', block)]
-    wts=[w for w in wts if 10<=w<=120 and w!=od]
+    m=re.search(r'2\.1\s+Pipe\s+Sections(.*?)2\.2\s+Run\s+Tally', text, re.S|re.I)
+    block=m.group(1) if m else text[:4000]
+    # OD: encaja cada candidato al OD estándar más cercano (±0.07") para descartar longitudes
+    # de tiro (~12 m); si se conoce la fase, prioriza su OD esperado.
+    snapped=[]
+    for x in re.findall(r'\b(\d{1,2}\.\d{1,3})\b', text):
+        v=float(x); best=None; bd=0.07
+        for s in STD_OD:
+            d=abs(v-s)
+            if d<bd: bd=d; best=s
+        if best is not None: snapped.append(best)
+    if phase and PHASE_OD_EXP.get(phase) is not None:
+        snapped=[v for v in snapped if abs(v-PHASE_OD_EXP[phase])<1.6]
+    od=Counter(snapped).most_common(1)[0][0] if snapped else None
+    wts=[float(x) for x in re.findall(r'\b(\d{2,3}\.\d{1,2})\b', block)]
+    wts=[w for w in wts if 14<=w<=120]
     weight=Counter(wts).most_common(1)[0][0] if wts else None
     txt2=block + text[:3000]
     grades=re.findall(r'\b([KNPL])[\s-]?(\d{2,3})Q?\b', txt2)
     norm=[a+b for a,b in grades if 50<=int(b)<=140]
     grade=Counter(norm).most_common(1)[0][0] if norm else None
-    mt=re.search(r'Total length run\s+([\d,]+\.\d+)', text)
+    mt=re.search(r'Total\s+length\s+run\s+([\d,]+\.\d+)', text, re.I)
     shoe=float(mt.group(1).replace(",","")) if mt else None
-    return od, shoe, weight, grade
+    # caños cortos + shoetrack: solo interesan en la aislación (5"); en las otras fases se omiten
+    shorts, shoetrack = parse_run_tally(text) if phase=="produccion" else ([], None)
+    return od, shoe, weight, grade, shorts, shoetrack
 
 # ============================================================================
 # CONFIGURACIÓN DEL PAD — ajustar estos diccionarios y el bloque pad={} abajo.
@@ -172,8 +233,11 @@ for i,wid in enumerate(WELL_ORDER):
     casings=[]
     for phase in ["guia","intermedia1","intermedia2","produccion"]:
         if phase in TALLYS.get(wid,{}):
-            od,shoe,weight,grade=parse_tally(TALLYS[wid][phase])
-            casings.append({"phase":phase,"od_in":od,"shoe_md":shoe,"toc_md":None,"weight_ppf":weight,"grade":grade})
+            od,shoe,weight,grade,shorts,shoetrack=parse_tally(TALLYS[wid][phase], phase)
+            cas={"phase":phase,"od_in":od,"shoe_md":shoe,"toc_md":None,"weight_ppf":weight,"grade":grade}
+            if shorts: cas["short_joints"]=shorts
+            if shoetrack: cas["shoetrack"]=shoetrack
+            casings.append(cas)
     wells.append({"id":wid,"name":f"PET.Nq.{wid[:8]}(h)","well_number":int(wid[6]),
         "architecture":"horizontal",
         "wellhead":{"x":i*float(SPACING),"y":0.0,"rkb_elev_m":RKB,"ground_elev_m":RKB},
@@ -190,5 +254,6 @@ print(f"=== PAD {PAD_ID} generado ===")
 for w in wells:
     ew=[s["ew"] for s in w["survey"]["stations"]]; ns=[s["ns"] for s in w["survey"]["stations"]]
     cs=" · ".join(f'{c["phase"][:4]} {c["od_in"]}"@{round(c["shoe_md"])}' for c in w["casings"])
-    print(f'{w["id"]}: EW[{min(ew):.0f},{max(ew):.0f}] NS[{min(ns):.0f},{max(ns):.0f}] {w["frac"]["total_stages"]}et | {cs}')
+    nsj=sum(len(c.get("short_joints",[])) for c in w["casings"])
+    print(f'{w["id"]}: EW[{min(ew):.0f},{max(ew):.0f}] NS[{min(ns):.0f},{max(ns):.0f}] {w["frac"]["total_stages"]}et | {cs} | caños cortos: {nsj}')
 print(f"JSON: {OUT}  ({os.path.getsize(OUT)} bytes)")

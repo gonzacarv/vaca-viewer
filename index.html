@@ -13,7 +13,7 @@
   :root {
     --bg:#0d1117; --panel:#161b22; --panel-2:#1c232d; --line:#2a3441;
     --ink:#e6edf3; --ink-dim:#8b97a6; --accent:#4ea1d3;
-    --casing:#d0d0d0; --perf:#f2a03d; --plug:#e5484d; --stage:#3fb950;
+    --casing:#d0d0d0; --perf:#f2a03d; --plug:#e5484d; --stage:#3fb950; --short:#ffe500;
     --mono:"SFMono-Regular",ui-monospace,"Cascadia Code",Consolas,monospace;
     --sans:"Inter",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
   }
@@ -57,6 +57,20 @@
   .layers .grp .grp-body { padding:0 14px 8px; }
   .layers .grp.collapsed .grp-body { display:none; }
   .row { display:flex; align-items:center; gap:8px; padding:3px 0; font-size:12.5px; cursor:pointer; }
+  /* ---- Árbol de pozos/elementos ---- */
+  .wnode { border-top:1px dashed var(--line); }
+  .wnode:first-child { border-top:0; }
+  .wnode .whead { display:flex; align-items:center; gap:7px; padding:5px 0; cursor:pointer; user-select:none; }
+  .wnode .whead .caret { width:10px; font-size:9px; color:var(--ink-dim); transition:transform .12s; }
+  .wnode.open .whead .caret { transform:rotate(90deg); }
+  .wnode .whead .wname { font-size:12.5px; }
+  .wnode.master .whead .wname { color:var(--ink-dim); font-size:11.5px; text-transform:uppercase; letter-spacing:.06em; }
+  .wnode .whead .meta { margin-left:auto; font-family:var(--mono); font-size:10px; color:var(--ink-dim); }
+  .wnode .wbody { padding:0 0 6px 24px; }
+  .wnode .wbody .row { padding:2px 0; font-size:12px; }
+  .wnode .wbody .perf-filter { width:100%; margin:2px 0 4px 18px; max-width:190px; font-size:11px;
+    background:var(--panel-2); color:var(--ink); border:1px solid var(--line); border-radius:4px; padding:3px 6px;
+    font-family:var(--mono); }
   .row input { accent-color:var(--accent); }
   .row .sw { width:10px; height:10px; border-radius:2px; flex:none; }
   .row .meta { margin-left:auto; font-family:var(--mono); font-size:10px; color:var(--ink-dim); }
@@ -72,19 +86,23 @@
   .btn.primary { background:var(--accent); border-color:var(--accent); color:#04141f; font-weight:600; }
   kbd { font-family:var(--mono); font-size:10.5px; background:var(--panel-2); border:1px solid var(--line); border-radius:3px; padding:1px 5px; }
   table.tbl { border-collapse:collapse; font-size:12px; font-family:var(--mono); width:100%; }
-  table.tbl th, table.tbl td { border:1px solid var(--line); padding:4px 8px; text-align:right; }
-  table.tbl th { color:var(--ink-dim); text-align:left; font-weight:500; }
-  table.tbl td:first-child, table.tbl th:first-child { text-align:left; }
+  table.tbl th, table.tbl td { border:1px solid var(--line); padding:4px 8px; text-align:left; }
+  table.tbl th { color:var(--ink-dim); font-weight:500; }
+  table.tbl .num { text-align:right; }
+  table.tbl .dim { color:var(--ink-dim); }
+  table.tbl tr.cc td { color:var(--ink-dim); }
   .toast { position:absolute; bottom:16px; left:50%; transform:translateX(-50%); background:var(--panel-2);
     border:1px solid var(--line); border-radius:6px; padding:8px 16px; font-size:12.5px; opacity:0; transition:opacity .3s; pointer-events:none; }
   .toast.show { opacity:1; }
   .drop { border:1.5px dashed var(--line); border-radius:8px; padding:22px; text-align:center; color:var(--ink-dim); font-size:12.5px; }
   .drop.hot { border-color:var(--accent); color:var(--ink); }
-  .lbl3d { position:absolute; transform:translate(-50%,-50%); font-family:var(--mono); font-size:11px;
+  .lbl3d { position:absolute; transform:translate(-50%,-50%); font-family:var(--lbl-font,var(--mono)); font-size:var(--lbl-size,11px);
     padding:2px 6px; border-radius:4px; background:rgba(13,17,23,.82); white-space:nowrap; pointer-events:none;
     border:1px solid var(--line); will-change:transform,left,top; }
-  .lbl3d.tpn { color:#ff9d9d; } .lbl3d.stage { color:#8fe6a5; }
-  .lbl3d.shoe { color:#e6edf3; font-size:10px; }
+  .lbl3d.tpn { color:#ff9d9d; } .lbl3d.stage { color:#8fe6a5; } .lbl3d.short { color:#ffe500; }
+  .lbl3d.install { color:#3ad6e0; }
+  .lbl3d.shoetrack { color:#c9a3ff; text-align:left; }
+  .lbl3d.shoe { color:#e6edf3; }
   .viewcube { position:absolute; bottom:16px; left:16px; display:flex; flex-direction:column;
     align-items:center; gap:3px; pointer-events:auto; }
   .viewcube .vc-mid { display:flex; gap:3px; }
@@ -93,17 +111,57 @@
   .viewcube button:hover { color:#fff; border-color:var(--accent); background:var(--panel-2); }
   .viewcube .vc-iso { width:auto; padding:0 10px; margin-top:2px; }
   #hover-tip { position:absolute; pointer-events:none; z-index:5; display:none;
-    font-family:var(--mono); font-size:11px; line-height:1.45; color:var(--ink);
+    font-family:var(--lbl-font,var(--mono)); font-size:var(--lbl-size,11px); line-height:1.45; color:var(--ink);
     background:rgba(13,17,23,.92); border:1px solid var(--accent); border-radius:5px; padding:5px 8px;
     white-space:nowrap; transform:translate(12px,12px); }
   #hover-tip .w { color:var(--accent); }
   #hover-tip .d { color:var(--ink-dim); }
+  #hover-tip .s { color:var(--stage); font-weight:600; }
+  #hover-tip .dl { color:var(--short); }
+  #hud-measure.on { color:#04141f; background:var(--accent); border-color:var(--accent); }
+  #measure-tip { position:absolute; pointer-events:none; z-index:6; display:none; transform:translate(-50%,-140%);
+    font-family:var(--lbl-font,var(--mono)); font-size:11px; line-height:1.5; color:var(--ink); text-align:center;
+    background:rgba(13,17,23,.94); border:1px solid var(--accent); border-radius:5px; padding:5px 9px; white-space:nowrap; }
+  #measure-tip .d { color:var(--ink-dim); }
+  /* ---- Constructor de pad (sección Datos) ---- */
+  .build-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px 18px; max-width:640px; }
+  .build-grid label, .well-card label { display:flex; flex-direction:column; gap:4px; font-size:10.5px;
+    color:var(--ink-dim); text-transform:uppercase; letter-spacing:.06em; }
+  .build-grid input, .build-grid select, .well-card input, .well-card select {
+    background:var(--panel-2); color:var(--ink); border:1px solid var(--line); border-radius:5px;
+    padding:6px 8px; font-size:12.5px; font-family:var(--sans); }
+  .phase-row { display:flex; align-items:center; gap:8px; padding:7px 0; flex-wrap:wrap; border-top:1px dashed var(--line); }
+  .cas-grid { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-left:auto; }
+  .cas-grid label { font-size:9.5px; gap:3px; }
+  .cas-grid select, .cas-grid input { padding:4px 6px; font-size:12px; }
+  .cas-grid input[type=number] { width:82px; }
+  .inst-wrap { margin:6px 0 0 16px; padding:8px 0 4px 12px; border-left:2px solid #00567a; }
+  .inst-body { margin-top:8px; display:flex; flex-direction:column; gap:8px; align-items:flex-start; }
+  .inst-body.disabled { opacity:.42; pointer-events:none; }
+  .inst-body .tbg-sel { flex-direction:row !important; align-items:center; gap:8px;
+    text-transform:none !important; letter-spacing:0 !important; }
+  .inst-el { display:flex; gap:8px; align-items:center; }
+  .inst-el input { width:96px; }
+  table.tbl tr.inst td { color:#3ad6e0; }
+  .well-card { border:1px solid var(--line); border-radius:8px; padding:14px 16px; margin-top:12px; background:var(--panel-2); }
+  .well-card h5 { margin:0 0 12px; font-size:12.5px; letter-spacing:.05em; color:var(--ink); font-weight:600; }
+  .file-row { display:flex; align-items:center; gap:10px; padding:5px 0; flex-wrap:wrap; }
+  .file-row .tag { width:104px; font-size:11px; color:var(--ink-dim); text-transform:uppercase; letter-spacing:.05em; flex:none; }
+  .file-row .st { font-family:var(--mono); font-size:11px; color:var(--stage); }
+  .file-row .st.err { color:var(--plug); }
+  .file-row .st.wait { color:var(--ink-dim); }
+  .file-row .toc { margin-left:auto; flex-direction:row !important; align-items:center; gap:6px;
+    text-transform:none !important; letter-spacing:0 !important; }
+  .file-row .toc input { width:88px; }
+  .filebtn { position:relative; overflow:hidden; display:inline-block; }
+  .filebtn.opt::after { content:" (opc.)"; color:var(--ink-dim); font-size:11px; }
+  .filebtn input[type=file] { position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; }
 </style>
 </head>
 <body>
 <div id="app">
   <aside id="nav">
-    <div class="brand"><h1>Vaca Viewer</h1><div class="sub">subsuelo · v0.2d-E</div></div>
+    <div class="brand"><h1>Vaca Viewer</h1><div class="sub">subsuelo · v0.2d-F</div></div>
     <nav>
       <button data-view="v3d" class="active">Vista 3D <span class="k">1</span></button>
       <button data-view="vexport">Exportar <span class="k">2</span></button>
@@ -120,38 +178,14 @@
       <div class="overlay hud-tl">
         <div class="pill" id="hud-cam">orbit · pan · zoom</div><br>
         <div class="pill" id="hud-scale">escala real 1:1</div><br>
-        <div class="pill" id="hud-sel">F = encuadrar · doble-click = enfocar</div>
-      </div>
-      <div class="viewcube" id="viewcube">
-        <button data-view3d="top">Arriba</button>
-        <div class="vc-mid">
-          <button data-view3d="west">O</button>
-          <button data-view3d="south" title="rama navegando">S</button>
-          <button data-view3d="north">N</button>
-          <button data-view3d="east">E</button>
-        </div>
-        <button data-view3d="iso" class="vc-iso">ISO</button>
+        <div class="pill" id="hud-sel">F = encuadrar · doble-click = enfocar</div><br>
+        <div class="pill" id="hud-measure" style="pointer-events:auto; cursor:pointer">📏 Medir (M)</div>
       </div>
       <div class="layers" id="layers">
         <h3 id="layers-head"><span class="grip">⠿</span>Capas<span class="collapse-all" id="collapse-all">plegar</span></h3>
-        <div class="grp"><div class="lbl">Pozos</div><div class="grp-body"><div id="well-toggles"></div></div></div>
         <div class="grp">
-          <div class="lbl">Elementos</div>
-          <div class="grp-body">
-          <label class="row"><input type="checkbox" id="t-traj" checked><span class="sw" style="background:var(--accent)"></span>Trayectoria</label>
-          <label class="row"><input type="checkbox" id="t-casing" checked><span class="sw" style="background:var(--casing)"></span>Cañerías (todas)</label>
-          <label class="row"><input type="checkbox" id="t-perf" checked><span class="sw" style="background:var(--perf)"></span>Punzados</label>
-          <label class="row"><input type="checkbox" id="t-plug" checked><span class="sw" style="background:var(--plug)"></span>Tapones</label>
-          </div>
-        </div>
-        <div class="grp">
-          <div class="lbl">Cañerías por fase</div>
-          <div class="grp-body">
-          <label class="row"><input type="checkbox" data-phase="guia" checked><span class="meta">Guía</span></label>
-          <label class="row"><input type="checkbox" data-phase="intermedia1" checked><span class="meta">Intermedia 1</span></label>
-          <label class="row"><input type="checkbox" data-phase="intermedia2" checked><span class="meta">Intermedia 2</span></label>
-          <label class="row"><input type="checkbox" data-phase="produccion" checked><span class="meta">Aislación</span></label>
-          </div>
+          <div class="lbl">Pozos y elementos</div>
+          <div class="grp-body"><div id="well-tree"></div></div>
         </div>
         <div class="grp">
           <div class="lbl">Modo aislación</div>
@@ -166,9 +200,12 @@
         <div class="grp">
           <div class="lbl">Etiquetas</div>
           <div class="grp-body">
-          <label class="row"><input type="checkbox" id="lbl-stage"><span class="sw" style="background:var(--stage)"></span>Etapas</label>
-          <label class="row"><input type="checkbox" id="lbl-tpn" checked><span class="sw" style="background:var(--plug)"></span>Tapones</label>
-          <label class="row"><input type="checkbox" id="lbl-shoe" checked><span class="sw" style="background:var(--casing)"></span>Zapatos (datos)</label>
+          <label class="row"><input type="checkbox" id="lbl-stage" checked><span class="sw" style="background:var(--stage)"></span>Etapas</label>
+          <label class="row"><input type="checkbox" id="lbl-tpn"><span class="sw" style="background:var(--plug)"></span>Tapones</label>
+          <label class="row"><input type="checkbox" id="lbl-short"><span class="sw" style="background:var(--short)"></span>Caños cortos</label>
+          <label class="row"><input type="checkbox" id="lbl-install"><span class="sw" style="background:#00c2d1"></span>Instalación (detalle)</label>
+          <label class="row"><input type="checkbox" id="lbl-shoetrack"><span class="sw" style="background:#c9a3ff"></span>Shoetrack (detalle)</label>
+          <label class="row"><input type="checkbox" id="lbl-shoe"><span class="sw" style="background:var(--casing)"></span>Zapatos (datos)</label>
           <label class="row"><input type="checkbox" id="lbl-cursor" checked><span class="sw" style="background:var(--accent)"></span>Cursor MD/TVD (hover)</label>
           </div>
         </div>
@@ -201,12 +238,42 @@
     <section class="view" id="vdata">
       <div class="pad">
         <h2>Datos</h2>
-        <p class="lead">Cargá un pad (<span class="stub">pad.json</span>) o arrastralo acá. La importación directa de
-          survey/tally/fracplan y la edición en tabla llegan en v0.3.</p>
+        <p class="lead">Construí el pad cargando los archivos crudos (survey <span class="stub">.xlsx</span>,
+          tally <span class="stub">.pdf</span> de OpenWells y fracplan <span class="stub">.xlsx</span>), o cargá un
+          <span class="stub">pad.json</span> ya armado. Todo se procesa en el navegador; los datos no salen del equipo.</p>
         <div class="card">
-          <h4>Cargar pad</h4>
+          <h4>Cargar pad existente</h4>
           <div class="drop" id="drop">Arrastrá <b>pad_MMo-35.json</b> aquí, o
             <label style="color:var(--accent); cursor:pointer; text-decoration:underline">elegí archivo<input type="file" id="file-json" accept=".json" hidden></label>.
+          </div>
+        </div>
+
+        <div class="card" id="builder">
+          <h4>Construir pad desde archivos crudos</h4>
+          <div class="stub" style="margin-bottom:14px">Elegí la cantidad de pozos. Por cada fase podés cargar el
+            tally (.pdf) — que autocompleta OD/libraje/acero/MD y queda editable — o elegir todo a mano en los picklists.
+            El survey y el fracplan son opcionales (sin survey se asume pozo vertical perfecto). Todo queda en un único
+            <span style="color:var(--ink)">pad.json</span>.</div>
+          <div class="build-grid">
+            <label>Nombre del pad <input id="b-name" type="text"></label>
+            <label>ID <input id="b-id" type="text"></label>
+            <label>Yacimiento <input id="b-field" type="text"></label>
+            <label>Operador <input id="b-operator" type="text"></label>
+            <label>Campaña <input id="b-campaign" type="number"></label>
+            <label>Separación de bocas (m) <input id="b-spacing" type="number" value="10"></label>
+            <label>RKB / datum (m) <input id="b-rkb" type="number"></label>
+            <label>Cantidad de pozos
+              <select id="b-nwells">
+                <option>1</option><option>2</option><option>3</option><option selected>4</option>
+                <option>5</option><option>6</option><option>7</option><option>8</option>
+              </select>
+            </label>
+          </div>
+          <div id="b-wells"></div>
+          <div style="margin-top:16px; display:flex; align-items:center; gap:8px; flex-wrap:wrap">
+            <button class="btn primary" id="b-generate">Generar y ver pad</button>
+            <button class="btn" id="b-download">Descargar pad.json</button>
+            <span class="stub" id="b-status"></span>
           </div>
         </div>
         <div class="card" id="data-summary"><h4>Pad cargado</h4><div class="stub" id="summary-body">—</div></div>
@@ -237,9 +304,33 @@
             <span class="meta" id="dexag-val">40×</span></label>
           <div class="stub" style="margin-top:8px">Los diámetros reales (5"–13⅜") son invisibles sobre 6600 m de pozo. Este factor los agranda de forma proporcional entre sí. No afecta la escala de profundidad.</div>
         </div>
+        <div class="card"><h4>Radio de punzados</h4>
+          <label class="row" style="max-width:420px">Propagación (m)
+            <input type="range" id="cfg-perfradius" min="1" max="200" step="1" value="20" style="flex:1; accent-color:var(--accent)">
+            <span class="meta" id="perfradius-val">20 m</span></label>
+          <div class="stub" style="margin-top:8px">Radio real (en metros) hasta donde llega la "rama" de punzados — sirve para ver la propagación real. No afecta la profundidad.</div>
+        </div>
         <div class="card"><h4>Numeración de tapones</h4>
           <label class="row" style="max-width:420px"><input type="checkbox" id="cfg-pluginv"> Invertir conteo (N°1 = más somero)</label>
           <div class="stub" style="margin-top:8px">Por defecto los TPN se numeran en orden de bajada: N°1 = más profundo (primera etapa). Invertir es útil para el rotado.</div>
+        </div>
+        <div class="card"><h4>Apariencia de etiquetas</h4>
+          <label class="row" style="max-width:420px">Tamaño de letra
+            <input type="range" id="cfg-lblsize" min="9" max="18" step="1" value="11" style="flex:1; accent-color:var(--accent)">
+            <span class="meta" id="lblsize-val">11 px</span></label>
+          <label class="row" style="max-width:420px; margin-top:6px">Tipografía
+            <select id="cfg-font" style="flex:1; background:var(--panel-2); color:var(--ink); border:1px solid var(--line); border-radius:5px; padding:4px 8px; font-size:12.5px">
+              <option value="mono">Monoespaciada</option>
+              <option value="sans">Sans-serif</option>
+              <option value="serif">Serif</option>
+              <option value="cond">Condensada</option>
+            </select></label>
+          <div class="stub" style="margin-top:8px">Afecta las etiquetas 3D (zapatos, tapones, etapas) y el cartelito de cursor.</div>
+        </div>
+        <div class="card"><h4>Diámetro de cañería</h4>
+          <div class="lbl" style="font-family:var(--mono); font-size:10px; color:var(--ink-dim); text-transform:uppercase; letter-spacing:.08em; margin-bottom:6px">Formato del OD en etiquetas</div>
+          <label class="row" style="max-width:420px"><input type="radio" name="odfmt" value="decimal" checked> Decimal &nbsp;<span class="stub">7.625"</span></label>
+          <label class="row" style="max-width:420px"><input type="radio" name="odfmt" value="imperial"> Imperial (fraccional) &nbsp;<span class="stub">7 5/8"</span></label>
         </div>
         <div class="card"><h4>Atajos</h4>
           <div class="stub"><kbd>1</kbd>–<kbd>4</kbd> secciones · <kbd>rueda</kbd> zoom · <kbd>arrastrar</kbd> orbitar ·
@@ -250,6 +341,10 @@
   </main>
 </div>
 
+<!-- Parsers de archivos crudos (ingesta en navegador). En release van embebidos para uso offline. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";</script>
 <script type="importmap">
 { "imports": { "three": "https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.module.min.js" }}
 </script>
@@ -263,9 +358,11 @@ function show(id){ views.forEach(v=>v.classList.toggle("active",v.id===id));
 navBtns.forEach(b=>b.addEventListener("click",()=>show(b.dataset.view)));
 window.addEventListener("keydown",e=>{
   const m={"1":"v3d","2":"vexport","3":"vdata","4":"vconfig"};
-  if(/input|textarea/i.test(document.activeElement.tagName)) return;
+  if(/input|textarea|select/i.test(document.activeElement.tagName)) return;
   if(m[e.key]) show(m[e.key]);
   if(e.key==="f"||e.key==="F") frameAll();
+  if(e.key==="m"||e.key==="M") setMeasure(!measureMode);
+  if(e.key==="Escape"){ if(measurePts.length||measureMode){ clearMeasure(); setMeasure(false); } }
   if(e.key==="d"||e.key==="D"){ DBG=!DBG; document.getElementById("dbg").style.display=DBG?"block":"none"; updateDbg(); }
 });
 let DBG=false;
@@ -284,6 +381,7 @@ const gridGroup=new THREE.Group();
 const grid=new THREE.GridHelper(6000,60,0x2a3441,0x1a2029); grid.rotation.x=Math.PI/2; gridGroup.add(grid); world.add(gridGroup);
 const axes=new THREE.AxesHelper(400); world.add(axes);
 const shoesGroup=new THREE.Group(); world.add(shoesGroup);
+const measureGroup=new THREE.Group(); world.add(measureGroup);   // regla medidora
 
 let target=new THREE.Vector3(0,0,0), sph=new THREE.Spherical(3000,1.1,0.6);
 
@@ -299,7 +397,18 @@ const PERF_LIGHT=0x6ff5e8, PERF_DARK=0x17c4b0;
 /* Nombres de fase para la leyenda (sin medidas, la fase es lo estable) */
 const PHASE_LABEL={guia:"Guía", intermedia1:"Intermedia 1", intermedia2:"Intermedia 2", produccion:"Aislación"};
 
-let PAD=null, wellObjects={}, vexag=1, diamExag=40, plugCountInverted=false;
+let PAD=null, wellObjects={}, vexag=1, diamExag=40, plugCountInverted=false, perfRadiusM=20;
+let odFormat="decimal";          // "decimal" (7.625") | "imperial" (7 5/8")
+/* OD en pulgadas → texto. Imperial redondea a octavos (los OD de casing son fracciones de 1/8"). */
+function fmtOD(od){
+  if(od==null) return "";
+  if(odFormat==="decimal") return `${od}"`;
+  const whole=Math.floor(od);
+  let num=Math.round((od-whole)*8), den=8;
+  if(num===0) return `${whole}"`;
+  while(num%2===0 && den%2===0){ num/=2; den/=2; }   // simplifica 4/8→1/2, 6/8→3/4…
+  return `${whole} ${num}/${den}"`;
+}
 let autoDiam=false;              // auto-escala de diámetro según distancia de cámara
 const AUTO_TARGET_PX=18;         // tamaño aparente deseado de la aislación (px de diámetro)
 const AUTO_MIN=15, AUTO_MAX=1600;// límites del multiplicador efectivo
@@ -347,8 +456,12 @@ function casingRadius(phase, od_in){
   return (od/2)*0.0254*diamExag;   // metros, exagerado
 }
 
-/* world transform: (x=E/O, y=N/S, tvd abajo) → three Y-up (x, -tvd*vexag, y) */
-function toThree(x,y,tvd){ return new THREE.Vector3(x, -tvd*vexag, y); }
+/* world transform: (x=E/O, y=N/S, tvd abajo) → three Y-up.
+   El Este se mapea a -X (no +X) para que el marco sea diestro y geográficamente correcto:
+   con Este=+X, Norte=+Z, Arriba=+Y el producto E×N daba "abajo" (marco zurdo) y el par E/O
+   quedaba espejado — por eso, mirando desde el Sur, el pozo 1 (Oeste) aparecía a la derecha.
+   Con Este=-X: mirando al Norte, el Oeste queda a la izquierda y el Este a la derecha. */
+function toThree(x,y,tvd){ return new THREE.Vector3(-x, -tvd*vexag, y); }
 
 /* ===== Etiquetas HTML overlay (tamaño fijo en pantalla, umbral de zoom + LOD) =====
    Cada etiqueta = {pos:Vector3, el:div, kind:'tpn'|'stage', wellId, visible}.
@@ -356,12 +469,13 @@ function toThree(x,y,tvd){ return new THREE.Vector3(x, -tvd*vexag, y); }
 const labelsLayer=document.getElementById("labels");
 let LABELS=[];
 function clearLabels(){ LABELS.forEach(l=>l.el.remove()); LABELS=[]; }
-function addLabel(text, pos3, kind, wellId){
+function addLabel(text, pos3, kind, wellId, html){
   const el=document.createElement("div");
-  el.className="lbl3d "+kind; el.textContent=text;
+  el.className="lbl3d "+kind; el[html?"innerHTML":"textContent"]=text;
   labelsLayer.appendChild(el);
   LABELS.push({pos:pos3.clone(), el, kind, wellId, idx:LABELS.length});
 }
+const escHtml=s=>String(s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
 /* Distancia de cámara a partir de la cual se muestran; y cada cuántas etiquetas
    mostrar según zoom (LOD por conteo, sin cálculo de colisiones). */
 function labelStep(radius){
@@ -377,12 +491,22 @@ function updateLabels(){
   const step=labelStep(sph.radius);
   const W=canvas.clientWidth, H=canvas.clientHeight;
   let shownStage=0, shownTpn=0;
+  // Escala por zoom: a `R0` (o más cerca) las etiquetas tienen su tamaño normal (k=1); al alejarse
+  // más allá de ese umbral se encogen ∝ R0/radio (se ven de lejos, pero apenas legibles). Piso 0.14.
+  const R0 = Math.max(500, _sceneRadius*0.5);
+  const kScale = Math.max(0.14, Math.min(1, R0/sph.radius));
   for(const l of LABELS){
     const wellVisible = wellObjects[l.wellId] ? wellObjects[l.wellId].visible : true;
-    const kindOn = l.kind==="tpn" ? SHOW_TPN_LABELS : (l.kind==="stage" ? SHOW_STAGE_LABELS : SHOW_SHOE_LABELS);
-    if(!wellVisible || !kindOn){ l.el.style.display="none"; continue; }
-    // zapatos: siempre visibles (son pocos, 4 por pozo). Etapas/tapones: LOD por zoom.
-    if(l.kind!=="shoe"){
+    const kindOn = l.kind==="tpn" ? SHOW_TPN_LABELS : l.kind==="stage" ? SHOW_STAGE_LABELS
+                 : l.kind==="short" ? SHOW_SHORT_LABELS : l.kind==="install" ? SHOW_INSTALL_LABELS
+                 : l.kind==="shoetrack" ? SHOW_SHOETRACK_LABELS : SHOW_SHOE_LABELS;
+    // visibilidad por pozo (árbol): la etiqueta sigue al elemento de SU pozo
+    const vw=VIS[l.wellId];
+    const elemKey = l.kind==="tpn" ? "plug" : (l.kind==="short"||l.kind==="install"||l.kind==="shoetrack") ? l.kind : null;
+    const elemOn = !vw || !elemKey || vw[elemKey]!==false;
+    if(!wellVisible || !kindOn || !elemOn){ l.el.style.display="none"; continue; }
+    // zapatos, caños cortos, instalación y shoetrack: siempre visibles (pocos). Etapas/tapones: LOD.
+    if(l.kind!=="shoe" && l.kind!=="short" && l.kind!=="install" && l.kind!=="shoetrack"){
       if(step===0){ l.el.style.display="none"; continue; }
       const counter = l.kind==="tpn" ? shownTpn++ : shownStage++;
       if(counter % step !== 0){ l.el.style.display="none"; continue; }
@@ -392,9 +516,10 @@ function updateLabels(){
     const x=(_projV.x*0.5+0.5)*W, y=(-_projV.y*0.5+0.5)*H;
     l.el.style.display="block";
     l.el.style.left=x+"px"; l.el.style.top=y+"px";
+    l.el.style.transform=`translate(-50%,-50%) scale(${kScale})`;
   }
 }
-let SHOW_TPN_LABELS=true, SHOW_STAGE_LABELS=false, SHOW_SHOE_LABELS=true, SHOW_CURSOR_TIP=true;
+let SHOW_TPN_LABELS=false, SHOW_STAGE_LABELS=true, SHOW_SHOE_LABELS=false, SHOW_SHORT_LABELS=false, SHOW_INSTALL_LABELS=false, SHOW_SHOETRACK_LABELS=false, SHOW_CURSOR_TIP=true;
 
 /* interpola X,Y,TVD (coords locales del pad) a un MD dado desde las stations */
 function interpAtMD(st, md, wx){
@@ -413,7 +538,8 @@ function interpAtMD(st, md, wx){
   return {x:wx+(last.ew||0), y:last.ns||0, tvd:last.tvd};
 }
 
-function clearWorld(){ Object.values(wellObjects).forEach(g=>world.remove(g)); wellObjects={}; shoesGroup.clear(); clearLabels(); }
+function clearWorld(){ Object.values(wellObjects).forEach(g=>world.remove(g)); wellObjects={}; shoesGroup.clear(); clearLabels();
+  if(typeof measurePts!=="undefined"){ measurePts.length=0; measureGroup.clear(); if(measureTip) measureTip.style.display="none"; } }
 
 /* Pinta un tubo de aislación con vertex colors según isoMode.
    normal → sin vertex colors (usa el color del material). stages/dogleg → color por anillo. */
@@ -432,7 +558,10 @@ function applyIsoColors(tube){
   // frontera curva/lateral = MD del inicio de la primera etapa (primer cluster de la etapa más somera)
   let firstStageMD=Infinity, lastStageMD=-Infinity;
   iso.stageRanges.forEach(r=>{ firstStageMD=Math.min(firstStageMD,r.md0); lastStageMD=Math.max(lastStageMD,r.md1); });
-  if(!isFinite(firstStageMD)){ firstStageMD=0; lastStageMD=iso.ringMD(iso.tubSeg); }
+  if(!isFinite(firstStageMD)){   // sin fracplan: usa el landing del survey como frontera curva/lateral
+    firstStageMD = (iso.landingMD!=null ? iso.landingMD : iso.ringMD(iso.tubSeg));
+    lastStageMD = iso.ringMD(iso.tubSeg);
+  }
   // para dogleg: máximo DLS DENTRO del tramo activo, para auto-normalizar el gradiente a ese tramo
   let segMax=0;
   if(isDogleg){
@@ -558,10 +687,58 @@ function buildPad(pad){
           }
           return st.at(-1).dls||0;
         };
-        tube.userData.iso={tubSeg, radial:14, ringMD, stageRanges, dlsAtMD};
+        // landing aprox: primer MD con inclinación ≥88° (o el de mayor inclinación si nunca llega).
+        // Frontera curva/lateral cuando NO hay fracplan (sin él, stageRanges queda vacío y el dogleg
+        // no tenía dónde cortar: la "rama" pintaba todo y la "curva" nada).
+        let landingMD=null, maxIncl=-1, maxInclMD=st[0]?.md||0;
+        for(const s of st){ const inc=s.incl||0;
+          if(inc>maxIncl){ maxIncl=inc; maxInclMD=s.md; }
+          if(landingMD==null && inc>=88) landingMD=s.md; }
+        if(landingMD==null) landingMD=maxInclMD;
+        tube.userData.iso={tubSeg, radial:14, ringMD, stageRanges, dlsAtMD, landingMD};
         applyIsoColors(tube);            // pinta según isoMode actual
       }
       g.add(tube);
+      // caños cortos (pup joints de la aislación): banda amarilla de referencia, alternable por sí sola.
+      // Son piezas de casing mucho más cortas que un tiro normal; se resaltan aunque midan pocos metros.
+      (cas.short_joints||[]).forEach(sj=>{
+        if(sj.top_md==null || sj.bottom_md==null) return;
+        const a=interpAtMD(st,sj.top_md,wx), b=interpAtMD(st,sj.bottom_md,wx);
+        const va=toThree(a.x,a.y,a.tvd), vb=toThree(b.x,b.y,b.tvd);
+        const mid=va.clone().add(vb).multiplyScalar(0.5);
+        const axis=vb.clone().sub(va); let h=axis.length();
+        if(h<1e-6){ axis.set(0,-1,0); h=0; }
+        const H=Math.max(h, r*2.5);               // alto mínimo para que sea visible pese a ser corto
+        const band=new THREE.Mesh(new THREE.CylinderGeometry(r*1.18, r*1.18, H, 20),
+          new THREE.MeshStandardMaterial({color:0xffe500, metalness:.2, roughness:.5, emissive:0x3a3600, emissiveIntensity:.6}));
+        band.quaternion.copy(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0), axis.normalize()));
+        band.position.copy(mid);
+        band.userData.kind="short"; band.userData.wellId=w.id; g.add(band);
+        const ccLen = (sj.length_m!=null) ? ` (${sj.length_m} m)` : "";
+        addLabel(`${sj.xover?"Xover":"Caño corto"} · MD ${Math.round(sj.top_md)}${ccLen}`,
+          mid.clone().add(new THREE.Vector3(0, r*4, 0)), "short", w.id);
+      });
+      // shoetrack (últimos ~150 m de la aislación): bandas violeta claro + 1 etiqueta con la lista
+      if(cas.shoetrack?.elements?.length){
+        cas.shoetrack.elements.forEach(el=>{
+          if(el.top_md==null || el.bottom_md==null) return;
+          const a=interpAtMD(st,el.top_md,wx), b=interpAtMD(st,el.bottom_md,wx);
+          const va=toThree(a.x,a.y,a.tvd), vb=toThree(b.x,b.y,b.tvd);
+          const mid=va.clone().add(vb).multiplyScalar(0.5);
+          const axis=vb.clone().sub(va); let h=axis.length(); if(h<1e-6){ axis.set(0,-1,0); h=0; }
+          const band=new THREE.Mesh(new THREE.CylinderGeometry(r*1.16, r*1.16, Math.max(h,r*2.2), 20),
+            new THREE.MeshStandardMaterial({color:0xc9a3ff, metalness:.2, roughness:.5, emissive:0x2a1f3a, emissiveIntensity:.5}));
+          band.quaternion.copy(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0), axis.normalize()));
+          band.position.copy(mid); band.userData.kind="shoetrack"; band.userData.wellId=w.id; g.add(band);
+        });
+        const first=cas.shoetrack.elements[0]; const sp=interpAtMD(st,first.top_md,wx);
+        let html=`<b>shoetrack</b> · MD ${Math.round(first.top_md)} · TVD ${Math.round(sp.tvd)}`;
+        cas.shoetrack.elements.forEach((el,idx)=>{
+          const d=escHtml(el.desc.length>28?el.desc.slice(0,28)+"…":el.desc);
+          html+=`<br>${idx+1}. ${d} · ${Math.round(el.top_md)} m`;
+        });
+        addLabel(html, toThree(sp.x,sp.y,sp.tvd).add(new THREE.Vector3(0, r*6, 0)), "shoetrack", w.id, true);
+      }
       // triángulo de zapato + leyenda MD/TVD (se completa en v0.2d con clipping; marca base acá)
       // zapato: disco sólido del color de la fase, orientado normal al eje del pozo
       const shoeTan=(function(){
@@ -575,7 +752,7 @@ function buildPad(pad){
       shoe.quaternion.copy(sq); shoe.position.copy(toThree(sp.x,sp.y,sp.tvd));
       shoe.userData.kind="shoe"; shoesGroup.add(shoe);
       // etiqueta de zapato: OD, libraje (lb/ft) y acero  →  ej.  5" 21.4 lb/ft P110 · MD 6650 · TVD 3070
-      const specs=[`${cas.od_in}"`];
+      const specs=[fmtOD(cas.od_in)];
       if(cas.weight_ppf!=null) specs.push(`${cas.weight_ppf} lb/ft`);
       if(cas.grade) specs.push(cas.grade);
       const shoeTvd=sp.tvd.toFixed(0);
@@ -617,19 +794,24 @@ function buildPad(pad){
         const md=(cl.top_md!=null?cl.top_md:cl.bottom_md); if(md==null) return;
         const p=interpAtMD(st,md,wx); const center=toThree(p.x,p.y,p.tvd);
         const tan=tangentAtMD(md); const [u,v]=perpBasis(tan);
-        const rIn=prodR, rOut=prodR*5;
-        const nRays=12; const pos=[];
-        for(let k=0;k<nRays;k++){
-          const ang=(k/nRays)*Math.PI*2;
-          const d=u.clone().multiplyScalar(Math.cos(ang)).add(v.clone().multiplyScalar(Math.sin(ang)));
-          const a=center.clone().add(d.clone().multiplyScalar(rIn));
-          const b=center.clone().add(d.clone().multiplyScalar(rOut));
-          pos.push(a.x,a.y,a.z, b.x,b.y,b.z);
-        }
+        const rOut=perfRadiusM, rIn=Math.min(prodR, perfRadiusM*0.2);   // radio real en metros (Configuración)
+        const pos=[];
+        const at=(ang,rad)=>center.clone()
+          .add(u.clone().multiplyScalar(Math.cos(ang)*rad)).add(v.clone().multiplyScalar(Math.sin(ang)*rad));
+        // rama de árbol: cada raíz crece hacia afuera y se bifurca al ganar distancia
+        const branch=(ang,r0,r1,depth,spread)=>{
+          const a=at(ang,r0), b=at(ang,r1); pos.push(a.x,a.y,a.z, b.x,b.y,b.z);
+          if(depth<=0) return;
+          const nr=r1+(r1-r0)*0.85;
+          branch(ang-spread, r1, nr, depth-1, spread*0.7);
+          branch(ang+spread, r1, nr, depth-1, spread*0.7);
+        };
+        const nRoots=6, step=(rOut-rIn)*0.42;
+        for(let k=0;k<nRoots;k++) branch((k/nRoots)*Math.PI*2, rIn, rIn+step, 2, 0.28);
         const geo=new THREE.BufferGeometry();
         geo.setAttribute("position", new THREE.Float32BufferAttribute(pos,3));
         const rays=new THREE.LineSegments(geo, perfMat);
-        rays.userData.kind="perf"; g.add(rays);
+        rays.userData.kind="perf"; rays.userData.wellId=w.id; rays.userData.stage=stg.stage; g.add(rays);
       });
 
       // tapones: cilindro rojo + etiqueta HTML "TPN N° x"
@@ -658,51 +840,209 @@ function buildPad(pad){
       addLabel(`Etapa ${stg.stage}`, toThree(p.x,p.y,p.tvd).add(new THREE.Vector3(0, prodR*9, 0)), "stage", w.id);
     });
 
+    // --- INSTALACIÓN: TBG (caño fino desde superficie hasta su MD final) + TPN/PKR ---
+    if(w.installation){
+      const inst=w.installation;
+      // fondo del TBG = MD final indicada (obligatoria). Fallback histórico si faltara.
+      let instBottom=inst.tbg_md_m;
+      if(instBottom==null){
+        (w.frac?.stages||[]).forEach(s=>(s.clusters||[]).forEach(cl=>{ const m=cl.bottom_md??cl.top_md; if(m!=null) instBottom=Math.max(instBottom??0,m); }));
+        if(instBottom==null){ const ais=(w.casings||[]).find(c=>c.phase==="produccion"); instBottom=ais?.shoe_md ?? st.at(-1).md; }
+      }
+      const tbgR=prodR*0.5;
+      const seg=[]; for(const s of st){ if(s.md<=instBottom) seg.push(toThree(wx+(s.ew||0),s.ns||0,s.tvd)); }
+      const bp=interpAtMD(st,instBottom,wx); seg.push(toThree(bp.x,bp.y,bp.tvd));
+      if(seg.length>=2){
+        const tube=new THREE.Mesh(
+          new THREE.TubeGeometry(new THREE.CatmullRomCurve3(seg), Math.max(80,seg.length), tbgR, 12, false),
+          new THREE.MeshStandardMaterial({color:0x00c2d1, metalness:.2, roughness:.5, emissive:0x00343a, emissiveIntensity:.4}));
+        tube.userData.kind="install"; tube.userData.wellId=w.id; g.add(tube);
+        if(inst.tbg_od_in!=null){
+          const tbgSpec=[`TBG ${fmtOD(inst.tbg_od_in)}`];
+          if(inst.tbg_weight_ppf!=null) tbgSpec.push(`${inst.tbg_weight_ppf} lb/ft`);
+          if(inst.tbg_grade) tbgSpec.push(inst.tbg_grade);
+          addLabel(tbgSpec.join(" "), toThree(bp.x,bp.y,bp.tvd).add(new THREE.Vector3(0, tbgR*6, 0)), "install", w.id);
+        }
+      }
+      (inst.elements||[]).forEach(el=>{
+        if(el.md==null) return;
+        const p=interpAtMD(st,el.md,wx); const center=toThree(p.x,p.y,p.tvd);
+        const isPkr=el.type==="PKR"; const R2=prodR*(isPkr?1.28:1.12), H2=prodR*(isPkr?1.2:0.9);
+        const mk=new THREE.Mesh(new THREE.CylinderGeometry(R2,R2,H2,20),
+          new THREE.MeshStandardMaterial({color:isPkr?0x3fb950:0xf2a03d, metalness:.2, roughness:.5}));
+        mk.quaternion.copy(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0), tangentAtMD(el.md)));
+        mk.position.copy(center); mk.userData.kind="install"; mk.userData.wellId=w.id; g.add(mk);
+        addLabel(`${el.type} · MD ${Math.round(el.md)}`, center.clone().add(new THREE.Vector3(0, prodR*6, 0)), "install", w.id);
+      });
+    }
+
     world.add(g); wellObjects[w.id]=g;
   });
 
-  buildWellToggles(wells); applyAllToggles(); frameAll(); updateSummary();
+  buildWellTree(wells); applyAllToggles(); frameAll(); updateSummary();
+  // re-aplica en el próximo frame: evita que, recién cargado, alguna capa quede sin estado
+  // hasta que el usuario toca un toggle (visibilidad no reflejada en el primer build).
+  requestAnimationFrame(applyAllToggles);
 }
 
-/* ============ Toggles ============ */
-function buildWellToggles(wells){
-  const wt=document.getElementById("well-toggles"); wt.innerHTML="";
-  wells.forEach((w,idx)=>{
-    const color=WELL_COLORS[idx%WELL_COLORS.length];
-    const l=document.createElement("label"); l.className="row";
-    const ne=w.frac?.total_stages||0;
-    l.innerHTML=`<input type="checkbox" checked data-well="${w.id}">
-      <span class="sw" style="background:#${color.toString(16).padStart(6,"0")}"></span>${w.id}
-      <span class="meta">${ne} et</span>`;
-    wt.appendChild(l);
-    l.querySelector("input").addEventListener("change",e=>{ wellObjects[w.id].visible=e.target.checked; });
+/* ============ Toggles: árbol por pozo ============
+   Cada pozo es un nodo desplegable con sus propios checkboxes de elementos, así se puede ver
+   cosas distintas en pozos distintos. El nodo "TODOS" aplica el cambio a todos los pozos a la vez.
+   Estado en VIS[wellId][clave] — persiste entre regeneraciones del pad (misma id de pozo). */
+const q=id=>{ const el=document.getElementById(id); return el?el.checked:true; };
+const ELEMS=[
+  ["traj","Trayectoria","#4ea1d3"],
+  ["guia","Guía","#e8c96a"],["intermedia1","Intermedia 1","#7fc7e0"],
+  ["intermedia2","Intermedia 2","#b79fe0"],["produccion","Aislación","#f2ede2"],
+  ["perf","Punzados","#17c4b0"],["plug","Tapones","#e5484d"],
+  ["short","Caños cortos","#ffe500"],["shoetrack","Shoetrack","#c9a3ff"],
+  ["install","Instalación","#00c2d1"]];
+const ELEM_DEFAULT={traj:true,guia:true,intermedia1:true,intermedia2:true,produccion:true,
+  perf:false,plug:true,short:true,shoetrack:true,install:true};
+let VIS={};
+function ensureVis(wid){ if(!VIS[wid]) VIS[wid]={well:true,perfStages:"",...ELEM_DEFAULT}; return VIS[wid]; }
+/* "1,3,10-15,18" → Set{1,3,10..15,18}; vacío → null (todas las etapas) */
+function parseStages(str){
+  str=(str||"").trim(); if(!str) return null;
+  const set=new Set();
+  for(const part of str.split(",")){ const p=part.trim(); if(!p) continue;
+    const m=p.match(/^(\d+)\s*-\s*(\d+)$/);
+    if(m){ let a=+m[1],b=+m[2]; if(a>b)[a,b]=[b,a]; for(let s=a;s<=b;s++) set.add(s); }
+    else if(/^\d+$/.test(p)) set.add(+p);
+  }
+  return set.size?set:null;
+}
+function applyWellVis(wid){
+  const g=wellObjects[wid]; if(!g) return; const v=ensureVis(wid);
+  g.visible=v.well!==false;
+  let hasInstall=false;
+  g.traverse(o=>{ if(o.userData.kind==="install") hasInstall=true; });
+  // con la instalación visible, la aislación se vuelve traslúcida para ver el TBG adentro
+  const isoTranslucent = hasInstall && v.install!==false;
+  const perfFilter = parseStages(v.perfStages);   // null = todas
+  g.traverse(o=>{ const k=o.userData.kind; if(!k) return;
+    if(k==="casing"){ o.visible=v[o.userData.phase]!==false;
+      if(o.userData.phase==="produccion" && o.material){
+        o.material.transparent = isoTranslucent; o.material.opacity = isoTranslucent?0.28:1;
+        o.material.needsUpdate=true;
+      }
+    }
+    else if(k==="perf") o.visible = (v.perf!==false) && (!perfFilter || perfFilter.has(o.userData.stage));
+    else if(k in ELEM_DEFAULT) o.visible=v[k]!==false;
   });
 }
-const q=id=>{ const el=document.getElementById(id); return el?el.checked:true; };
-function setKind(kind,on){
-  Object.values(wellObjects).forEach(g=>g.traverse(o=>{ if(o.userData.kind===kind) o.visible=on; }));
+function buildWellTree(wells){
+  const cont=document.getElementById("well-tree"); cont.innerHTML="";
+  const mkNode=(wid,name,color,meta,isMaster)=>{
+    const n=document.createElement("div"); n.className="wnode"+(isMaster?" master":"");
+    n.dataset.wid=wid??"";
+    const sw=color!=null?`<span class="sw" style="background:#${color.toString(16).padStart(6,"0")}"></span>`:"";
+    const v=wid?ensureVis(wid):null;
+    n.innerHTML=`<div class="whead"><span class="caret">▸</span>
+        <input type="checkbox" class="wvis" ${(!wid||v.well)?"checked":""}>
+        ${sw}<span class="wname">${name}</span>${meta?`<span class="meta">${meta}</span>`:""}</div>
+      <div class="wbody" hidden>${ELEMS.map(([k,label,col])=>{
+        const on = wid ? v[k]!==false : ELEMS_MASTER_STATE(k);
+        let row=`<label class="row"><input type="checkbox" data-el="${k}" ${on?"checked":""}>
+          <span class="sw" style="background:${col}"></span>${label}</label>`;
+        if(k==="perf"){ const pf=wid?(v.perfStages||""):"";
+          row+=`<input class="perf-filter" data-perffilter type="text" value="${pf}" placeholder="etapas (ej: 1,3,10-15) — vacío=todas">`; }
+        return row;}).join("")}</div>`;
+    return n;
+  };
+  // estado "master" mostrado: true si TODOS los pozos lo tienen activo
+  function ELEMS_MASTER_STATE(k){
+    const wids=Object.keys(wellObjects); if(!wids.length) return ELEM_DEFAULT[k];
+    return wids.every(wid=>ensureVis(wid)[k]!==false);
+  }
+  cont.appendChild(mkNode(null,"Todos",null,null,true));
+  wells.forEach((w,idx)=>{
+    ensureVis(w.id);
+    cont.appendChild(mkNode(w.id, w.id, WELL_COLORS[idx%WELL_COLORS.length],
+      `${w.frac?.total_stages||0} et`, false));
+  });
 }
-function setPhase(phase,on){ Object.values(wellObjects).forEach(g=>g.traverse(o=>{ if(o.userData.kind==="casing"&&o.userData.phase===phase) o.visible=on; })); }
+document.getElementById("well-tree").addEventListener("click",e=>{
+  const head=e.target.closest(".whead");
+  if(head && !e.target.classList.contains("wvis")){
+    const node=head.parentElement;
+    node.classList.toggle("open");
+    node.querySelector(".wbody").hidden=!node.classList.contains("open");
+  }
+});
+document.getElementById("well-tree").addEventListener("change",e=>{
+  const t=e.target, node=t.closest(".wnode"); if(!node) return;
+  const wid=node.dataset.wid||null, tree=document.getElementById("well-tree");
+  if(t.classList.contains("wvis")){
+    if(wid){ ensureVis(wid).well=t.checked; applyWellVis(wid); }
+    else {   // master: todos los pozos
+      tree.querySelectorAll(".wnode:not(.master)").forEach(n=>{
+        const id=n.dataset.wid; ensureVis(id).well=t.checked;
+        n.querySelector(".wvis").checked=t.checked; applyWellVis(id);
+      });
+    }
+    return;
+  }
+  const k=t.dataset.el; if(!k) return;
+  if(wid){ ensureVis(wid)[k]=t.checked; applyWellVis(wid); }
+  else {
+    tree.querySelectorAll(".wnode:not(.master)").forEach(n=>{
+      const id=n.dataset.wid; ensureVis(id)[k]=t.checked;
+      const cb=n.querySelector(`[data-el="${k}"]`); if(cb) cb.checked=t.checked;
+      applyWellVis(id);
+    });
+  }
+});
+// filtro de etapas de punzados (caja de texto por pozo / para todos)
+document.getElementById("well-tree").addEventListener("input",e=>{
+  const t=e.target; if(!t.matches("[data-perffilter]")) return;
+  const node=t.closest(".wnode"), wid=node.dataset.wid||null, tree=document.getElementById("well-tree");
+  if(wid){ ensureVis(wid).perfStages=t.value; applyWellVis(wid); }
+  else {
+    tree.querySelectorAll(".wnode:not(.master)").forEach(n=>{ const id=n.dataset.wid;
+      ensureVis(id).perfStages=t.value; const inp=n.querySelector("[data-perffilter]"); if(inp) inp.value=t.value;
+      applyWellVis(id); });
+  }
+  saveViewCfg();
+});
 function applyAllToggles(){
-  setKind("traj",q("t-traj")); setKind("perf",q("t-perf")); setKind("plug",q("t-plug"));
-  document.querySelectorAll("[data-phase]").forEach(cb=>setPhase(cb.dataset.phase,cb.checked));
-  if(!q("t-casing")) setKind("casing",false);
+  Object.keys(wellObjects).forEach(applyWellVis);
   gridGroup.visible=q("cfg-grid"); axes.visible=q("cfg-axes"); shoesGroup.visible=q("cfg-shoes");
-  SHOW_STAGE_LABELS=q("lbl-stage"); SHOW_TPN_LABELS=q("lbl-tpn"); SHOW_SHOE_LABELS=q("lbl-shoe"); SHOW_CURSOR_TIP=q("lbl-cursor");
+  SHOW_STAGE_LABELS=q("lbl-stage"); SHOW_TPN_LABELS=q("lbl-tpn"); SHOW_SHOE_LABELS=q("lbl-shoe");
+  SHOW_SHORT_LABELS=q("lbl-short"); SHOW_INSTALL_LABELS=q("lbl-install");
+  SHOW_SHOETRACK_LABELS=q("lbl-shoetrack"); SHOW_CURSOR_TIP=q("lbl-cursor");
 }
 document.getElementById("lbl-stage").addEventListener("change",e=>SHOW_STAGE_LABELS=e.target.checked);
 document.getElementById("lbl-tpn").addEventListener("change",e=>SHOW_TPN_LABELS=e.target.checked);
+document.getElementById("lbl-short").addEventListener("change",e=>SHOW_SHORT_LABELS=e.target.checked);
+document.getElementById("lbl-install").addEventListener("change",e=>SHOW_INSTALL_LABELS=e.target.checked);
+document.getElementById("lbl-shoetrack").addEventListener("change",e=>SHOW_SHOETRACK_LABELS=e.target.checked);
 document.getElementById("lbl-shoe").addEventListener("change",e=>SHOW_SHOE_LABELS=e.target.checked);
-["t-traj","t-perf","t-plug"].forEach(id=>document.getElementById(id).addEventListener("change",e=>setKind(id.slice(2),e.target.checked)));
-document.getElementById("t-casing").addEventListener("change",e=>{ setKind("casing",e.target.checked);
-  if(e.target.checked) document.querySelectorAll("[data-phase]").forEach(cb=>setPhase(cb.dataset.phase,cb.checked)); });
-document.querySelectorAll("[data-phase]").forEach(cb=>cb.addEventListener("change",()=>setPhase(cb.dataset.phase,cb.checked)));
 document.querySelectorAll("input[name='isomode']").forEach(r=>r.addEventListener("change",e=>{
   if(e.target.checked){ isoMode=e.target.value; refreshIsoColors(); }
 }));
 document.getElementById("cfg-grid").addEventListener("change",e=>gridGroup.visible=e.target.checked);
 document.getElementById("cfg-axes").addEventListener("change",e=>axes.visible=e.target.checked);
 document.getElementById("cfg-shoes").addEventListener("change",e=>shoesGroup.visible=e.target.checked);
+
+/* ---- Apariencia de etiquetas: tamaño, tipografía, formato de OD ---- */
+const LABEL_FONTS={
+  mono:'"SFMono-Regular",ui-monospace,Consolas,monospace',
+  sans:'"Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif',
+  serif:'Georgia,"Times New Roman",serif',
+  cond:'"Arial Narrow","Roboto Condensed","Segoe UI",sans-serif'
+};
+const labelsEl=document.getElementById("labels"), hoverEl=document.getElementById("hover-tip");
+function setLabelSize(px){ labelsEl.style.setProperty("--lbl-size",px+"px"); hoverEl.style.setProperty("--lbl-size",px+"px");
+  document.getElementById("lblsize-val").textContent=px+" px"; }
+function setLabelFont(key){ const f=LABEL_FONTS[key]||LABEL_FONTS.mono;
+  labelsEl.style.setProperty("--lbl-font",f); hoverEl.style.setProperty("--lbl-font",f); }
+document.getElementById("cfg-lblsize").addEventListener("input",e=>setLabelSize(parseInt(e.target.value,10)));
+document.getElementById("cfg-font").addEventListener("change",e=>setLabelFont(e.target.value));
+document.querySelectorAll("input[name='odfmt']").forEach(r=>r.addEventListener("change",e=>{
+  if(e.target.checked){ odFormat=e.target.value; if(PAD) buildPad(PAD); renderWellCards(); }   // reetiqueta zapatos 3D y picklists del constructor
+}));
+setLabelSize(11); setLabelFont("mono");
 document.getElementById("lbl-cursor").addEventListener("change",e=>{ SHOW_CURSOR_TIP=e.target.checked;
   if(!SHOW_CURSOR_TIP) document.getElementById("hover-tip").style.display="none"; });
 
@@ -742,10 +1082,18 @@ document.getElementById("collapse-all").addEventListener("click",e=>{
 const _hray=new THREE.Raycaster();
 const hoverTip=document.getElementById("hover-tip");
 const _vA=new THREE.Vector3(), _vB=new THREE.Vector3(), _vP=new THREE.Vector3(), _vAB=new THREE.Vector3(), _vAP=new THREE.Vector3();
+/* etapa que contiene un MD dado (rango top→bottom de los clusters de la etapa) */
+function stageAtMD(w, md){
+  for(const s of (w.frac?.stages||[])){
+    const mds=(s.clusters||[]).flatMap(c=>[c.top_md,c.bottom_md]).filter(x=>x!=null);
+    if(mds.length && md>=Math.min(...mds) && md<=Math.max(...mds)) return s.stage;
+  }
+  return null;
+}
 function mdFromPoint(wellId, pt){
   const w=PAD?.pad.wells.find(x=>x.id===wellId); if(!w) return null;
   const st=w.survey.stations, wx=w.wellhead.x||0;
-  let best=Infinity, bestMD=null, bestTVD=null;
+  let best=Infinity, bestMD=null, bestTVD=null, bestDLS=null;
   for(let i=1;i<st.length;i++){
     const a=st[i-1], b=st[i];
     _vA.copy(toThree(wx+(a.ew||0),a.ns||0,a.tvd));
@@ -754,9 +1102,12 @@ function mdFromPoint(wellId, pt){
     const len2=_vAB.lengthSq()||1; let t=_vAP.dot(_vAB)/len2; t=Math.max(0,Math.min(1,t));
     _vP.copy(_vA).addScaledVector(_vAB,t);
     const d=_vP.distanceToSquared(pt);
-    if(d<best){ best=d; bestMD=a.md+(b.md-a.md)*t; bestTVD=a.tvd+(b.tvd-a.tvd)*t; }
+    if(d<best){ best=d; bestMD=a.md+(b.md-a.md)*t; bestTVD=a.tvd+(b.tvd-a.tvd)*t;
+      // dogleg: interpola si ambas estaciones lo traen; si no, usa la que exista (o null)
+      bestDLS=(a.dls!=null&&b.dls!=null)?a.dls+(b.dls-a.dls)*t:(b.dls!=null?b.dls:a.dls);
+    }
   }
-  return bestMD==null?null:{md:bestMD,tvd:bestTVD,well:wellId};
+  return bestMD==null?null:{md:bestMD,tvd:bestTVD,dls:bestDLS,stage:stageAtMD(w,bestMD),well:wellId};
 }
 canvas.addEventListener("mousemove",e=>{
   if(!SHOW_CURSOR_TIP || !PAD || dragging!==null){ hoverTip.style.display="none"; return; }
@@ -772,7 +1123,9 @@ canvas.addEventListener("mousemove",e=>{
   const wellId=hits[0].object.userData.wellId;
   const info=mdFromPoint(wellId, hits[0].point);
   if(!info){ hoverTip.style.display="none"; return; }
-  hoverTip.innerHTML=`<span class="w">${info.well}</span><br>MD <b>${Math.round(info.md)}</b> m · TVD <b>${Math.round(info.tvd)}</b> m`;
+  const stageTxt = info.stage!=null ? ` · <span class="s">E${info.stage}</span>` : "";
+  const dlsTxt = info.dls!=null ? `<br><span class="d">dogleg</span> <span class="dl">${info.dls.toFixed(2)}</span> °/30m` : "";
+  hoverTip.innerHTML=`<span class="w">${info.well}</span>${stageTxt}<br>MD <b>${Math.round(info.md)}</b> m · TVD <b>${Math.round(info.tvd)}</b> m${dlsTxt}`;
   hoverTip.style.display="block";
   hoverTip.style.left=(e.clientX-rect.left)+"px";
   hoverTip.style.top=(e.clientY-rect.top)+"px";
@@ -797,6 +1150,10 @@ document.getElementById("cfg-autodiam").addEventListener("change",e=>{
 });
 document.getElementById("cfg-pluginv").addEventListener("change",e=>{
   plugCountInverted=e.target.checked; if(PAD) buildPad(PAD);
+});
+document.getElementById("cfg-perfradius").addEventListener("input",e=>{
+  perfRadiusM=parseFloat(e.target.value); document.getElementById("perfradius-val").textContent=perfRadiusM+" m";
+  if(PAD) buildPad(PAD);
 });
 
 /* ============ Cámara CAD ============ */
@@ -827,12 +1184,20 @@ function setView(name){
     bottom: {phi:Math.PI-eps,theta:0},           // desde abajo
     north:  {phi:Math.PI/2,  theta:0},           // desde el Norte (+Z)
     south:  {phi:Math.PI/2,  theta:Math.PI},     // desde el Sur (rama navegando)
-    east:   {phi:Math.PI/2,  theta:Math.PI/2},   // desde el Este (+X)
-    west:   {phi:Math.PI/2,  theta:-Math.PI/2},  // desde el Oeste (-X)
+    east:   {phi:Math.PI/2,  theta:-Math.PI/2},  // desde el Este (Este = -X en mundo)
+    west:   {phi:Math.PI/2,  theta:Math.PI/2},   // desde el Oeste (Oeste = +X en mundo)
     iso:    {phi:1.05,       theta:0.7},         // isométrica
   };
   const v=V[name]||V.iso;
-  sph.phi=v.phi; sph.theta=v.theta;
+  sph.phi=v.phi;
+  if(name==="top"||name==="bottom"){
+    // arriba/abajo: NO forzar el azimut — snap al múltiplo de 90° más cercano del actual.
+    // Así, si venís mirando desde el Sur (Norte arriba de pantalla), la vista superior conserva
+    // el Norte arriba en vez de invertirlo.
+    sph.theta=Math.round(sph.theta/(Math.PI/2))*(Math.PI/2);
+  } else {
+    sph.theta=v.theta;
+  }
   frameAll();  // reencuadra manteniendo la nueva orientación
   document.getElementById("hud-cam").textContent="vista: "+name;
 }
@@ -840,7 +1205,69 @@ document.querySelectorAll("[data-view3d]").forEach(b=>
   b.addEventListener("click",()=>setView(b.dataset.view3d)));
 
 let dragging=null,px=0,py=0;
-canvas.addEventListener("mousedown",e=>{dragging=e.button;px=e.clientX;py=e.clientY;});
+canvas.addEventListener("mousedown",e=>{
+  if(gizmoHitTest(e.clientX,e.clientY)) return;   // dentro del ViewCube: no orbitar (se resuelve en click)
+  if(measureMode && e.button===0) return;         // modo medir: el click izquierdo pincha, no orbita
+  dragging=e.button;px=e.clientX;py=e.clientY;});
+canvas.addEventListener("click",e=>{
+  const h=gizmoHitTest(e.clientX,e.clientY); if(h){ applyGizmoHit(h); return; }
+  if(measureMode && e.button===0) measurePick(e.clientX,e.clientY);
+});
+
+/* ============ Regla medidora ============
+   Modo "colocar punto": M/botón arma UN click. Al colocar, se desarma solo → se navega normal.
+   Se vuelve a armar con M/botón para el 2° punto (o iniciar de nuevo). Esc borra la medición. */
+let measureMode=false; const measurePts=[]; const _mray=new THREE.Raycaster();
+const measureTip=document.createElement("div"); measureTip.id="measure-tip";
+document.getElementById("v3d").appendChild(measureTip);
+function setMeasure(on){
+  measureMode=on;
+  document.getElementById("hud-measure").classList.toggle("on",on);
+  canvas.style.cursor=on?"crosshair":"";
+  document.getElementById("hud-cam").textContent = on
+    ? (measurePts.length===1 ? "medir: click en el 2° punto" : "medir: click en el 1° punto")
+    : "orbit · pan · zoom";
+}
+function clearMeasure(){ measurePts.length=0; measureGroup.clear(); measureTip.style.display="none"; }
+function measurePick(cx,cy){
+  camera.updateMatrixWorld();
+  const rect=canvas.getBoundingClientRect();
+  const ndc=new THREE.Vector2(((cx-rect.left)/rect.width)*2-1, -(((cy-rect.top)/rect.height)*2-1));
+  _mray.setFromCamera(ndc,camera); _mray.params.Line.threshold=sph.radius*0.02;
+  const trajs=[]; Object.values(wellObjects).forEach(g=>{ if(!g.visible) return;
+    g.traverse(o=>{ if(o.userData.kind==="traj"&&o.visible) trajs.push(o); }); });
+  const hits=_mray.intersectObjects(trajs,false);
+  if(!hits.length){ toast("Medir: hacé click sobre una trayectoria"); return; }   // sigue armado
+  if(measurePts.length>=2) clearMeasure();     // medición completa → arranca una nueva
+  const pt=hits[0].point.clone(); measurePts.push(pt);
+  const dot=new THREE.Mesh(new THREE.SphereGeometry(sph.radius*0.009,10,10),
+    new THREE.MeshBasicMaterial({color:0x4ea1d3, depthTest:false}));
+  dot.position.copy(pt); dot.renderOrder=3; measureGroup.add(dot);
+  if(measurePts.length===2){
+    const line=new THREE.Line(new THREE.BufferGeometry().setFromPoints(measurePts),
+      new THREE.LineDashedMaterial({color:0x4ea1d3, dashSize:sph.radius*0.02, gapSize:sph.radius*0.012, depthTest:false}));
+    line.computeLineDistances(); line.renderOrder=3; measureGroup.add(line);
+  }
+  updateMeasure();
+  setMeasure(false);          // un solo punto por activación → vuelve la navegación normal
+}
+function updateMeasure(){
+  if(measurePts.length<2){ measureTip.style.display="none"; return; }
+  const [a,b]=measurePts;
+  const dE=-(b.x-a.x), dN=(b.z-a.z), dT=-(b.y-a.y)/vexag;    // mundo→real (Este=-X, TVD=-Y/vexag)
+  const dist=Math.hypot(dE,dN,dT), horiz=Math.hypot(dE,dN);
+  // altura firmada respecto al origen (1er punto): 2° más somero ⇒ negativo; más profundo ⇒ positivo
+  const alt=dT;
+  measureTip.innerHTML=`<b>${dist.toFixed(1)} m</b><br>`
+    +`<span class="d">N/S</span> ${dN>=0?"N":"S"}${Math.abs(dN).toFixed(1)} · `
+    +`<span class="d">E/O</span> ${dE>=0?"E":"O"}${Math.abs(dE).toFixed(1)}<br>`
+    +`<span class="d">altura</span> ${alt>=0?"+":"−"}${Math.abs(alt).toFixed(1)} · <span class="d">horiz</span> ${horiz.toFixed(1)}`;
+  const mid=a.clone().add(b).multiplyScalar(0.5).project(camera);
+  const W=canvas.clientWidth,H=canvas.clientHeight;
+  measureTip.style.display = mid.z<1 ? "block":"none";
+  measureTip.style.left=((mid.x*0.5+0.5)*W)+"px"; measureTip.style.top=((-mid.y*0.5+0.5)*H)+"px";
+}
+document.getElementById("hud-measure").addEventListener("click",()=>setMeasure(!measureMode));
 window.addEventListener("mouseup",()=>dragging=null);
 window.addEventListener("mousemove",e=>{
   if(dragging===null) return;
@@ -914,8 +1341,78 @@ const IDB={ db:null,
 function loadPadObject(obj, persist=true){
   if(!obj||obj.schema_version!==1||!obj.pad){ toast("JSON no compatible (se esperaba schema_version 1)"); return; }
   buildPad(obj); if(persist) IDB.save(obj);
+  syncBuilderFromPad(obj);   // el constructor refleja el pad cargado: picklists, MDs, metadata (editable)
   toast(`Pad ${obj.pad.id} cargado · ${obj.pad.wells.length} pozos`); show("v3d");
 }
+/* Pad → constructor: llena metadata, picklists y cajas con lo cargado (JSON o generado), para
+   poder EDITAR cualquier dato y re-aplicarlo con "Generar y ver pad". La tabla es el resumen. */
+function syncBuilderFromPad(pad){
+  const p=pad.pad, setv=(id,v)=>{ document.getElementById(id).value=(v??""); };
+  setv("b-name",p.name); setv("b-id",p.id); setv("b-field",p.field); setv("b-operator",p.operator);
+  setv("b-campaign",p.campaign); setv("b-spacing",p.surface?.wellhead_spacing_m??10);
+  setv("b-rkb",p.wells[0]?.wellhead?.rkb_elev_m);
+  const n=Math.min(p.wells.length,8);   // el selector soporta hasta 8; más pozos → solo los primeros en el form
+  document.getElementById("b-nwells").value=String(Math.max(n,1));
+  ING.wells=p.wells.slice(0,8).map(w=>{
+    const casings={};
+    (w.casings||[]).forEach(c=>{ casings[c.phase]={od_in:c.od_in??null, shoe_md:c.shoe_md??null,
+      toc_md:c.toc_md??null, weight_ppf:c.weight_ppf??null, grade:c.grade??null,
+      short_joints:c.short_joints||undefined, shoetrack:c.shoetrack||undefined}; });
+    const inst=w.installation ? {enabled:true, tbg_od:w.installation.tbg_od_in??null,
+        tbg_weight:w.installation.tbg_weight_ppf??null, tbg_grade:w.installation.tbg_grade??null,
+        tbg_md:w.installation.tbg_md_m??null,
+        elements:(w.installation.elements||[]).map(el=>({type:el.type, md:el.md}))}
+      : {enabled:false, tbg_od:null, tbg_weight:null, tbg_grade:null, tbg_md:null, elements:[]};
+    return { id:w.id||"",
+      survey:(w.architecture==="vertical")?null:(w.survey||null),   // vertical sintético: no lo importo, se re-sintetiza
+      frac:(w.frac&&(w.frac.stages||[]).length)?w.frac:null, casings, install:inst };
+  });
+  renderWellCards();
+}
+
+/* ============ Persistencia de la vista (localStorage) ============
+   La app recuerda SIEMPRE la configuración de vista: capas por pozo (VIS), etiquetas, referencia,
+   modo aislación, formato de OD, exageraciones, numeración de TPN y apariencia de etiquetas. */
+const VIEWCFG_KEY="vv-viewcfg-v1";
+function saveViewCfg(){
+  try{
+    const cfg={ VIS, isoMode, odFormat, vexag, diamExag, autoDiam, perfRadiusM,
+      plugInv:plugCountInverted,
+      lblSize:parseInt(document.getElementById("cfg-lblsize").value,10),
+      font:document.getElementById("cfg-font").value, checks:{} };
+    ["lbl-stage","lbl-tpn","lbl-short","lbl-install","lbl-shoetrack","lbl-shoe","lbl-cursor",
+     "cfg-grid","cfg-axes","cfg-shoes","cfg-autodiam"].forEach(id=>cfg.checks[id]=document.getElementById(id).checked);
+    localStorage.setItem(VIEWCFG_KEY, JSON.stringify(cfg));
+  }catch(e){ /* almacenamiento no disponible: la vista simplemente no persiste */ }
+}
+function loadViewCfg(){
+  let cfg=null; try{ cfg=JSON.parse(localStorage.getItem(VIEWCFG_KEY)||"null"); }catch(e){}
+  if(!cfg) return;
+  if(cfg.VIS && typeof cfg.VIS==="object") VIS=cfg.VIS;
+  Object.entries(cfg.checks||{}).forEach(([id,val])=>{ const el=document.getElementById(id); if(el) el.checked=!!val; });
+  if(cfg.isoMode){ isoMode=cfg.isoMode;
+    const r=document.querySelector(`input[name='isomode'][value='${cfg.isoMode}']`); if(r) r.checked=true; }
+  if(cfg.odFormat){ odFormat=cfg.odFormat;
+    const r=document.querySelector(`input[name='odfmt'][value='${cfg.odFormat}']`); if(r) r.checked=true; }
+  if(typeof cfg.vexag==="number"){ vexag=cfg.vexag;
+    document.getElementById("cfg-vexag").value=cfg.vexag;
+    document.getElementById("vexag-val").textContent=vexag.toFixed(1)+"×"; }
+  autoDiam=!!cfg.autoDiam; document.getElementById("cfg-dexag").disabled=autoDiam;
+  if(typeof cfg.diamExag==="number" && !autoDiam){ diamExag=cfg.diamExag;
+    document.getElementById("cfg-dexag").value=cfg.diamExag;
+    document.getElementById("dexag-val").textContent=Math.round(diamExag)+"×"; }
+  if(typeof cfg.lblSize==="number"){ document.getElementById("cfg-lblsize").value=cfg.lblSize; setLabelSize(cfg.lblSize); }
+  if(cfg.font){ document.getElementById("cfg-font").value=cfg.font; setLabelFont(cfg.font); }
+  if(cfg.plugInv!=null){ plugCountInverted=!!cfg.plugInv; document.getElementById("cfg-pluginv").checked=plugCountInverted; }
+  if(typeof cfg.perfRadiusM==="number"){ perfRadiusM=cfg.perfRadiusM;
+    document.getElementById("cfg-perfradius").value=cfg.perfRadiusM;
+    document.getElementById("perfradius-val").textContent=perfRadiusM+" m"; }
+  applyAllToggles();
+}
+// cualquier cambio en el panel de capas o en Configuración guarda la vista
+document.getElementById("layers").addEventListener("change",saveViewCfg);
+document.getElementById("vconfig").addEventListener("change",saveViewCfg);
+loadViewCfg();
 
 IDB.open().then(()=>IDB.load()).then(saved=>{
   if(saved){ loadPadObject(saved, false); toast("Pad restaurado de sesión anterior"); return; }
@@ -944,17 +1441,464 @@ document.getElementById("ex-json").addEventListener("click",()=>{
   const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
   a.download=`pad_${PAD.pad.id}.json`; a.click(); URL.revokeObjectURL(a.href);
 });
-document.getElementById("forget").addEventListener("click",()=>{ IDB.clear(); toast("Pad guardado borrado. Al recargar, la app pedirá cargar uno."); });
+document.getElementById("forget").addEventListener("click",()=>{
+  IDB.clear();
+  // reset completo: gráfico, tabla, pie de página y formulario del constructor
+  PAD=null; clearWorld();
+  document.getElementById("summary-body").innerHTML="—";
+  document.getElementById("foot-pad").textContent="—"; document.getElementById("foot-wells").textContent="—";
+  document.getElementById("well-tree").innerHTML="";
+  ING.wells=[];
+  ["b-name","b-id","b-field","b-operator","b-campaign","b-rkb"].forEach(id=>document.getElementById(id).value="");
+  document.getElementById("b-spacing").value=10;
+  renderWellCards();
+  toast("Pad olvidado: gráfico, tabla y formulario reseteados");
+});
+
+/* ============================================================================
+   INGESTA EN NAVEGADOR — parsers de survey/tally/fracplan (puerto de build_pad.py)
+   XLS con SheetJS, PDF con pdf.js. Mantener la lógica en paridad con build_pad.py.
+   ============================================================================ */
+const round3=x=>x==null?null:Math.round(x*1000)/1000;
+const mostCommon=arr=>{ if(!arr.length) return null; const m=new Map();
+  for(const v of arr) m.set(v,(m.get(v)||0)+1);
+  return [...m.entries()].sort((a,b)=>b[1]-a[1])[0][0]; };
+/* ODs estándar de casing (pulg) y OD esperado por fase — para "encajar" candidatos y descartar ruido */
+const STD_OD=[4.5,5.0,5.5,7.0,7.625,8.625,9.625,10.75,11.75,13.375];
+const PHASE_OD_EXP={guia:13.375, intermedia1:9.625, intermedia2:7.625, produccion:5.0};
+/* matriz 1-indexada tipo openpyxl ws.cell(r,c): preserva filas en blanco (a diferencia de sheet_to_json) */
+function sheetMatrix(ws){
+  const ref=ws && ws["!ref"]; if(!ref) return [];
+  const range=XLSX.utils.decode_range(ref); const rows=[];
+  for(let R=range.s.r; R<=range.e.r; R++){ const row=[];
+    for(let C=range.s.c; C<=range.e.c; C++){ const cell=ws[XLSX.utils.encode_cell({r:R,c:C})]; row.push(cell?cell.v:null); }
+    rows.push(row);
+  }
+  return rows;
+}
+
+function parseSurveyXLS(buf){
+  if(!window.XLSX) throw new Error("SheetJS no cargó (sin internet?)");
+  const wb=XLSX.read(new Uint8Array(buf),{type:"array"}); const ws=wb.Sheets[wb.SheetNames[0]];
+  const rows=sheetMatrix(ws); const maxCol=rows.length?rows[0].length:0;
+  const cell=(r,c)=>{ const row=rows[r-1]; return row?(row[c-1]??null):null; };   // 1-indexado
+  let hdr=null;
+  for(let r=1;r<=40;r++){ const v=cell(r,2);
+    if(typeof v==="string" && v.trim().toUpperCase().startsWith("MD")){ hdr=r; break; } }
+  if(hdr==null) hdr=23;
+  const col={};
+  for(let c=1;c<=maxCol;c++){ const h=cell(hdr,c);
+    if(typeof h==="string") col[h.trim().toUpperCase().split("\n")[0].trim()]=c; }
+  const find=(...names)=>{ for(const n of names) if(n in col) return col[n]; return null; };
+  const c_md=find("MD"), c_incl=find("INCL"), c_az=find("AZIM GRID","AZIM","AZIMUTH"),
+    c_tvd=find("TVD"), c_vsec=find("VSEC"), c_ns=find("NS"), c_ew=find("EW"), c_dls=find("DLS");
+  const num=x=>{ if(x==null) return null; if(typeof x==="number") return x;
+    const m=String(x).replace(/,/g,"").match(/-?[\d.]+/); return m?parseFloat(m[0]):null; };
+  const signed=x=>{ if(x==null) return null; if(typeof x==="number") return x;
+    const m=String(x).trim().match(/([NSEW])\s*([\d.]+)/);
+    if(m){ const v=parseFloat(m[2]); return (m[1]==="S"||m[1]==="W")?-v:v; } return num(x); };
+  let vsec_az=null;
+  for(let r=5;r<=21;r++){ for(const [lc,vc] of [[1,3],[7,9]]){ const lab=cell(r,lc);
+    if(typeof lab==="string" && lab.includes("Vertical Section Azimuth")){
+      const mm=String(cell(r,vc)).match(/[\d.]+/); vsec_az=mm?parseFloat(mm[0]):null; } } }
+  const stations=[];
+  for(let r=hdr+1;r<=rows.length;r++){
+    const md=c_md?cell(r,c_md):null; if(typeof md!=="number") continue;
+    stations.push({ md:round3(md),
+      incl:c_incl?num(cell(r,c_incl)):null, azim:c_az?num(cell(r,c_az)):null,
+      tvd:c_tvd?round3(num(cell(r,c_tvd))||0):null, vsec:c_vsec?num(cell(r,c_vsec)):null,
+      ns:c_ns?signed(cell(r,c_ns)):null, ew:c_ew?signed(cell(r,c_ew)):null,
+      dls:c_dls?num(cell(r,c_dls)):null });
+  }
+  if(!stations.length) throw new Error("no se encontraron estaciones (revisá el layout)");
+  return {vsec_azimuth_deg:vsec_az, stations};
+}
+
+function parseFracplanXLS(buf){
+  if(!window.XLSX) throw new Error("SheetJS no cargó (sin internet?)");
+  const wb=XLSX.read(new Uint8Array(buf),{type:"array"}); const ws=wb.Sheets["Punzados"];
+  if(!ws) throw new Error('falta la hoja "Punzados"');
+  const rows=sheetMatrix(ws);
+  const c=(r,col)=>{ const row=rows[r-1]; return row?(row[col-1]??null):null; };
+  const hdr={lp_md:c(5,2),collar_md:c(6,2),horizontal_ext_m:c(7,2),total_stages:c(9,2)};
+  const stages={}, order=[]; let cur=null;
+  for(let r=13;r<=rows.length;r++){
+    const name=c(r,1); if(!(typeof name==="string" && name.startsWith("Cluster"))) continue;
+    const nm=name.match(/(\d+)/); const n=nm?parseInt(nm[1],10):null;
+    const stg=c(r,5), plug=c(r,12);
+    if(stg!=null){ cur=parseInt(stg,10);
+      if(!(cur in stages)){ stages[cur]={stage:cur,plug_md:null,clusters:[]}; order.push(cur); } }
+    if(cur==null) continue;
+    stages[cur].clusters.push({n, top_md:c(r,2), bottom_md:c(r,3), incl:c(r,4),
+      shots:c(r,8), charge:c(r,9), phasing:c(r,10)});
+    if(plug!=null) stages[cur].plug_md=plug;
+  }
+  return { total_stages: hdr.total_stages?parseInt(hdr.total_stages,10):order.length,
+    lp_md:hdr.lp_md, collar_md:hdr.collar_md, horizontal_ext_m:hdr.horizontal_ext_m,
+    planned_vs_actual:"planned", stages:order.map(s=>stages[s]) };
+}
+
+/* pdf.js: reconstruye líneas agrupando ítems de texto por su coordenada y (arriba→abajo) */
+/* Reconstruye texto de un PDF con pdf.js imitando a pdfplumber: agrupa ítems por línea (y)
+   y, dentro de la línea, inserta espacio SOLO cuando hay un hueco real entre columnas.
+   Unir todo con " " a ciegas rompía números ("13.375"→"13. 375") y títulos de sección
+   ("2.2 Run Tally"), lo que dejaba el OD en "?" y no detectaba los caños cortos. */
+async function pdfText(buf){
+  if(!window.pdfjsLib) throw new Error("pdf.js no cargó (sin internet?)");
+  const pdf=await pdfjsLib.getDocument({data:buf}).promise; let out="";
+  for(let p=1;p<=pdf.numPages;p++){
+    const page=await pdf.getPage(p); const tc=await page.getTextContent();
+    const lines=new Map();
+    for(const it of tc.items){ if(!it.str) continue;
+      const y=Math.round(it.transform[5]);
+      if(!lines.has(y)) lines.set(y,[]);
+      lines.get(y).push({x:it.transform[4], w:it.width||0, h:Math.abs(it.height)||8, s:it.str}); }
+    const ys=[...lines.keys()].sort((a,b)=>b-a);
+    for(const y of ys){
+      const items=lines.get(y).sort((a,b)=>a.x-b.x);
+      let line="", prevEnd=null, prevH=8;
+      for(const it of items){
+        if(prevEnd!=null && (it.x-prevEnd) > Math.max(1, prevH*0.3)) line+=" ";
+        line+=it.s; prevEnd=it.x+it.w; prevH=it.h||prevH;
+      }
+      out+=line+"\n";
+    }
+  }
+  return out;
+}
+async function parseTallyPDF(buf, phase){
+  const text=await pdfText(buf);
+  const m=text.match(/2\.1\s+Pipe\s+Sections([\s\S]*?)2\.2\s+Run\s+Tally/i);
+  // fallback: si no aisla la sección 2.1, usa el catálogo del principio del doc igual sirve
+  const block=m?m[1]:text.slice(0,4000);
+  // OD: junta candidatos decimales de TODO el texto y "encaja" cada uno al OD estándar más
+  // cercano (±0.07"). Así descarta las longitudes de tiro (~12 m) que caen en 4–13.5 y hacían
+  // ganar un valor equivocado (o ninguno). Si se conoce la fase, prioriza su OD esperado.
+  const cands=[...text.matchAll(/\b(\d{1,2}\.\d{1,3})\b/g)].map(x=>parseFloat(x[1]));
+  let snapped=[];
+  for(const v of cands){ let best=null,bd=0.07;
+    for(const s of STD_OD){ const d=Math.abs(v-s); if(d<bd){ bd=d; best=s; } }
+    if(best!=null) snapped.push(best); }
+  if(phase && PHASE_OD_EXP[phase]!=null) snapped=snapped.filter(v=>Math.abs(v-PHASE_OD_EXP[phase])<1.6);
+  const od=mostCommon(snapped);
+  // peso (lb/ft): >=14 excluye longitudes de tiro (~12 m); el casing de estas medidas pesa más
+  const wts=[...block.matchAll(/\b(\d{2,3}\.\d{1,2})\b/g)].map(x=>parseFloat(x[1])).filter(w=>w>=14&&w<=120);
+  const weight=mostCommon(wts);
+  const txt2=block+text.slice(0,3000);
+  const grades=[...txt2.matchAll(/\b([KNPL])[\s-]?(\d{2,3})Q?\b/g)]
+    .filter(g=>+g[2]>=50 && +g[2]<=140).map(g=>g[1]+g[2]);
+  const grade=mostCommon(grades);
+  const mt=text.match(/Total\s+length\s+run\s+([\d,]+\.\d+)/i);
+  const shoe=mt?parseFloat(mt[1].replace(/,/g,"")):null;
+  const rt = phase==="produccion" ? parseRunTally(text) : {shorts:[], shoetrack:null};
+  return {od_in:od, shoe_md:shoe, weight_ppf:weight, grade, short_joints:rt.shorts, shoetrack:rt.shoetrack};
+}
+/* Lee el "2.2 Run Tally" y separa piezas cortas (<10 m; los caños normales miden >10 m) en:
+   - caños cortos: casing corto / XOVER del TRAMO MEDIO. Se ignoran los primeros y últimos `edgeM`
+     metros (cabezal/colgador arriba, shoetrack abajo).
+   - shoetrack: piezas cortas de los últimos `edgeM` m (zapato, collar flotador, camisas, cortos).
+   Cada fila trae 3 decimales consecutivos = Longitud, Cum.Length, Set Depth (con/sin comas de miles).
+   OJO: la fila corta NO trae "N° Tally", por eso ubicamos los 3 decimales sin asumir cuántos enteros
+   van antes. Set Depth = MD del TOPE de la pieza (≈ TD − Cum.Length) ⇒ bottom = Set Depth + Longitud. */
+function parseRunTally(text, maxLen=10.0, edgeM=150){
+  const m=text.match(/2\.2\s+Run\s+Tally([\s\S]*?)(?:\n\s*2\.3|\n\s*3\.|$)/i);
+  const block=m?m[1]:text;
+  const dec=String.raw`\d+(?:,\d{3})*\.\d+`;
+  const re=new RegExp(`(${dec})\\s+(${dec})\\s+(${dec})`);
+  const rows=[];
+  for(const line of block.split("\n")){
+    if(!/^\s*\d/.test(line)) continue;                 // fila de tally: empieza con el N° de junta
+    const mm=line.match(re); if(!mm) continue;
+    const length=parseFloat(mm[1].replace(/,/g,"")), setd=parseFloat(mm[3].replace(/,/g,""));
+    if(!(length>0) || !(setd>0) || length>30) continue;
+    rows.push({length, setd, desc:line.slice(mm.index+mm[0].length).trim()});
+  }
+  if(!rows.length) return {shorts:[], shoetrack:null};
+  const maxMD=Math.max(...rows.map(r=>r.setd+r.length));   // fondo de la sarta (≈ zapato)
+  const shorts=[], stEls=[];
+  for(const r of rows){
+    if(r.length>=maxLen) continue;                     // caño normal
+    const top=round3(r.setd), bottom=round3(r.setd+r.length);
+    if(top<edgeM) continue;                            // primeros 150 m (cabezal/colgador): se ignora
+    if(bottom>maxMD-edgeM){                            // últimos 150 m: shoetrack
+      stEls.push({desc:r.desc||"elemento", length_m:round3(r.length), top_md:top, bottom_md:bottom});
+      continue;
+    }
+    const isXO=/\bXO\b|X-?OVER|CROSS/i.test(r.desc);    // xover vs casing corto
+    shorts.push({desc:r.desc||"caño corto", xover:isXO, length_m:round3(r.length), top_md:top, bottom_md:bottom});
+  }
+  shorts.sort((a,b)=>a.top_md-b.top_md);
+  stEls.sort((a,b)=>a.top_md-b.top_md);                // somero → profundo
+  return {shorts, shoetrack: stEls.length?{elements:stEls}:null};
+}
+
+/* ---- Estado + UI del constructor ---- */
+const PHASES=[["guia","Guía"],["intermedia1","Intermedia 1"],["intermedia2","Intermedia 2"],["produccion","Aislación"]];
+// OD API (5–30"), librajes API por OD (lb/ft) y aceros API comunes; TBG de instalación
+const API_OD=[5.0,5.5,6.625,7.0,7.625,8.625,9.625,10.75,11.75,13.375,16.0,18.625,20.0,24.0,30.0];
+const API_WT={
+ 5.0:[11.5,13,15,18,21.4,23.2], 5.5:[14,15.5,17,20,23,26,29,32,35,38.5,40.5,43.1],
+ 6.625:[20,24,28,32], 7.0:[17,20,23,26,29,32,35,38,42.7], 7.625:[24,26.4,29.7,33.7,39],
+ 8.625:[24,28,32,36,40,44,49], 9.625:[32.3,36,40,43.5,47,53.5,58.4,61.1],
+ 10.75:[32.75,40.5,45.5,51,55.5,60.7,65.7], 11.75:[42,47,54,60], 13.375:[48,54.5,61,68,72],
+ 16.0:[65,75,84,97,109], 18.625:[87.5], 20.0:[94,106.5,133], 24.0:[100.46,140.68], 30.0:[157,196,234]};
+const API_GRADE=["J55","K55","N80","L80","C90","T95","P110","Q125"];
+const TBG_OD=[2.0,2.375,2.875,3.5];
+// librajes API de tubing (lb/ft) por OD
+const TBG_WT={2.0:[3.4,4.0,4.6], 2.375:[4.6,4.7,5.8,5.95], 2.875:[6.4,6.5,7.8,7.9,8.6,8.7],
+  3.5:[7.7,9.2,9.3,10.2,12.7,12.95]};
+const ING={wells:[]};
+const bnum=id=>{ const v=parseFloat(document.getElementById(id).value); return isFinite(v)?v:null; };
+const bstr=id=>document.getElementById(id).value.trim();
+// opción API más cercana (para autollenar desde el tally, que puede dar 7.62, 21.3, etc.)
+function nearestOD(od){ if(od==null) return null; let best=null,bd=0.12;
+  for(const s of API_OD){ const d=Math.abs(s-od); if(d<bd){bd=d;best=s;} } return best; }
+function nearestWT(od,wt){ if(wt==null||od==null||!API_WT[od]) return null; let best=null,bd=1.6;
+  for(const s of API_WT[od]){ const d=Math.abs(s-wt); if(d<bd){bd=d;best=s;} } return best; }
+const opt=(v,txt,sel)=>`<option value="${v}"${v===sel?" selected":""}>${txt}</option>`;
+/* si el valor cargado (de JSON/tally) no está en el catálogo API, se agrega igual al picklist
+   para que el dato se VEA y siga siendo editable (no se pierde información del pad) */
+const withSel=(list,sel)=>(sel!=null && !list.includes(sel)) ? [...list,sel].sort((a,b)=>a-b) : list;
+const odOptions=sel=>`<option value="">—</option>`+withSel(API_OD,sel).map(o=>opt(o,fmtOD(o),sel)).join("");
+const wtOptions=(od,sel)=>`<option value="">—</option>`+withSel(((od&&API_WT[od])||[]).slice(),sel).map(w=>opt(w,w,sel)).join("");
+const grOptions=sel=>`<option value="">—</option>`+((sel&&!API_GRADE.includes(sel))?[...API_GRADE,sel]:API_GRADE).map(g=>opt(g,g,sel)).join("");
+const tbgOptions=sel=>`<option value="">—</option>`+withSel(TBG_OD,sel).map(o=>opt(o,fmtOD(o),sel)).join("");
+const tbgWtOptions=(od,sel)=>`<option value="">—</option>`+withSel(((od&&TBG_WT[od])||[]).slice(),sel).map(w=>opt(w,w,sel)).join("");
+function stset(sel,txt,cls){ const el=document.querySelector(`[data-st="${sel}"]`); if(!el) return;
+  el.textContent=txt; el.className="st"+(cls?" "+cls:""); }
+function fmtCasingStatus(c){
+  if(!c) return "—";
+  let s=`${c.od_in!=null?fmtOD(c.od_in):"?"} @ ${c.shoe_md!=null?Math.round(c.shoe_md):"?"}`;
+  if(c.grade) s+=" "+c.grade;
+  if(c.short_joints?.length) s+=` · ${c.short_joints.length} caño(s) corto(s)`;
+  return s;
+}
+function phaseBlock(i,ph,label,c){ c=c||{};
+  return `<div class="phase-row"><span class="tag">${label}</span>
+    <span class="btn filebtn">Tally .pdf<input type="file" accept=".pdf" data-w="${i}" data-kind="tally" data-phase="${ph}"></span>
+    <span class="st" data-st="tally-${ph}-${i}">${(c.od_in!=null||c.shoe_md!=null)?fmtCasingStatus(c):"—"}</span>
+    <div class="cas-grid">
+      <label>OD<select data-w="${i}" data-ph="${ph}" data-c="od">${odOptions(c.od_in)}</select></label>
+      <label>lb/ft<select data-w="${i}" data-ph="${ph}" data-c="wt">${wtOptions(c.od_in,c.weight_ppf)}</select></label>
+      <label>Acero<select data-w="${i}" data-ph="${ph}" data-c="gr">${grOptions(c.grade)}</select></label>
+      <label>Zapato MD<input type="number" data-w="${i}" data-ph="${ph}" data-c="md" value="${c.shoe_md??""}"></label>
+      <label>TOC MD<input type="number" data-w="${i}" data-ph="${ph}" data-c="toc" value="${c.toc_md??""}"></label>
+    </div></div>`;
+}
+function instBlock(i,w){
+  const ins=w.install||{};
+  const els=(ins.elements||[]).map((el,k)=>`<div class="inst-el">
+      <select data-w="${i}" data-ie="${k}" data-if="type">
+        ${opt("TPN","TPN (tapón)",el.type)}${opt("PKR","PKR (packer)",el.type)}</select>
+      <input type="number" data-w="${i}" data-ie="${k}" data-if="md" value="${el.md??""}" placeholder="MD (m)">
+      <button class="btn" data-w="${i}" data-ie="${k}" data-iact="del">✕</button></div>`).join("");
+  return `<div class="inst-wrap">
+    <label class="row" style="text-transform:none; letter-spacing:0"><input type="checkbox" data-w="${i}" data-iact="enable" ${ins.enabled?"checked":""}> Instalación <span class="dim" style="font-family:var(--mono);font-size:10px">(completación · dentro de la aislación)</span></label>
+    <div class="inst-body${ins.enabled?"":" disabled"}">
+      <div class="cas-grid" style="margin-left:0">
+        <label>TBG OD<select data-w="${i}" data-iact="tbg-od">${tbgOptions(ins.tbg_od)}</select></label>
+        <label>lb/ft<select data-w="${i}" data-iact="tbg-wt">${tbgWtOptions(ins.tbg_od,ins.tbg_weight)}</select></label>
+        <label>Acero<select data-w="${i}" data-iact="tbg-gr">${grOptions(ins.tbg_grade)}</select></label>
+        <label>MD final (m) *<input type="number" data-w="${i}" data-iact="tbg-md" value="${ins.tbg_md??""}"></label>
+      </div>
+      <div class="stub" style="font-size:10px">* profundidad (MD desde superficie) hasta donde baja la sarta de TBG. Obligatorio.</div>
+      <div class="inst-list">${els}</div>
+      <div><button class="btn" data-w="${i}" data-iact="add-TPN">+ TPN</button>
+        <button class="btn" data-w="${i}" data-iact="add-PKR">+ PKR</button></div>
+    </div></div>`;
+}
+function renderWellCards(){
+  const n=parseInt(document.getElementById("b-nwells").value,10)||0;
+  const cont=document.getElementById("b-wells");
+  while(ING.wells.length<n) ING.wells.push({id:"", survey:null, frac:null, casings:{}, install:{enabled:false,tbg_od:null,elements:[]}});
+  ING.wells.length=n;
+  cont.innerHTML="";
+  for(let i=0;i<n;i++){
+    const w=ING.wells[i]; if(!w.install) w.install={enabled:false,tbg_od:null,elements:[]}; if(!w.casings) w.casings={};
+    const card=document.createElement("div"); card.className="well-card";
+    const survSt=w.survey?`MD ${Math.round(w.survey.stations.at(-1).md)} · ${w.survey.stations.length} est`:"— (vertical)";
+    const fracSt=w.frac?`${w.frac.total_stages} etapas`:"— (opcional)";
+    card.innerHTML=`<h5>Pozo ${i+1}</h5>
+      <label style="max-width:280px; margin-bottom:8px">ID del pozo
+        <input type="text" data-w="${i}" data-f="id" value="${w.id||""}"></label>
+      <div class="file-row"><span class="tag">Survey</span>
+        <span class="btn filebtn">Cargar .xlsx<input type="file" accept=".xlsx,.xls" data-w="${i}" data-kind="survey"></span>
+        <span class="st" data-st="survey-${i}">${survSt}</span></div>
+      <div class="file-row"><span class="tag">Fracplan</span>
+        <span class="btn filebtn">Cargar .xlsx<input type="file" accept=".xlsx,.xls" data-w="${i}" data-kind="frac"></span>
+        <span class="st" data-st="frac-${i}">${fracSt}</span></div>
+      ${PHASES.map(([ph,label])=>phaseBlock(i,ph,label,w.casings[ph])+(ph==="produccion"?instBlock(i,w):"")).join("")}`;
+    cont.appendChild(card);
+  }
+}
+document.getElementById("b-nwells").addEventListener("change",renderWellCards);
+
+function onWellField(e){
+  const t=e.target, i=+t.dataset.w; if(!(i>=0)) return; const w=ING.wells[i]; if(!w) return;
+  if(t.dataset.f==="id"){ w.id=t.value.trim(); return; }
+  if(t.dataset.c){
+    const cas=w.casings[t.dataset.ph]||(w.casings[t.dataset.ph]={}); const f=t.dataset.c, v=t.value;
+    if(f==="od"){ cas.od_in=v===""?null:parseFloat(v);
+      const wtSel=t.closest(".cas-grid").querySelector('[data-c="wt"]');
+      if(wtSel){ wtSel.innerHTML=wtOptions(cas.od_in,null); } cas.weight_ppf=null; }
+    else if(f==="wt") cas.weight_ppf=v===""?null:parseFloat(v);
+    else if(f==="gr") cas.grade=v||null;
+    else if(f==="md") cas.shoe_md=v===""?null:parseFloat(v);
+    else if(f==="toc") cas.toc_md=v===""?null:parseFloat(v);
+    return;
+  }
+  if(t.dataset.if){ const el=w.install.elements[+t.dataset.ie]; if(!el) return;
+    if(t.dataset.if==="type") el.type=t.value; else if(t.dataset.if==="md") el.md=t.value===""?null:parseFloat(t.value);
+    return; }
+  const ia=t.dataset.iact;
+  if(ia==="tbg-od"){ w.install.tbg_od=t.value===""?null:parseFloat(t.value);
+    const wtSel=t.closest(".cas-grid").querySelector('[data-iact="tbg-wt"]');
+    if(wtSel){ wtSel.innerHTML=tbgWtOptions(w.install.tbg_od,null); } w.install.tbg_weight=null; return; }
+  if(ia==="tbg-wt"){ w.install.tbg_weight=t.value===""?null:parseFloat(t.value); return; }
+  if(ia==="tbg-gr"){ w.install.tbg_grade=t.value||null; return; }
+  if(ia==="tbg-md"){ w.install.tbg_md=t.value===""?null:parseFloat(t.value); return; }
+}
+document.getElementById("b-wells").addEventListener("input",onWellField);
+document.getElementById("b-wells").addEventListener("change",onWellField);
+document.getElementById("b-wells").addEventListener("click",e=>{
+  const t=e.target.closest("[data-iact]"); if(!t) return; const i=+t.dataset.w; const w=ING.wells[i]; if(!w) return;
+  const act=t.dataset.iact;
+  if(act==="enable"){ w.install.enabled=e.target.checked;
+    const body=t.closest(".inst-wrap").querySelector(".inst-body");
+    if(body) body.classList.toggle("disabled",!e.target.checked); return; }   // visible pero no editable
+  if(act==="add-TPN"||act==="add-PKR"){ w.install.elements.push({type:act.slice(4), md:null}); renderWellCards(); return; }
+  if(act==="del"){ w.install.elements.splice(+t.dataset.ie,1); renderWellCards(); return; }
+});
+document.getElementById("b-wells").addEventListener("change",async e=>{
+  const t=e.target; if(t.type!=="file" || !t.files[0]) return;
+  const i=+t.dataset.w, kind=t.dataset.kind, file=t.files[0];
+  const key = kind==="tally" ? `tally-${t.dataset.phase}-${i}` : `${kind}-${i}`;
+  stset(key,"leyendo…","wait");
+  try{
+    const buf=await file.arrayBuffer();
+    if(kind==="survey"){ const s=parseSurveyXLS(buf); ING.wells[i].survey=s;
+      stset(key, `MD ${Math.round(s.stations.at(-1).md)} · ${s.stations.length} est`); }
+    else if(kind==="frac"){ const f=parseFracplanXLS(buf); ING.wells[i].frac=f;
+      stset(key, `${f.total_stages} etapas`); }
+    else if(kind==="tally"){ const ph=t.dataset.phase; const c=await parseTallyPDF(buf, ph);
+      const cas=ING.wells[i].casings[ph]||(ING.wells[i].casings[ph]={});
+      const od=nearestOD(c.od_in); if(od!=null) cas.od_in=od;
+      const wt=nearestWT(cas.od_in, c.weight_ppf); if(wt!=null) cas.weight_ppf=wt;
+      if(c.grade) cas.grade=c.grade;
+      if(c.shoe_md!=null) cas.shoe_md=c.shoe_md;
+      cas.short_joints = c.short_joints?.length ? c.short_joints : undefined;
+      cas.shoetrack = c.shoetrack || undefined;
+      renderWellCards();                       // refleja el autollenado en los picklists (editable)
+      stset(key, fmtCasingStatus(cas)); }
+  }catch(err){ stset(key, "error: "+err.message, "err"); }
+  t.value="";
+});
+
+// sin survey: pozo vertical perfecto (TVD=MD, ns=ew=0) hasta el punto más profundo conocido
+function synthVertical(w){
+  let td=0;
+  Object.values(w.casings||{}).forEach(c=>{ if(c.shoe_md) td=Math.max(td,c.shoe_md); if(c.toc_md) td=Math.max(td,c.toc_md); });
+  (w.install?.elements||[]).forEach(el=>{ if(el.md) td=Math.max(td,el.md); });
+  (w.frac?.stages||[]).forEach(s=>(s.clusters||[]).forEach(cl=>{ const m=cl.bottom_md??cl.top_md; if(m) td=Math.max(td,m); }));
+  if(td<=0) td=1000;
+  const stations=[]; for(let md=0; md<td; md+=100) stations.push({md, incl:0, azim:0, tvd:md, ns:0, ew:0, vsec:md, dls:0});
+  stations.push({md:td, incl:0, azim:0, tvd:td, ns:0, ew:0, vsec:td, dls:0});
+  return {vsec_azimuth_deg:0, stations};
+}
+function assemblePad(){
+  const spacing=bnum("b-spacing")??10, rkb=bnum("b-rkb")??0;
+  const id=bstr("b-id")||"PAD", name=bstr("b-name")||id;
+  const wells=[]; let err=null;
+  ING.wells.forEach((w,i)=>{
+    if(err) return;
+    const anyCas=PHASES.some(([ph])=>{ const c=w.casings[ph];
+      return c && (c.od_in!=null||c.shoe_md!=null||c.weight_ppf!=null||c.grade||c.toc_md!=null); });
+    if(!(w.survey||w.frac||anyCas||w.install?.enabled)) return;   // pozo totalmente vacío: se omite
+    const survey=w.survey||synthVertical(w); const vertical=!w.survey;
+    const casings=[];
+    PHASES.forEach(([ph])=>{ const c=w.casings[ph];
+      if(!c || !(c.od_in!=null||c.shoe_md!=null||c.weight_ppf!=null||c.grade||c.toc_md!=null)) return;
+      const cas={phase:ph, od_in:c.od_in??null, shoe_md:c.shoe_md??null, toc_md:c.toc_md??null,
+        weight_ppf:c.weight_ppf??null, grade:c.grade??null};
+      if(c.short_joints?.length) cas.short_joints=c.short_joints;
+      if(c.shoetrack?.elements?.length) cas.shoetrack=c.shoetrack;
+      casings.push(cas);
+    });
+    const wobj={ id:w.id||`W${i+1}`, name:w.id||`Pozo ${i+1}`, well_number:i+1,
+      architecture:vertical?"vertical":"horizontal",
+      wellhead:{x:i*spacing, y:0, rkb_elev_m:rkb, ground_elev_m:rkb},
+      survey, casings, frac:w.frac||{total_stages:0, stages:[]} };
+    if(w.install?.enabled && (w.install.tbg_od!=null || w.install.tbg_md!=null || (w.install.elements||[]).some(el=>el.md!=null))){
+      if(w.install.tbg_md==null){ toast(`Indicá la MD final del TBG en el pozo ${w.id||i+1}`); err=1; return; }
+      wobj.installation={ tbg_od_in:w.install.tbg_od??null, tbg_weight_ppf:w.install.tbg_weight??null,
+        tbg_grade:w.install.tbg_grade??null, tbg_md_m:w.install.tbg_md,
+        elements:(w.install.elements||[]).filter(el=>el.md!=null).map(el=>({type:el.type, md:el.md})) };
+    }
+    wells.push(wobj);
+  });
+  if(err) return null;
+  if(!wells.length){ toast("Agregá al menos un pozo con algún dato"); return null; }
+  return { schema_version:1, app:"vaca-viewer", generated_at:new Date().toISOString(),
+    pad:{ id, name, field:bstr("b-field")||null, operator:bstr("b-operator")||null,
+      campaign:bnum("b-campaign"),
+      surface:{wellhead_spacing_m:spacing, line_azimuth_deg:90}, wells } };
+}
+document.getElementById("b-generate").addEventListener("click",()=>{
+  const pad=assemblePad(); if(!pad) return;
+  loadPadObject(pad);
+  document.getElementById("b-status").textContent=`✓ ${pad.pad.wells.length} pozo(s) generados`;
+});
+document.getElementById("b-download").addEventListener("click",()=>{
+  const pad=assemblePad(); if(!pad) return;
+  const blob=new Blob([JSON.stringify(pad)],{type:"application/json"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
+  a.download=`pad_${pad.pad.id||"nuevo"}.json`; a.click(); URL.revokeObjectURL(a.href);
+});
+renderWellCards();
 
 function updateSummary(){
   if(!PAD) return;
-  const rows=PAD.pad.wells.map(w=>{
-    const cs=(w.casings||[]).map(c=>`${c.od_in}"@${Math.round(c.shoe_md)}`).join(" · ")||"—";
-    const mdf=w.survey.stations.at(-1).md;
-    return `<tr><td>${w.id}</td><td>${w.survey.stations.length}</td><td>${Math.round(mdf)}</td><td>${w.frac?.total_stages||0}</td><td>${cs}</td></tr>`;
-  }).join("");
+  let out="";
+  PAD.pad.wells.forEach(w=>{
+    const cas=w.casings||[]; const mdf=Math.round((w.survey?.stations.at(-1).md)||0);
+    const rws=[];   // filas del pozo: {cls, c} donde c = celdas (sin la de Pozo)
+    cas.forEach(c=>{
+      rws.push({cls:"", c:`<td>${PHASE_LABEL[c.phase]||c.phase}</td><td>${c.od_in!=null?fmtOD(c.od_in):"—"}</td>`
+        +`<td class="num">${c.shoe_md!=null?Math.round(c.shoe_md):"—"}</td><td class="num">${c.toc_md!=null?Math.round(c.toc_md):"—"}</td>`
+        +`<td class="num">${c.weight_ppf!=null?c.weight_ppf:"—"}</td><td>${c.grade||"—"}</td>`});
+      (c.short_joints||[]).forEach((sj,k)=>{ const len=sj.length_m!=null?`${sj.length_m} m`:"";
+        rws.push({cls:"cc", c:`<td>↳ ${sj.xover?"xover":"caño corto"} ${k+1}</td><td>—</td>`
+          +`<td class="num">${Math.round(sj.top_md)}–${Math.round(sj.bottom_md)} m</td>`
+          +`<td colspan="3" class="dim">${len}${sj.desc?" · "+sj.desc:""}</td>`}); });
+      const st=c.shoetrack?.elements||[];
+      if(st.length){
+        rws.push({cls:"cc", c:`<td>↳ shoetrack</td><td>—</td>`
+          +`<td class="num">desde ${Math.round(st[0].top_md)} m</td>`
+          +`<td colspan="3" class="dim">${st.length} elemento(s), somero→profundo</td>`});
+        st.forEach((el,k)=>rws.push({cls:"cc", c:`<td>&nbsp;&nbsp;${k+1}.</td><td>—</td>`
+          +`<td class="num">${Math.round(el.top_md)}–${Math.round(el.bottom_md)} m</td>`
+          +`<td colspan="3" class="dim">${el.length_m!=null?el.length_m+" m":""}${el.desc?" · "+el.desc:""}</td>`}));
+      }
+    });
+    if(w.installation){ const ins=w.installation;
+      const tbgTxt=[ins.tbg_od_in!=null?"TBG "+fmtOD(ins.tbg_od_in):"—",
+        ins.tbg_weight_ppf!=null?ins.tbg_weight_ppf+" lb/ft":null, ins.tbg_grade].filter(Boolean).join(" · ");
+      rws.push({cls:"inst", c:`<td>Instalación</td><td colspan="2">${tbgTxt}</td>`
+        +`<td colspan="3" class="dim">${(ins.elements||[]).length} elemento(s)</td>`});
+      (ins.elements||[]).forEach(el=>rws.push({cls:"inst", c:`<td>↳ ${el.type}</td><td>—</td>`
+        +`<td class="num">${Math.round(el.md)} m</td><td colspan="3" class="dim">${el.type==="PKR"?"packer":"tapón"}</td>`}));
+    }
+    if(!rws.length) rws.push({cls:"dim", c:`<td colspan="6">sin cañerías cargadas</td>`});
+    const meta=`${mdf} m · ${w.frac?.total_stages||0} et${w.architecture==="vertical"?" · vert":""}`;
+    out+=`<tr><td rowspan="${rws.length}">${w.id}<br><span class="dim">${meta}</span></td>${rws[0].c}</tr>`;
+    for(let k=1;k<rws.length;k++) out+=`<tr class="${rws[k].cls}">${rws[k].c}</tr>`;
+  });
+  const p=PAD.pad;
+  const meta=[p.name||p.id, p.field, p.operator, p.campaign!=null?`campaña ${p.campaign}`:null]
+    .filter(Boolean).join(" · ");
   document.getElementById("summary-body").innerHTML=
-    `<table class="tbl"><tr><th>Pozo</th><th>Est</th><th>MD final</th><th>Etapas</th><th>Casings (OD@zapato)</th></tr>${rows}</table>`;
+    `<div class="stub" style="margin-bottom:8px"><b style="color:var(--ink)">${p.id}</b>${meta?" — "+meta:""}</div>`
+    +`<table class="tbl"><tr><th>Pozo</th><th>Fase</th><th>OD</th><th>Zapato MD</th><th>TOC MD</th><th>lb/ft</th><th>Grado</th></tr>${out}</table>`;
 }
 
 /* ============ Debug panel ============ */
@@ -985,6 +1929,103 @@ let toastT=null;
 function toast(msg){ const t=document.getElementById("toast"); t.textContent=msg; t.classList.add("show");
   clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove("show"),2600); }
 
+/* ============ ViewCube (veleta cúbica 3D, estilo Onshape) ============ */
+/* Cubo translúcido atravesado por dos ejes (N-S y E-O) con las etiquetas cardinales en las
+   puntas (siempre visibles). Se renderiza en un recuadro de la esquina con una cámara que copia
+   la orientación de la principal, así se inclina como el terreno. Click en una CARA → vista plana;
+   click en un VÉRTICE → vista isométrica de ese octante. Fondo transparente (no pinta color).
+   Este=-X, Norte=+Z, Arriba=+Y (paridad con toThree). */
+const gizmoScene=new THREE.Scene();
+const gizmoCam=new THREE.OrthographicCamera(-1.85,1.85,1.85,-1.85,0.1,100);
+const gizmoPick=[], gizmoVerts=[]; let gizmoRect=null, gizmoFaceHi=null;
+const _gray=new THREE.Raycaster(), _gv=new THREE.Vector3();
+function makeCardSprite(txt,color){
+  const c=document.createElement("canvas"); c.width=c.height=64;
+  const x=c.getContext("2d"); x.fillStyle=color; x.font="bold 46px ui-monospace,Consolas,monospace";
+  x.textAlign="center"; x.textBaseline="middle"; x.fillText(txt,32,36);
+  const t=new THREE.CanvasTexture(c); t.anisotropy=4;
+  const s=new THREE.Sprite(new THREE.SpriteMaterial({map:t, depthTest:false, depthWrite:false, transparent:true}));
+  s.scale.set(0.9,0.9,1); return s;
+}
+(function buildCube(){
+  const s=0.6;
+  const cube=new THREE.Mesh(new THREE.BoxGeometry(s*2,s*2,s*2),
+    new THREE.MeshBasicMaterial({color:0x2b3542, transparent:true, opacity:0.26, depthWrite:false}));
+  cube.userData.gizmo="face"; gizmoScene.add(cube); gizmoPick.push(cube);
+  gizmoScene.add(new THREE.LineSegments(new THREE.EdgesGeometry(cube.geometry),
+    new THREE.LineBasicMaterial({color:0x5a6b7d})));
+  // resaltador de cara (se posiciona sobre la cara bajo el cursor)
+  gizmoFaceHi=new THREE.Mesh(new THREE.PlaneGeometry(s*1.9,s*1.9),
+    new THREE.MeshBasicMaterial({color:0x4ea1d3, transparent:true, opacity:0.4, side:THREE.DoubleSide, depthTest:false, depthWrite:false}));
+  gizmoFaceHi.visible=false; gizmoFaceHi.renderOrder=2; gizmoScene.add(gizmoFaceHi);
+  const L=1.12;   // ejes que sobresalen del cubo
+  gizmoScene.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(0,0,-L),new THREE.Vector3(0,0,L),
+    new THREE.Vector3(-L,0,0),new THREE.Vector3(L,0,0)]),
+    new THREE.LineBasicMaterial({color:0x8b97a6})));
+  const R=1.3;
+  const cards={N:[0,0,1,"#4ea1d3"], S:[0,0,-1,"#8b97a6"], E:[-1,0,0,"#8b97a6"], W:[1,0,0,"#8b97a6"]};
+  for(const k in cards){ const [dx,,dz,col]=cards[k];
+    const sp=makeCardSprite(k==="W"?"O":k, col); sp.position.set(dx*R,0,dz*R); gizmoScene.add(sp); }
+  // vértices clickeables → vistas isométricas
+  const vg=new THREE.SphereGeometry(0.11,12,12);
+  for(const sx of [-1,1]) for(const sy of [-1,1]) for(const sz of [-1,1]){
+    const v=new THREE.Mesh(vg, new THREE.MeshBasicMaterial({color:0x4ea1d3, transparent:true, opacity:0.55}));
+    v.position.set(sx*s,sy*s,sz*s); v.userData.gizmo="vertex"; v.userData.dir=new THREE.Vector3(sx,sy,sz);
+    gizmoScene.add(v); gizmoPick.push(v); gizmoVerts.push(v);
+  }
+})();
+/* resalte al pasar el mouse: cara → cuadro celeste sobre la cara; vértice → esfera más grande y opaca */
+function gizmoHover(clientX,clientY){
+  const hit=(dragging===null)?gizmoHitTest(clientX,clientY):null;
+  if(gizmoFaceHi) gizmoFaceHi.visible=false;
+  gizmoVerts.forEach(v=>{ v.material.opacity=0.55; v.scale.setScalar(1); });
+  canvas.style.cursor = hit ? "pointer" : "";
+  if(!hit) return;
+  if(hit.object.userData.gizmo==="vertex"){ hit.object.material.opacity=1; hit.object.scale.setScalar(1.5); return; }
+  const n=hit.face.normal, off=0.6*1.02;
+  gizmoFaceHi.position.set(n.x*off, n.y*off, n.z*off);
+  if(Math.abs(n.x)>0.5) gizmoFaceHi.rotation.set(0,Math.PI/2,0);
+  else if(Math.abs(n.y)>0.5) gizmoFaceHi.rotation.set(Math.PI/2,0,0);
+  else gizmoFaceHi.rotation.set(0,0,0);
+  gizmoFaceHi.visible=true;
+}
+canvas.addEventListener("mousemove",e=>gizmoHover(e.clientX,e.clientY));
+function renderGizmo(){
+  _gv.setFromSpherical(new THREE.Spherical(6, sph.phi, sph.theta));
+  gizmoCam.position.copy(_gv); gizmoCam.up.set(0,1,0); gizmoCam.lookAt(0,0,0);
+  const W=canvas.clientWidth, H=canvas.clientHeight, S=112, m=12;
+  gizmoRect={x:W-S-m, yTop:H-S-m, S};              // en coords de pantalla (top-left) para el picking
+  renderer.autoClear=false;                         // no pintar fondo → transparente sobre la escena
+  renderer.setScissorTest(true);
+  renderer.setViewport(W-S-m, m, S, S); renderer.setScissor(W-S-m, m, S, S);
+  renderer.clearDepth();
+  renderer.render(gizmoScene, gizmoCam);
+  renderer.setScissorTest(false); renderer.setViewport(0,0,W,H); renderer.autoClear=true;
+}
+function gizmoHitTest(clientX,clientY){
+  if(!gizmoRect) return null;
+  const rect=canvas.getBoundingClientRect(); const cx=clientX-rect.left, cy=clientY-rect.top;
+  if(cx<gizmoRect.x || cx>gizmoRect.x+gizmoRect.S || cy<gizmoRect.yTop || cy>gizmoRect.yTop+gizmoRect.S) return null;
+  const nx=((cx-gizmoRect.x)/gizmoRect.S)*2-1, ny=-(((cy-gizmoRect.yTop)/gizmoRect.S)*2-1);
+  _gray.setFromCamera({x:nx,y:ny}, gizmoCam);
+  const hits=_gray.intersectObjects(gizmoPick,false); return hits.length?hits[0]:null;
+}
+function setViewFromDir(dir){
+  const s=new THREE.Spherical().setFromVector3(dir.clone().normalize());
+  sph.phi=Math.max(0.05,Math.min(Math.PI-0.05,s.phi)); sph.theta=s.theta;
+  frameAll(); document.getElementById("hud-cam").textContent="vista: esquina (iso)";
+}
+function applyGizmoHit(hit){
+  const o=hit.object;
+  if(o.userData.gizmo==="vertex"){ setViewFromDir(o.userData.dir); return; }
+  const n=hit.face.normal; let name;
+  if(Math.abs(n.y)>=Math.abs(n.x) && Math.abs(n.y)>=Math.abs(n.z)) name=n.y>0?"top":"bottom";
+  else if(Math.abs(n.z)>=Math.abs(n.x)) name=n.z>0?"north":"south";
+  else name=n.x>0?"west":"east";     // Este=-X ⇒ cara +X es Oeste
+  setView(name);
+}
+
 /* ============ Loop ============ */
 function onResize(){
   const w=canvas.clientWidth||canvas.parentElement.clientWidth, h=canvas.clientHeight||canvas.parentElement.clientHeight;
@@ -1003,7 +2044,9 @@ function tick(){ camera.position.copy(target).add(new THREE.Vector3().setFromSph
   camera.updateProjectionMatrix();
   if(autoDiam) updateAutoDiam();
   renderer.render(scene,camera);
+  renderGizmo();
   updateLabels();
+  if(measurePts.length===2) updateMeasure();
   if(DBG && (dbgFrame++ %15===0)) updateDbg();
   requestAnimationFrame(tick); }
 onResize(); tick();

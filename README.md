@@ -137,8 +137,10 @@ Especificación completa en [`docs/data-schema.md`](docs/data-schema.md).
 - [x] Andamiaje de la app y navegación entre secciones
 - [x] Escena 3D con navegación CAD a escala real
 - [x] Esquema de datos versionado
-- [x] Parsers reales: survey `.xlsx` · tally `.pdf` · fracplan `.xlsx` *(en Python; en-navegador → v0.3)*
+- [x] Parsers reales: survey `.xlsx` · tally `.pdf` · fracplan `.xlsx` *(en Python y **en-navegador** desde la sección Datos)*
+- [x] Constructor de pad en-navegador: elegís cantidad de pozos, cargás archivos por pozo y TOC a mano → `pad.json` único
 - [x] Carga del pad completo desde datos reales (pad MMo-35: 4 pozos)
+- [x] Caños cortos (pup joints) de la aislación, capa amarilla alternable
 - [ ] Exportar corte lateral 2D a PNG/JPG
 - [ ] Editor de datos con copiar/pegar de tablas
 - [ ] Export ZIP del pad + persistencia local (IndexedDB)
