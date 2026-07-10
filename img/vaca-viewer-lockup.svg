@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 372 96" width="372" height="96" font-family="'Segoe UI',system-ui,-apple-system,Roboto,sans-serif">
+  <rect width="372" height="96" rx="20" fill="#0d1117"/>
+  <g transform="translate(18,16) scale(0.64)">
+    <defs><clipPath id="bm"><rect x="2" y="2" width="96" height="96" rx="24"/></clipPath></defs>
+    <rect x="2" y="2" width="96" height="96" rx="24" fill="#0d1117" stroke="#232e3b" stroke-width="3"/>
+    <g clip-path="url(#bm)">
+      <path d="M0 60 L32 60 L32 46 L62 46 L62 60 L100 60 L100 100 L0 100 Z" fill="#18212e"/>
+      <path d="M46 44 L46 70 Q46 82 59 82 L84 82" fill="none" stroke="#d7e0e8" stroke-width="6.5" stroke-linecap="round"/>
+      <circle cx="46" cy="44" r="7" fill="#e3a94c"/>
+    </g>
+  </g>
+  <text x="98" y="59" font-size="37" letter-spacing="0.3"><tspan font-weight="700" fill="#eaeff4">vaca</tspan><tspan fill="#0d1117"> </tspan><tspan font-weight="400" fill="#9fb0bd">viewer</tspan></text>
+</svg>
