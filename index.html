@@ -65,7 +65,8 @@
           <label class="row"><input type="radio" name="isomode" value="stages"><span class="sw" style="background:#18d94a"></span>Por etapas</label>
           <label class="row"><input type="radio" name="isomode" value="dogleg_lateral"><span class="sw" style="background:linear-gradient(90deg,#00e33a,#ffe500,#ff1e1e)"></span>Dogleg · lateral</label>
           <label class="row"><input type="radio" name="isomode" value="dogleg_build"><span class="sw" style="background:linear-gradient(90deg,#00e33a,#ffe500,#ff1e1e)"></span>Dogleg · curva</label>
-          <div class="stub" style="font-size:10px; margin-top:4px; line-height:1.4">Lateral: última→primera etapa (resalta dogleg fino). Curva: superficie→última etapa (resalta la curva de asentamiento).</div>
+          <label class="row"><input type="radio" name="isomode" value="dogleg_total"><span class="sw" style="background:linear-gradient(90deg,#00e33a,#ffe500,#ff1e1e)"></span>Dogleg · total</label>
+          <div class="stub" style="font-size:10px; margin-top:4px; line-height:1.4">Lateral: última→primera etapa (resalta dogleg fino). Curva: superficie→última etapa (resalta la curva de asentamiento). Total: superficie→fondo, un único rango.</div>
           </div>
         </div>
         <div class="grp">
@@ -142,6 +143,10 @@
                   <span class="meta" id="ex3d-diam-val">1.0×</span></label>
                 <div class="stub" style="margin-top:6px">Engorda las cañerías para la foto (multiplica el diámetro actual de la Vista 3D). No afecta la vista en vivo.</div>
               </div>
+              <div class="card"><h4>Transparencia por pozo</h4>
+                <div id="ex3d-wellops"><div class="stub">Cargá un pad para listar los pozos.</div></div>
+                <div class="stub" style="margin-top:6px">Opacidad de cada pozo solo en la foto: dejá al 100% el pozo a resaltar y bajá los demás. No afecta la vista en vivo.</div>
+              </div>
               <div class="card"><h4>Exportar</h4>
                 <div class="ex-actions">
                   <button class="btn" id="ex3d-preview">Previsualizar</button>
@@ -190,7 +195,10 @@
               <div class="card"><h4>Estilo</h4>
                 <label class="row">Color
                   <select id="ex2d-theme" class="ex-sel"><option value="color" selected>Color (etapas / cañerías)</option>
+                    <option value="dogleg">Color (dogleg)</option>
                     <option value="bw">Blanco y negro</option></select></label>
+                <div class="stub" style="margin-top:6px">Con <b>Color (dogleg)</b> el interior del pozo se pinta según el
+                  DLS (verde→rojo, normalizado al máximo del rango visible) y las etapas muestran solo el N°.</div>
                 <label class="row">Tamaño de letra
                   <input type="range" id="ex2d-font" min="7" max="16" step="0.5" value="10.5" style="flex:1; accent-color:var(--accent)">
                   <span class="meta" id="ex2d-font-val">10.5 px</span></label>
@@ -202,13 +210,14 @@
                 <label class="row"><input type="checkbox" data-ex2d-el="plugs" checked> Tapones</label>
                 <label class="row"><input type="checkbox" data-ex2d-el="tbg" checked> TBG (+ cartel MD/TVD)</label>
                 <label class="row"><input type="checkbox" data-ex2d-el="instel" checked> Packers / TPN de instalación</label>
-                <label class="row"><input type="checkbox" data-ex2d-el="stages" checked> Etapas (color + N°)</label>
+                <label class="row"><input type="checkbox" data-ex2d-el="stages" checked> Etapas (banda + N° según estilo)</label>
                 <label class="row"><input type="checkbox" data-ex2d-el="perf" checked> Punzados (dientes)</label>
                 <input type="text" id="ex2d-perfstages" class="ex-inp" style="width:100%; margin:2px 0 6px"
                   placeholder="etapas a punzar (ej: 1,3,10-15) — vacío = todas">
                 <label class="row"><input type="checkbox" data-ex2d-el="shorts"> Caños cortos</label>
                 <label class="row"><input type="checkbox" data-ex2d-el="shoetrack"> Shoetrack</label>
                 <label class="row"><input type="checkbox" data-ex2d-el="ruler" checked> Regla de profundidad</label>
+                <label class="row"><input type="checkbox" data-ex2d-el="extruler"> Regla de extensión (MD)</label>
                 <label class="row"><input type="checkbox" data-ex2d-el="labels" checked> Etiquetas de texto</label>
               </div>
               <div class="card"><h4>Exportar</h4>
