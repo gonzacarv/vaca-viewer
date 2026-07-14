@@ -35,17 +35,48 @@ function wireTabs(){
 
 function refreshOnEnter(){
   populateWells();
+  populateWellAlpha();
   if($("ex2d")?.classList.contains("active")) render2D();
 }
 
 /* ============ 3D ============ */
+/* Sliders de opacidad por pozo (uno por pozo del pad), con el color de traza de la Vista 3D
+   como referencia. Se repueblan al entrar a la sección conservando los valores ya movidos. */
+function populateWellAlpha(){
+  const box=$("ex3d-wellops"); if(!box) return;
+  const wells=V.PAD?.pad?.wells||[];
+  const prev={}; box.querySelectorAll(".ex3d-walpha").forEach(s=>{ prev[s.dataset.well]=s.value; });
+  if(!wells.length){ box.innerHTML=`<div class="stub">Cargá un pad para listar los pozos.</div>`; return; }
+  box.innerHTML=wells.map((w,i)=>{
+    const col="#"+V.WELL_COLORS[i%V.WELL_COLORS.length].toString(16).padStart(6,"0");
+    const v=prev[w.id]??"100";
+    return `<label class="row" title="${V.escAttr(w.id)}">
+      <span style="width:10px;height:10px;border-radius:50%;background:${col};flex:none"></span>
+      <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${V.escHtml(w.id)}</span>
+      <input type="range" class="ex3d-walpha" data-well="${V.escAttr(w.id)}" min="0" max="100" step="5" value="${v}"
+        style="flex:1; accent-color:var(--accent)">
+      <span class="meta ex3d-walpha-val">${v}%</span></label>`;
+  }).join("");
+}
+function readWellAlpha(){
+  const m={};
+  document.querySelectorAll(".ex3d-walpha").forEach(s=>{ m[s.dataset.well]=parseInt(s.value,10)/100; });
+  return m;
+}
 function read3DOpts(){
   return { view:$("ex3d-view").value, scale:parseInt($("ex3d-scale").value,10),
     bg:$("ex3d-bg").value, theme:$("ex3d-theme").value, labels:$("ex3d-labels").checked,
-    diam:parseFloat($("ex3d-diam").value) };
+    diam:parseFloat($("ex3d-diam").value), wellAlpha:readWellAlpha() };
 }
 function wire3D(){
   $("ex3d-diam").addEventListener("input", e=>{ $("ex3d-diam-val").textContent=parseFloat(e.target.value).toFixed(1)+"×"; });
+  // delegado: las filas se recrean en cada populateWellAlpha
+  $("ex3d-wellops")?.addEventListener("input", e=>{
+    if(!e.target.classList?.contains("ex3d-walpha")) return;
+    const val=e.target.parentElement.querySelector(".ex3d-walpha-val");
+    if(val) val.textContent=e.target.value+"%";
+  });
+  populateWellAlpha();
   $("ex3d-preview").addEventListener("click", ()=>{
     if(!V.PAD){ status("ex3d-status","No hay pad cargado.",true); return; }
     try{
@@ -87,7 +118,8 @@ function read2DOpts(){
     theme: $("ex2d-theme").value,
     els:{ casings:el("casings"), cement:el("cement"), shoes:el("shoes"), plugs:el("plugs"),
       tbg:el("tbg"), instel:el("instel"), stages:el("stages"), perf:el("perf"),
-      shorts:el("shorts"), shoetrack:el("shoetrack"), ruler:el("ruler"), labels:el("labels") } };
+      shorts:el("shorts"), shoetrack:el("shoetrack"), ruler:el("ruler"), extruler:el("extruler"),
+      labels:el("labels") } };
 }
 function render2D(){
   const w=currentWell(); const box=$("ex2d-box"); if(!box) return;

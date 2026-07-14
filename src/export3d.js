@@ -1,7 +1,8 @@
 /*
   export3d.js — captura de la Vista 3D para documentos (v0.3).
   Renderiza la escena a un canvas de alta resolución con fondo blanco (o oscuro), tema claro/B&N,
-  compone las etiquetas HTML (que no viven en el canvas WebGL) y exporta PNG/JPG/PDF.
+  transparencia por pozo (resaltar uno dejando el resto traslúcido), compone las etiquetas HTML
+  (que no viven en el canvas WebGL) y exporta PNG/JPG/PDF.
   Todo es síncrono: guarda estado, rinde, captura y restaura sin que el loop en vivo interfiera.
 */
 import * as V from "./viewer.js";
@@ -58,6 +59,36 @@ function restoreTheme(store){
   });
 }
 
+/* Opacidad por pozo (solo para la foto): multiplica la opacidad de cada material del grupo
+   del pozo — y de sus zapatos, que cuelgan de shoesGroup con userData.wellId — guardando los
+   originales en `store` para restaurar. alphaMap: { wellId: 0..1 }. */
+function applyWellAlpha(alphaMap, store){
+  if(!alphaMap) return;
+  const fade=(o,a)=>{
+    const mats = o.material ? (Array.isArray(o.material)?o.material:[o.material]) : [];
+    mats.forEach(m=>{
+      if(!m || store.has(m)) return;
+      store.set(m, { transparent:m.transparent, opacity:m.opacity, depthWrite:m.depthWrite });
+      m.transparent=true; m.opacity=m.opacity*a; m.depthWrite=false; m.needsUpdate=true;
+    });
+  };
+  Object.entries(V.wellObjects).forEach(([wid,g])=>{
+    const a=alphaMap[wid];
+    if(a!=null && a<0.999) g.traverse(o=>fade(o,a));
+  });
+  V.world.traverse(o=>{
+    if(o.userData?.kind!=="shoe") return;
+    const a=alphaMap[o.userData.wellId];
+    if(a!=null && a<0.999) fade(o,a);
+  });
+}
+function restoreWellAlpha(store){
+  store.forEach((orig,m)=>{
+    m.transparent=orig.transparent; m.opacity=orig.opacity;
+    m.depthWrite=orig.depthWrite; m.needsUpdate=true;
+  });
+}
+
 /* Determina si una etiqueta debe verse, replicando la lógica de updateLabels() de viewer.js. */
 function labelEnabled(l){
   const flags = { tpn:V.SHOW_TPN_LABELS, stage:V.SHOW_STAGE_LABELS, shoe:V.SHOW_SHOE_LABELS,
@@ -101,6 +132,7 @@ export function capture3D(opts){
   const savedDiam=V.diamExag;
   const doBoost = opts.diam && Math.abs(opts.diam-1)>0.01 && V.PAD;
   const store=new Map();
+  const alphaStore=new Map();
 
   const W=Math.round(baseW*scale), H=Math.round(baseH*scale);
   const bgHex = bg==="white" ? 0xffffff : 0x0d1117;
@@ -112,6 +144,8 @@ export function capture3D(opts){
     scene.background = new THREE.Color(bgHex);
     if(bg==="white"){ V.gridGroup.visible=false; V.axes.visible=false; }
     applyTheme(bg==="white"?theme:(theme==="bw"?"bw":"asis"), store);
+    // transparencia por pozo, después del rebuild del boost (que recrea los materiales)
+    applyWellAlpha(opts.wellAlpha, alphaStore);
 
     // --- cámara ---
     // el rebuild del boost llama frameAll y mueve sph/target: restaurar la vista guardada primero
@@ -141,18 +175,24 @@ export function capture3D(opts){
     if(labels){
       const fontPx=Math.round(12*scale);
       const _p=new THREE.Vector3();
+      const wAlpha=opts.wellAlpha||{};
       for(const l of V.LABELS){
         if(!labelEnabled(l)) continue;
+        const a = wAlpha[l.wellId]!=null ? wAlpha[l.wellId] : 1;
+        if(a<=0.02) continue;
         _p.copy(l.pos).project(camera);
         if(_p.z>1 || _p.x<-1.05 || _p.x>1.05 || _p.y<-1.05 || _p.y>1.05) continue;
         const sx=(_p.x*0.5+0.5)*W, sy=(-_p.y*0.5+0.5)*H;
         const ink = bg==="white" ? (LABEL_INK[l.kind]||"#20242a") : "#e6edf3";
+        ctx.globalAlpha=a;
         drawLabelText(ctx, l.el.textContent, sx, sy, ink, fontPx);
       }
+      ctx.globalAlpha=1;
     }
     return cv;
   } finally {
     // --- restaurar SIEMPRE ---
+    restoreWellAlpha(alphaStore);
     restoreTheme(store);
     if(doBoost) V.setDiamExagForExport(savedDiam);   // rebuild al diámetro original
     scene.background=prevBg;

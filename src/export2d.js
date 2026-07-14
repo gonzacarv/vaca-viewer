@@ -20,6 +20,16 @@ const PHASE_ORDER = ["guia","intermedia1","intermedia2","produccion"];
 const INK="#111", DIM="#6a7178", WALL_W=3.2;
 const STAGE_PAL = ["#1f77b4","#e07a00","#2ca02c","#c02a2a","#8a5cc0","#8c564b","#c85aa8","#0f8fa6","#9a9a1e","#5a5a5a"];
 
+/* rampa dogleg (misma que la Vista 3D): 0→verde puro, medio→amarillo, máx→rojo.
+   Se normaliza al DLS máximo del rango visible (auto-normalización, como el isoMode 3D). */
+const DLS_LOW=[0,227,58], DLS_MID=[255,229,0], DLS_HIGH=[255,30,30];
+function dlsColor(t){
+  t=Math.max(0,Math.min(1,t||0));
+  const mix=(a,b,u)=>a.map((v,i)=>Math.round(v+(b[i]-v)*u));
+  const c=t<0.5?mix(DLS_LOW,DLS_MID,t/0.5):mix(DLS_MID,DLS_HIGH,(t-0.5)/0.5);
+  return `rgb(${c[0]},${c[1]},${c[2]})`;
+}
+
 const esc = V.escHtml;
 const f1 = n => Math.round(n*10)/10;
 
@@ -55,8 +65,9 @@ function findKick(st, landingMD, tvdLand, Rm){
 export function buildWellSVG(w, opts={}){
   const o = { cx:1, cy:1, diam:1, elw:6, shoe:1, font:10.5, perfStages:"", from:null, to:null, theme:"color",
     els:{ casings:true, cement:true, shoes:true, plugs:true, tbg:true, instel:true, stages:true,
-          perf:true, shorts:false, shoetrack:false, ruler:true, labels:true }, ...opts };
+          perf:true, shorts:false, shoetrack:false, ruler:true, extruler:false, labels:true }, ...opts };
   const bw = o.theme==="bw";
+  const dg = o.theme==="dogleg";
   const FS = Math.max(6, o.font||10.5);                  // tamaño de letra base (px)
   const stageFilter = V.parseStages(o.perfStages);       // null = todas las etapas punzadas
   const st = w.survey?.stations || [];
@@ -79,6 +90,15 @@ export function buildWellSVG(w, opts={}){
   const prodHalf = HW("produccion");
 
   const tvdAt = md => sampleMD(st, md).tvd;
+  // DLS interpolado por MD desde el survey (misma idea que dlsAtMD de la Vista 3D)
+  const dlsAt = md => {
+    if(md<=st[0].md) return st[0].dls||0;
+    for(let i=1;i<st.length;i++) if(md<=st[i].md){
+      const a=st[i-1], b=st[i], t=(md-a.md)/((b.md-a.md)||1);
+      return (a.dls||0)+((b.dls||0)-(a.dls||0))*t;
+    }
+    return st.at(-1).dls||0;
+  };
   const tvdFrom = tvdAt(fromMD);
   const tvdKick = tvdAt(Math.min(kickMD, toMD));
   const tvdLand = tvdAt(Math.min(landingMD, toMD));
@@ -176,6 +196,31 @@ export function buildWellSVG(w, opts={}){
     for(const sgn of [1,-1]) S.push(`<path d="${polyPath(sideLine(pts,sgn,half))}" fill="none" stroke="${INK}" stroke-width="${WALL_W}"/>`);
   });
 
+  // ---------- coloreo por dogleg: interior del pozo pintado con la rampa verde→rojo ----------
+  // Normalizado al DLS máximo del rango visible (auto-normalización, como el isoMode de la Vista 3D).
+  let dlsMax=0;
+  if(dg){
+    for(const s of st) if(s.md>=fromMD&&s.md<=toMD) dlsMax=Math.max(dlsMax, s.dls||0);
+    dlsMax=Math.max(dlsMax, dlsAt(fromMD), dlsAt(toMD));
+    if(dlsMax>0){
+      const n=240, w2=prodHalf-WALL_W/2;
+      for(let i=0;i<n;i++){
+        const a=fromMD+(toMD-fromMD)*i/n, b=fromMD+(toMD-fromMD)*(i+1)/n;
+        const col=dlsColor(dlsAt((a+b)/2)/dlsMax);
+        S.push(`<path d="${bandPath(bandPts(a,b,3),w2)}" fill="${col}" stroke="${col}" stroke-width="0.5"/>`);
+      }
+      // leyenda de escala (barra 0→máx) bajo el título
+      S.push(`<defs><linearGradient id="dlsg" x1="0" y1="0" x2="1" y2="0">`+
+        `<stop offset="0" stop-color="rgb(0,227,58)"/><stop offset="0.5" stop-color="rgb(255,229,0)"/>`+
+        `<stop offset="1" stop-color="rgb(255,30,30)"/></linearGradient></defs>`);
+      const gx=leftMargin, gy=37, gw=120;
+      S.push(`<rect x="${gx}" y="${gy}" width="${gw}" height="8" fill="url(#dlsg)" stroke="#999" stroke-width="0.5"/>`
+        +`<text x="${gx}" y="${f1(gy+8+FS)}" font-family="ui-monospace,monospace" font-size="${f1(FS*0.85)}" fill="${DIM}">0</text>`
+        +`<text x="${gx+gw}" y="${f1(gy+8+FS)}" font-family="ui-monospace,monospace" font-size="${f1(FS*0.85)}" fill="${DIM}" text-anchor="end">${f1(dlsMax)}</text>`
+        +`<text x="${gx+gw+8}" y="${f1(gy+7.5)}" font-family="ui-monospace,monospace" font-size="${f1(FS*0.85)}" fill="${DIM}">dogleg (°/30m)</text>`);
+    }
+  }
+
   // ---------- TBG (checkbox propio; con cartel de specs + MD/TVD) ----------
   if(o.els.tbg && w.installation){
     const inst=w.installation;
@@ -203,31 +248,34 @@ export function buildWellSVG(w, opts={}){
   };
 
   // ---------- etapas: banda de color en el interior + N° centrado ----------
-  // En B&N no se pinta banda: queda el caño blanco y solo la etiqueta ("solo etiqueta y blanco").
+  // Banda solo en tema "color". En dogleg NO se pinta banda (no debe pisar el coloreo por DLS):
+  // queda solo el N°, con halo blanco para leerse sobre la rampa. En B&N, solo el N° sobre blanco.
   if(o.els.stages && w.frac?.stages?.length){
     w.frac.stages.forEach(stg=>{
       const r=stageRange(stg); if(!r) return;
       const col=STAGE_PAL[(stg.stage||0)%STAGE_PAL.length];
-      if(!bw){
+      if(!bw && !dg){
         const pts=bandPts(r.md0,r.md1,24);
         S.push(`<path d="${bandPath(pts,prodHalf-WALL_W/2)}" fill="${col}" fill-opacity="0.85"/>`);
       }
       if(o.els.labels){
         const f=P((r.md0+r.md1)/2);
         const efs=Math.min(FS*0.85, prodHalf*0.78);
-        const fill=bw?"#111":"#ffffff";
+        const fill=(bw||dg)?"#111":"#ffffff";
+        const halo=dg?` stroke="#ffffff" stroke-width="${f1(Math.max(1.6,efs*0.3))}" stroke-linejoin="round" paint-order="stroke"`:"";
         const rot=(r.md0+r.md1)/2>=landingMD ? ` transform="rotate(-90 ${f1(f.x)} ${f1(f.y)})"` : "";
-        S.push(`<text x="${f1(f.x)}" y="${f1(f.y+efs*0.36)}" font-family="Arial,Helvetica,sans-serif" font-size="${f1(efs)}" font-weight="bold" fill="${fill}" text-anchor="middle"${rot}>E${stg.stage}</text>`);
+        S.push(`<text x="${f1(f.x)}" y="${f1(f.y+efs*0.36)}" font-family="Arial,Helvetica,sans-serif" font-size="${f1(efs)}" font-weight="bold" fill="${fill}"${halo} text-anchor="middle"${rot}>E${stg.stage}</text>`);
       }
     });
   }
 
   // ---------- punzados: "dientes" esquemáticos hacia la formación (no 1:1 con los tiros reales) ----------
+  // Misma geometría y solidez en TODOS los temas: color de etapa en "color"/"dogleg", tinta en B&N.
   if(o.els.perf && w.frac?.stages?.length){
     w.frac.stages.forEach(stg=>{
       if(stageFilter && !stageFilter.has(stg.stage)) return;
       const r=stageRange(stg); if(!r) return;
-      const col=bw?"#333":STAGE_PAL[(stg.stage||0)%STAGE_PAL.length];
+      const col=bw?INK:STAGE_PAL[(stg.stage||0)%STAGE_PAL.length];
       S.push(drawTeeth(P, r.md0, r.md1, prodHalf, col, teethLen));
     });
   }
@@ -274,13 +322,22 @@ export function buildWellSVG(w, opts={}){
     });
   }
 
-  // ---------- caños cortos / shoetrack ----------
+  // ---------- caños cortos / shoetrack (con cartel MD/TVD + detalle, como el resto) ----------
   if(o.els.shorts||o.els.shoetrack){
+    // cartel de un elemento puntual: etiqueta rotada en el lateral, caja MD/TVD en tronco/arco
+    const pointLabel=(md,f,name,color)=>{
+      if(md>=landingMD) lanes.push({ f, text:`${name} · ${Math.round(md)} m`, color });
+      else queueLabel(f, [name, `${Math.round(md)} m · TVD ${Math.round(tvdAt(md))} m`], color, prodHalf, md);
+    };
     casings.forEach(c=>{
       if(o.els.shorts)(c.short_joints||[]).forEach(sj=>{ if(sj.top_md==null||sj.top_md<fromMD||sj.top_md>toMD) return;
-        S.push(blockAcross(P(sj.top_md), prodHalf, 4, bw?"#666":"#d9b800")); });
+        const f=P(sj.top_md);
+        S.push(blockAcross(f, prodHalf, 4, bw?"#666":"#d9b800"));
+        if(o.els.labels) pointLabel(sj.top_md, f, sj.desc||(sj.xover?"XOVER":"Caño corto"), bw?INK:"#8a6d00"); });
       if(o.els.shoetrack)(c.shoetrack?.elements||[]).forEach(el=>{ if(el.top_md==null||el.top_md<fromMD||el.top_md>toMD) return;
-        S.push(blockAcross(P(el.top_md), prodHalf, 4, bw?"#888":"#9a6cff")); });
+        const f=P(el.top_md);
+        S.push(blockAcross(f, prodHalf, 4, bw?"#888":"#9a6cff"));
+        if(o.els.labels) pointLabel(el.top_md, f, el.desc||"Shoetrack", bw?INK:"#7a4fd6"); });
     });
   }
 
@@ -298,23 +355,63 @@ export function buildWellSVG(w, opts={}){
     S.push(`<text x="${rx-8}" y="${f1(y0v*yScale+dy-12)}" font-family="ui-monospace,monospace" font-size="${f1(FS*0.95)}" fill="${DIM}" text-anchor="end">TVD (m)</text>`);
   }
 
+  // ---------- regla de extensión (MD) DEBAJO del esquema ----------
+  // Usa el mismo mapeo P(md).x del camino canónico, así cada tapón/elemento del lateral queda
+  // alineado verticalmente con su MD en la regla. Rango: tope del cluster más somero → TD.
+  let extBottom=0, extRight=0;
+  if(o.els.extruler && !isVerticalWell && latVisMD>0){
+    const tops=(w.frac?.stages||[]).flatMap(s=>(s.clusters||[]).map(c=>c.top_md)).filter(x=>x!=null);
+    const mdA=Math.max(fromMD, kickMD, tops.length?Math.min(...tops):landingMD);
+    const mdB=toMD;
+    if(mdB>mdA+1){
+      const yR=maxY+dy+maxHalf+teethLen+38;                // debajo de dientes/zapatos del lateral
+      const x0=P(mdA).x, x1=P(mdB).x;
+      const pxPerM=(x1-x0)/(mdB-mdA);
+      const step=niceStep(58/Math.max(pxPerM,1e-6));       // ticks "lindos" sin encimarse (~58 px)
+      const tick=(m,x,strong)=>{
+        S.push(`<line x1="${f1(x)}" y1="${f1(yR)}" x2="${f1(x)}" y2="${f1(yR+6)}" stroke="${DIM}" stroke-width="1"/>`
+          +`<text x="${f1(x)}" y="${f1(yR+8+FS*0.95)}" font-family="ui-monospace,monospace" font-size="${f1(FS*0.9)}" fill="${DIM}" text-anchor="middle"${strong?' font-weight="bold"':''}>${Math.round(m)}</text>`);
+      };
+      S.push(`<line x1="${f1(x0)}" y1="${f1(yR)}" x2="${f1(x1)}" y2="${f1(yR)}" stroke="${DIM}" stroke-width="1"/>`);
+      tick(mdA, x0, true); tick(mdB, x1, true);            // extremos exactos (tope somero y TD)
+      for(let m=Math.ceil(mdA/step)*step; m<mdB; m+=step){
+        const x=P(m).x;
+        if(x-x0>34 && x1-x>34) tick(m, x, false);          // no pisar las puntas
+      }
+      S.push(`<text x="${f1(x1+10)}" y="${f1(yR+4)}" font-family="ui-monospace,monospace" font-size="${f1(FS*0.95)}" fill="${DIM}">MD (m)</text>`);
+      extBottom=yR+10+FS*1.9; extRight=x1+10+FS*0.6*7;
+    }
+  }
+
   // ---------- etiquetas ----------
-  let boxRight=0, boxBottom=0;
+  let boxRight=0, boxBottom=0, labelTop=Infinity;
   if(o.els.labels){
     // zona ocupada por las etiquetas rotadas: las cajas no deben pisarla
     const laneZone = lanes.length ? { x0:Math.min(...lanes.map(L=>L.f.x))-10,
       y0:laneBase-laneSpace+10, y1:laneBase+6 } : null;
     const rb=renderBoxes(boxes, boxColX, trunkBoxLimit, latBoxTop, FS, laneZone);
-    S.push(rb.svg); boxRight=rb.right; boxBottom=rb.bottom;
-    S.push(renderLanes(lanes, laneBase, FS));
+    S.push(rb.svg); boxRight=rb.right; boxBottom=rb.bottom; labelTop=rb.top;
+    const rl=renderLanes(lanes, laneBase, FS);
+    S.push(rl.svg); labelTop=Math.min(labelTop, rl.top);
+  }
+
+  // ---------- anti-desborde superior ----------
+  // En la vista "solo lateral" (desde-MD ≥ landing) el tronco no reserva altura y las cajas
+  // laterales / etiquetas rotadas, que se apilan hacia ARRIBA, pueden quedar en y<0. El lienzo
+  // nunca recorta: se corre TODO el contenido hacia abajo y la altura crece en la misma medida.
+  let shift=0;
+  if(labelTop<38){
+    shift=Math.round(38-labelTop);
+    const inner=S.join(""); S.length=0;
+    S.push(`<g transform="translate(0 ${shift})">${inner}</g>`);
   }
 
   // ---------- título ----------
   S.unshift(`<text x="${leftMargin}" y="30" font-family="Arial,Helvetica,sans-serif" font-size="${f1(Math.max(15,FS*1.6))}" font-weight="bold" fill="${INK}">${esc(w.id||"pozo")}</text>`);
 
   // ---------- dimensiones del lienzo: crecen para contener TODO (cajas incluidas, sin recortes) ----------
-  const width  = Math.round(Math.max(maxX+dx+maxHalf+teethLen+24, boxRight+18, 460));
-  const height = Math.round(Math.max(maxY+dy+maxHalf+teethLen+26, rulerBottomTvd*yScale+dy+28, boxBottom+18));
+  const width  = Math.round(Math.max(maxX+dx+maxHalf+teethLen+24, boxRight+18, extRight+12, 460));
+  const height = Math.round(Math.max(maxY+dy+maxHalf+teethLen+26, rulerBottomTvd*yScale+dy+28, boxBottom+18, extBottom+12)+shift);
 
   const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`+
     `<rect width="${width}" height="${height}" fill="#ffffff"/>`+S.join("")+`</svg>`;
@@ -331,7 +428,7 @@ export function buildWellSVG(w, opts={}){
 
 /* ============ cajas de etiqueta (estilo "manual": recuadro con texto centrado) ============ */
 function renderBoxes(list, colX, trunkLimitY, latBoxTop, FS=10.5, laneZone=null){
-  if(!list.length) return { svg:"", right:0, bottom:0 };
+  if(!list.length) return { svg:"", right:0, bottom:0, top:Infinity };
   const fs=FS, lh=FS*1.33, padX=FS*0.95, padY=FS*0.57;
   const measure=L=>({ w:Math.max(...L.lines.map(t=>t.length))*fs*0.6+2*padX, h:L.lines.length*lh+2*padY });
   let out="";
@@ -351,8 +448,8 @@ function renderBoxes(list, colX, trunkLimitY, latBoxTop, FS=10.5, laneZone=null)
   }
   // segundo pase (de arriba hacia abajo): nada por encima del margen superior — si la pila se
   // desbordó del lienzo, se empuja hacia abajo (el lienzo crece con `bottom`, nunca se recorta)
-  let top=38;
-  for(const p of placed){ p.y=Math.max(p.y, top); top=p.y+p.h+10; }
+  let topMargin=38;
+  for(const p of placed){ p.y=Math.max(p.y, topMargin); topMargin=p.y+p.h+10; }
   let vbid=0;
   const emit=(x,y,w,h,L,ax,ay)=>{
     const id=vbid++;
@@ -361,20 +458,21 @@ function renderBoxes(list, colX, trunkLimitY, latBoxTop, FS=10.5, laneZone=null)
       +box(x, y, w, h, L.lines, L.color, fs, lh, padY)+`</g>`;
     return g;
   };
-  let right=0, bottom=0;
+  let right=0, bottom=0, top=Infinity;
   for(const p of placed){
     out+=emit(colX, p.y, p.w, p.h, p.L, p.L.f.x+p.L.half, p.L.f.y);
-    right=Math.max(right, colX+p.w); bottom=Math.max(bottom, p.y+p.h);
+    right=Math.max(right, colX+p.w); bottom=Math.max(bottom, p.y+p.h); top=Math.min(top, p.y);
   }
-  // lateral: caja flotando arriba del caño, por ENCIMA de las etiquetas rotadas
+  // lateral: caja flotando arriba del caño, por ENCIMA de las etiquetas rotadas.
+  // Pueden apilarse hasta y<0: el llamador corre todo el contenido hacia abajo con `top`.
   let latY=latBoxTop;
   for(const L of list.filter(L=>L.lateral)){
     const {w,h}=measure(L);
     const x=Math.max(6, L.f.x-w-14), y=latY-h; latY=y-8;   // varias cajas laterales: se apilan
     out+=emit(x, y, w, h, L, L.f.x, L.f.y-L.half);
-    right=Math.max(right, x+w); bottom=Math.max(bottom, y+h);
+    right=Math.max(right, x+w); bottom=Math.max(bottom, y+h); top=Math.min(top, y);
   }
-  return { svg:out, right, bottom };
+  return { svg:out, right, bottom, top };
 }
 function box(x,y,w,h,lines,color,fs,lh,padY){
   let g=`<rect x="${f1(x)}" y="${f1(y)}" width="${f1(w)}" height="${f1(h)}" fill="#ffffff" stroke="#555" stroke-width="0.9"/>`;
@@ -386,18 +484,19 @@ function box(x,y,w,h,lines,color,fs,lh,padY){
    Dos carriles: etapas (cortas) pegadas al caño, tapones (largas) arrancan más arriba.
    Anti-solape en x por carril: si dos caen muy juntas, se empuja a la derecha con líder. */
 function renderLanes(list, baseY, FS=10.5){
-  if(!list.length) return "";
+  if(!list.length) return { svg:"", top:Infinity };
   const fsS=FS*0.86, fsB=FS*0.9;
   const lanes={ small:{y:baseY, prev:-Infinity, gap:fsS*1.35, fs:fsS},
                 big:{y:baseY-FS*2.8, prev:-Infinity, gap:fsB*1.55, fs:fsB} };
-  let out="";
+  let out="", top=Infinity;
   for(const L of list.slice().sort((a,b)=>a.f.x-b.f.x)){
     const lane=L.small?lanes.small:lanes.big;
     const x=Math.max(L.f.x, lane.prev+lane.gap); lane.prev=x;
     out+=`<line x1="${f1(L.f.x)}" y1="${f1(L.f.y-14)}" x2="${f1(x)}" y2="${f1(lane.y+3)}" stroke="#c4c9cf" stroke-width="0.6"/>`;
     out+=`<text x="${f1(x)}" y="${f1(lane.y)}" font-family="ui-monospace,monospace" font-size="${f1(lane.fs)}" fill="${L.color}" text-anchor="start" transform="rotate(-90 ${f1(x)} ${f1(lane.y)})">${esc(L.text)}</text>`;
+    top=Math.min(top, lane.y-(L.text.length*lane.fs*0.62+4));  // extremo superior del texto rotado
   }
-  return out;
+  return { svg:out, top };
 }
 
 /* ============ símbolos ============ */

@@ -86,6 +86,8 @@ function updateAutoDiam(){
    · "dogleg_lateral": DLS en el tramo de etapas (última→primera), normalizado a su propio máximo
      → resalta el dogleg fino del lateral sin que lo tape el rojo de la curva.
    · "dogleg_build": DLS en el tramo de curva (superficie→última etapa) → resalta la curva de asentamiento.
+   · "dogleg_total": DLS en TODA la trayectoria (superficie→fondo), un único rango normalizado
+     → vista de conjunto; la curva suele dominar el rojo.
    El coloreo se hace con vertex colors sobre el MISMO tubo (sin geometría extra). */
 let isoMode="normal";
 const ISO_BASE=new THREE.Color(0xf2ede2);          // gris cálido casi blanco (fase produccion)
@@ -208,7 +210,7 @@ function applyIsoColors(tube){
     if(mat.userData._emissivePatched){ mat.onBeforeCompile=()=>{}; mat.userData._emissivePatched=false; mat.needsUpdate=true; }
     mat.needsUpdate=true; return;
   }
-  const isDogleg = isoMode==="dogleg_lateral" || isoMode==="dogleg_build";
+  const isDogleg = isoMode==="dogleg_lateral" || isoMode==="dogleg_build" || isoMode==="dogleg_total";
   // frontera curva/lateral = MD del inicio de la primera etapa (primer cluster de la etapa más somera)
   let firstStageMD=Infinity, lastStageMD=-Infinity;
   iso.stageRanges.forEach(r=>{ firstStageMD=Math.min(firstStageMD,r.md0); lastStageMD=Math.max(lastStageMD,r.md1); });
@@ -216,13 +218,16 @@ function applyIsoColors(tube){
     firstStageMD = (iso.landingMD!=null ? iso.landingMD : iso.ringMD(iso.tubSeg));
     lastStageMD = iso.ringMD(iso.tubSeg);
   }
+  // tramo activo del dogleg: build=curva, lateral=etapas, total=toda la trayectoria (sin segmentar)
+  const dlsInSeg = isoMode==="dogleg_build" ? (md=>md<firstStageMD)
+                 : isoMode==="dogleg_total" ? (()=>true)
+                 : (md=>md>=firstStageMD);
   // para dogleg: máximo DLS DENTRO del tramo activo, para auto-normalizar el gradiente a ese tramo
   let segMax=0;
   if(isDogleg){
     for(let i=0;i<=iso.tubSeg;i++){
       const md=iso.ringMD(i);
-      const inSeg = isoMode==="dogleg_build" ? (md<firstStageMD) : (md>=firstStageMD);
-      if(inSeg) segMax=Math.max(segMax, iso.dlsAtMD(md));
+      if(dlsInSeg(md)) segMax=Math.max(segMax, iso.dlsAtMD(md));
     }
     if(segMax<=0) segMax=1;
   }
@@ -235,10 +240,9 @@ function applyIsoColors(tube){
       const sr=iso.stageRanges.find(r=>md>=r.md0 && md<=r.md1);
       if(sr) c.copy(sr.stage%2===0?STAGE_GREEN_A:STAGE_GREEN_B);
       else   c.copy(ISO_BASE);                  // fuera de etapas (arriba del 1er cluster)
-    } else { // dogleg_lateral | dogleg_build
-      const inSeg = isoMode==="dogleg_build" ? (md<firstStageMD) : (md>=firstStageMD);
-      if(inSeg) c.copy(dlsColor(iso.dlsAtMD(md), segMax));
-      else      c.copy(ISO_BASE);               // el otro tramo queda en gris, no compite
+    } else { // dogleg_lateral | dogleg_build | dogleg_total
+      if(dlsInSeg(md)) c.copy(dlsColor(iso.dlsAtMD(md), segMax));
+      else             c.copy(ISO_BASE);        // el otro tramo queda en gris, no compite
     }
     for(let j=0;j<ringVerts;j++){ const o=(i*ringVerts+j)*3; colors[o]=c.r; colors[o+1]=c.g; colors[o+2]=c.b; }
   }
@@ -404,7 +408,7 @@ function buildPad(pad){
         new THREE.MeshStandardMaterial({color:col, metalness:.3, roughness:.5}));
       const sq=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0), shoeTan);
       shoe.quaternion.copy(sq); shoe.position.copy(toThree(sp.x,sp.y,sp.tvd));
-      shoe.userData.kind="shoe"; shoesGroup.add(shoe);
+      shoe.userData.kind="shoe"; shoe.userData.wellId=w.id; shoesGroup.add(shoe);
       // etiqueta de zapato: OD, libraje (lb/ft) y acero  →  ej.  5" 21.4 lb/ft P110 · MD 6650 · TVD 3070
       const specs=[fmtOD(cas.od_in)];
       if(cas.weight_ppf!=null) specs.push(`${cas.weight_ppf} lb/ft`);
