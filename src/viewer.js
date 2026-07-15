@@ -30,8 +30,11 @@ const camera=new THREE.PerspectiveCamera(45,1,1,60000);
 scene.add(new THREE.HemisphereLight(0xcfe0ff,0x121820,1.5));
 const dir=new THREE.DirectionalLight(0xffffff,0.85); dir.position.set(1,2,3); scene.add(dir);
 
-const gridGroup=new THREE.Group();
-const grid=new THREE.GridHelper(6000,60,0x2a3441,0x1a2029); grid.rotation.x=Math.PI/2; gridGroup.add(grid); world.add(gridGroup);
+/* gridGroup contiene dos grillas horizontales: superficie (TVD=0) y fondo/piso (50 m bajo lo más
+   profundo). Se reconstruyen por pad en buildGrids() para adaptar la huella (N/S sigue las ramas,
+   E/O ±1000 m). export3d togglea gridGroup.visible en bloque; acá controlamos cada grilla por hijo. */
+const gridGroup=new THREE.Group(); world.add(gridGroup);
+let surfaceGrid=null, floorGrid=null;
 const axes=new THREE.AxesHelper(400); world.add(axes);
 const shoesGroup=new THREE.Group(); world.add(shoesGroup);
 const measureGroup=new THREE.Group(); world.add(measureGroup);   // regla medidora
@@ -155,14 +158,15 @@ function updateLabels(){
     const wellVisible = wellObjects[l.wellId] ? wellObjects[l.wellId].visible : true;
     const kindOn = l.kind==="tpn" ? SHOW_TPN_LABELS : l.kind==="stage" ? SHOW_STAGE_LABELS
                  : l.kind==="short" ? SHOW_SHORT_LABELS : l.kind==="install" ? SHOW_INSTALL_LABELS
-                 : l.kind==="shoetrack" ? SHOW_SHOETRACK_LABELS : l.kind==="toc" ? SHOW_TOC_LABELS : SHOW_SHOE_LABELS;
+                 : l.kind==="shoetrack" ? SHOW_SHOETRACK_LABELS : l.kind==="toc" ? SHOW_TOC_LABELS
+                 : l.kind==="gridnum" ? SHOW_GRIDNUMS : SHOW_SHOE_LABELS;
     // visibilidad por pozo (árbol): la etiqueta sigue al elemento de SU pozo
     const vw=VIS[l.wellId];
     const elemKey = l.kind==="tpn" ? "plug" : (l.kind==="short"||l.kind==="install"||l.kind==="shoetrack"||l.kind==="toc") ? l.kind : null;
     const elemOn = !vw || !elemKey || vw[elemKey]!==false;
     if(!wellVisible || !kindOn || !elemOn){ l.el.style.display="none"; continue; }
-    // zapatos, caños cortos, instalación, shoetrack y TOC: siempre visibles (pocos). Etapas/tapones: LOD.
-    if(l.kind!=="shoe" && l.kind!=="short" && l.kind!=="install" && l.kind!=="shoetrack" && l.kind!=="toc"){
+    // zapatos, caños cortos, instalación, shoetrack, TOC y números de grilla: siempre visibles (pocos). Etapas/tapones: LOD.
+    if(l.kind!=="shoe" && l.kind!=="short" && l.kind!=="install" && l.kind!=="shoetrack" && l.kind!=="toc" && l.kind!=="gridnum"){
       if(step===0){ l.el.style.display="none"; continue; }
       const counter = l.kind==="tpn" ? shownTpn++ : shownStage++;
       if(counter % step !== 0){ l.el.style.display="none"; continue; }
@@ -175,7 +179,7 @@ function updateLabels(){
     l.el.style.transform=`translate(-50%,-50%) scale(${kScale})`;
   }
 }
-let SHOW_TPN_LABELS=false, SHOW_STAGE_LABELS=true, SHOW_SHOE_LABELS=false, SHOW_SHORT_LABELS=false, SHOW_INSTALL_LABELS=false, SHOW_SHOETRACK_LABELS=false, SHOW_TOC_LABELS=false, SHOW_CURSOR_TIP=true;
+let SHOW_TPN_LABELS=false, SHOW_STAGE_LABELS=true, SHOW_SHOE_LABELS=false, SHOW_SHORT_LABELS=false, SHOW_INSTALL_LABELS=false, SHOW_SHOETRACK_LABELS=false, SHOW_TOC_LABELS=false, SHOW_CURSOR_TIP=true, SHOW_GRIDNUMS=false;
 
 /* interpola X,Y,TVD (coords locales del pad) a un MD dado desde las stations */
 function interpAtMD(st, md, wx){
@@ -558,7 +562,7 @@ function buildPad(pad){
   // son verticales sintéticos (sin trayectoria cargada), se oculta el grupo.
   const hasSurvey=wells.some(w=>w.architecture!=="vertical");
   document.getElementById("grp-isomode").style.display=hasSurvey?"":"none";
-  buildWellTree(wells); applyAllToggles(); frameAll(); updateSummary();
+  buildWellMatrix(wells); buildGrids(); applyAllToggles(); frameAll(); updateSummary();
   // re-aplica en el próximo frame: evita que, recién cargado, alguna capa quede sin estado
   // hasta que el usuario toca un toggle (visibilidad no reflejada en el primer build).
   requestAnimationFrame(applyAllToggles);
@@ -569,6 +573,59 @@ function buildPad(pad){
    cosas distintas en pozos distintos. El nodo "TODOS" aplica el cambio a todos los pozos a la vez.
    Estado en VIS[wellId][clave] — persiste entre regeneraciones del pad (misma id de pozo). */
 const q=id=>{ const el=document.getElementById(id); return el?el.checked:true; };
+
+/* ============ Grillas de referencia (superficie + piso) ============
+   Cero de la numeración = boca de pozo / centro del pad. La huella N/S sigue las ramas de todos
+   los pozos; en E/O se proyecta ±1000 m (o más si algún pozo excede). El piso va 50 m bajo el
+   registro más profundo. Ambas grillas se reconstruyen por pad (dependen de vexag vía toThree). */
+function gridBounds(){
+  const wells=(PAD&&PAD.pad&&PAD.pad.wells)||[];
+  let minEW=0,maxEW=0,minNS=0,maxNS=0,maxTVD=0,any=false;
+  wells.forEach(w=>{ const wx=(w.wellhead&&w.wellhead.x)||0;
+    ((w.survey&&w.survey.stations)||[]).forEach(s=>{
+      const ew=wx+(s.ew||0), ns=s.ns||0, tvd=s.tvd||0;
+      minEW=Math.min(minEW,ew); maxEW=Math.max(maxEW,ew);
+      minNS=Math.min(minNS,ns); maxNS=Math.max(maxNS,ns);
+      maxTVD=Math.max(maxTVD,tvd); any=true; }); });
+  return {minEW,maxEW,minNS,maxNS,maxTVD,any};
+}
+// grilla horizontal a una TVD dada (líneas cada `step` m; realce cada 1000 m). world X = -ew, Z = ns.
+function makeGridPlane(tvd, ewMin, ewMax, nsMin, nsMax, step){
+  const grp=new THREE.Group(); const y=-tvd*vexag, minor=[], major=[];
+  const seg=(a,x1,z1,x2,z2)=>{ a.push(-x1,y,z1,-x2,y,z2); };
+  for(let ns=Math.ceil(nsMin/step)*step; ns<=nsMax+1e-6; ns+=step) seg(Math.abs(ns)%1000<1e-6?major:minor, ewMin,ns, ewMax,ns);
+  for(let ew=Math.ceil(ewMin/step)*step; ew<=ewMax+1e-6; ew+=step) seg(Math.abs(ew)%1000<1e-6?major:minor, ew,nsMin, ew,nsMax);
+  const mk=(arr,col)=>{ if(!arr.length) return; const g=new THREE.BufferGeometry();
+    g.setAttribute("position",new THREE.Float32BufferAttribute(arr,3));
+    grp.add(new THREE.LineSegments(g,new THREE.LineBasicMaterial({color:col,transparent:true,opacity:.6}))); };
+  mk(minor,0x2a3441); mk(major,0x3d4f63);
+  return grp;
+}
+function clearGridLabels(){ LABELS=LABELS.filter(l=>{ if(l.kind==="gridnum"){ l.el.remove(); return false; } return true; }); }
+function applyGridVis(){ if(surfaceGrid) surfaceGrid.visible=q("cfg-grid"); if(floorGrid) floorGrid.visible=q("cfg-floor"); }
+function buildGrids(){
+  clearGridLabels();
+  gridGroup.children.slice().forEach(c=>{ gridGroup.remove(c);
+    c.traverse(o=>{ if(o.geometry)o.geometry.dispose(); if(o.material)o.material.dispose(); }); });
+  const b=gridBounds(), step=200;
+  const ewHalf=Math.max(1000, Math.ceil((Math.max(Math.abs(b.minEW),Math.abs(b.maxEW))+200)/step)*step);
+  const nsMin=b.any?Math.floor((Math.min(0,b.minNS)-200)/step)*step:-1000;
+  const nsMax=b.any?Math.ceil((Math.max(0,b.maxNS)+200)/step)*step:1000;
+  const floorTVD=b.any?Math.ceil((b.maxTVD+50)/step)*step:0;
+  surfaceGrid=makeGridPlane(0,-ewHalf,ewHalf,nsMin,nsMax,step); gridGroup.add(surfaceGrid);
+  floorGrid=(b.any&&floorTVD>0)?makeGridPlane(floorTVD,-ewHalf,ewHalf,nsMin,nsMax,step):null;
+  if(floorGrid) gridGroup.add(floorGrid);
+  // numeración (metros, cero en boca): N/S y E/O sobre el plano de piso; profundidad en un canto vertical
+  const lblTVD=floorTVD||0, mstep=500;
+  for(let ns=Math.ceil(nsMin/mstep)*mstep; ns<=nsMax+1e-6; ns+=mstep)
+    addLabel(ns===0?"0":`${Math.abs(ns)} ${ns>0?"N":"S"}`, toThree(ewHalf,ns,lblTVD), "gridnum", null, false);
+  for(let ew=Math.ceil(-ewHalf/mstep)*mstep; ew<=ewHalf+1e-6; ew+=mstep)
+    addLabel(ew===0?"0":`${Math.abs(ew)} ${ew>0?"E":"O"}`, toThree(ew,nsMax,lblTVD), "gridnum", null, false);
+  if(lblTVD>0) for(let tvd=0; tvd<=lblTVD+1e-6; tvd+=mstep)
+    addLabel(`${Math.round(tvd)} m`, toThree(ewHalf,nsMin,tvd), "gridnum", null, false);
+  applyGridVis();
+}
+
 const ELEMS=[
   ["traj","Trayectoria","#4ea1d3"],
   ["guia","Guía","#e8c96a"],["intermedia1","Intermedia 1","#7fc7e0"],
@@ -610,83 +667,86 @@ function applyWellVis(wid){
     else if(k in ELEM_DEFAULT) o.visible=v[k]!==false;
   });
 }
-function buildWellTree(wells){
-  const cont=document.getElementById("well-tree"); cont.innerHTML="";
-  const mkNode=(wid,name,color,meta,isMaster)=>{
-    const n=document.createElement("div"); n.className="wnode"+(isMaster?" master":"");
-    n.dataset.wid=wid??"";
-    const sw=color!=null?`<span class="sw" style="background:#${color.toString(16).padStart(6,"0")}"></span>`:"";
-    const v=wid?ensureVis(wid):null;
-    n.innerHTML=`<div class="whead"><span class="caret">▸</span>
-        <input type="checkbox" class="wvis" ${(!wid||v.well)?"checked":""}>
-        ${sw}<span class="wname">${name}</span>${meta?`<span class="meta">${meta}</span>`:""}</div>
-      <div class="wbody" hidden>${ELEMS.map(([k,label,col])=>{
-        const on = wid ? v[k]!==false : ELEMS_MASTER_STATE(k);
-        let row=`<label class="row"><input type="checkbox" data-el="${k}" ${on?"checked":""}>
-          <span class="sw" style="background:${col}"></span>${label}</label>`;
-        if(k==="perf"){ const pf=wid?(v.perfStages||""):"";
-          row+=`<input class="perf-filter" data-perffilter type="text" value="${pf}" placeholder="etapas (ej: 1,3,10-15) — vacío=todas">`; }
-        return row;}).join("")}</div>`;
-    return n;
-  };
-  // estado "master" mostrado: true si TODOS los pozos lo tienen activo
-  function ELEMS_MASTER_STATE(k){
-    const wids=Object.keys(wellObjects); if(!wids.length) return ELEM_DEFAULT[k];
-    return wids.every(wid=>ensureVis(wid)[k]!==false);
-  }
-  cont.appendChild(mkNode(null,"Todos",null,null,true));
+/* ===== Matriz pozos × elementos =====
+   Columnas = pozos (colapsables a "Pozos"), filas = elementos (colapsables a "Todos").
+   Celda (pozo, elemento) = VIS[pozo][elemento]. La columna "Pozos" es el maestro por elemento
+   (todos los pozos) y la fila "Todos" es el maestro por pozo (todos los elementos). El cruce
+   Pozos×Todos togglea todo. La cabecera de cada pozo togglea su visibilidad (VIS.well). */
+function mxWids(){ return [...document.querySelectorAll("#well-matrix th.mx-well")].map(th=>th.dataset.wid); }
+function buildWellMatrix(wells){
+  const cont=document.getElementById("well-matrix");
+  if(!wells||!wells.length){ cont.innerHTML='<div class="stub" style="padding:6px 2px">Sin pozos cargados.</div>'; return; }
+  wells.forEach(w=>ensureVis(w.id));
+  const wids=wells.map(w=>w.id);
+  const elemAll = k => wids.every(id=>ensureVis(id)[k]!==false);
+  const wellAll = id => ELEMS.every(([k])=>ensureVis(id)[k]!==false);
+  const sw = c => `<span class="sw" style="background:${c}"></span>`;
+  let h='<table class="wmx"><thead><tr><th class="mx-corner"></th>'
+      +`<th class="mx-pozos"><label class="mxh"><input type="checkbox" class="mx-allwells" ${wids.every(id=>ensureVis(id).well)?"checked":""}><span>Pozos</span></label></th>`;
   wells.forEach((w,idx)=>{
-    ensureVis(w.id);
-    cont.appendChild(mkNode(w.id, w.id, WELL_COLORS[idx%WELL_COLORS.length],
-      `${w.frac?.total_stages||0} et`, false));
+    const col="#"+WELL_COLORS[idx%WELL_COLORS.length].toString(16).padStart(6,"0");
+    h+=`<th class="mx-well" data-wid="${escAttr(w.id)}"><label class="mxh" title="${escAttr(w.id)}">${sw(col)}<span class="wname">${escHtml(w.id)}</span>`
+      +`<input type="checkbox" class="mx-wellvis" ${ensureVis(w.id).well?"checked":""}></label></th>`;
   });
-}
-document.getElementById("well-tree").addEventListener("click",e=>{
-  const head=e.target.closest(".whead");
-  if(head && !e.target.classList.contains("wvis")){
-    const node=head.parentElement;
-    node.classList.toggle("open");
-    node.querySelector(".wbody").hidden=!node.classList.contains("open");
-  }
-});
-document.getElementById("well-tree").addEventListener("change",e=>{
-  const t=e.target, node=t.closest(".wnode"); if(!node) return;
-  const wid=node.dataset.wid||null, tree=document.getElementById("well-tree");
-  if(t.classList.contains("wvis")){
-    if(wid){ ensureVis(wid).well=t.checked; applyWellVis(wid); }
-    else {   // master: todos los pozos
-      tree.querySelectorAll(".wnode:not(.master)").forEach(n=>{
-        const id=n.dataset.wid; ensureVis(id).well=t.checked;
-        n.querySelector(".wvis").checked=t.checked; applyWellVis(id);
-      });
-    }
-    return;
-  }
-  const k=t.dataset.el; if(!k) return;
-  if(wid){ ensureVis(wid)[k]=t.checked; applyWellVis(wid); }
-  else {
-    tree.querySelectorAll(".wnode:not(.master)").forEach(n=>{
-      const id=n.dataset.wid; ensureVis(id)[k]=t.checked;
-      const cb=n.querySelector(`[data-el="${k}"]`); if(cb) cb.checked=t.checked;
-      applyWellVis(id);
+  h+='</tr></thead><tbody>';
+  // fila "Todos" (maestro por pozo)
+  h+='<tr class="mx-todos"><th class="mx-rowh">Todos</th>'
+    +`<td class="mx-pozos"><input type="checkbox" class="mx-all" ${wids.every(id=>wellAll(id))?"checked":""}></td>`;
+  wells.forEach(w=>{ h+=`<td class="mx-well" data-wid="${escAttr(w.id)}"><input type="checkbox" class="mx-welltodos" ${wellAll(w.id)?"checked":""}></td>`; });
+  h+='</tr>';
+  // una fila por elemento
+  ELEMS.forEach(([k,label,col])=>{
+    h+=`<tr class="mx-elem" data-el="${k}"><th class="mx-rowh">${sw(col)}${escHtml(label)}</th>`;
+    h+=`<td class="mx-pozos"><input type="checkbox" class="mx-elemall" data-el="${k}" ${elemAll(k)?"checked":""}>`;
+    if(k==="perf") h+=`<input type="text" class="mx-perf" data-perfall placeholder="1,3,10-15">`;
+    h+='</td>';
+    wells.forEach(w=>{
+      h+=`<td class="mx-well" data-wid="${escAttr(w.id)}"><input type="checkbox" data-el="${k}" ${ensureVis(w.id)[k]!==false?"checked":""}>`;
+      if(k==="perf") h+=`<input type="text" class="mx-perf" data-perffilter value="${escAttr(ensureVis(w.id).perfStages||"")}" placeholder="todas">`;
+      h+='</td>';
     });
-  }
+    h+='</tr>';
+  });
+  cont.innerHTML=h+'</tbody></table>';
+}
+// recomputa los estados "maestro" (Pozos / Todos / cruce) tras cualquier cambio de celda
+function mxSyncMasters(){
+  const cont=document.getElementById("well-matrix"); if(!cont) return;
+  const wids=mxWids(); if(!wids.length) return;
+  const elemAll = k => wids.every(id=>ensureVis(id)[k]!==false);
+  const wellAll = id => ELEMS.every(([k])=>ensureVis(id)[k]!==false);
+  cont.querySelectorAll("th.mx-well").forEach(th=>{ const cb=th.querySelector(".mx-wellvis"); if(cb) cb.checked=!!ensureVis(th.dataset.wid).well; });
+  const aw=cont.querySelector(".mx-allwells"); if(aw) aw.checked=wids.every(id=>ensureVis(id).well);
+  cont.querySelectorAll(".mx-elemall").forEach(cb=>cb.checked=elemAll(cb.dataset.el));
+  cont.querySelectorAll("tr.mx-elem").forEach(tr=>{ const k=tr.dataset.el;
+    tr.querySelectorAll("td.mx-well").forEach(td=>{ const cb=td.querySelector("input[data-el]"); if(cb) cb.checked=ensureVis(td.dataset.wid)[k]!==false; }); });
+  cont.querySelectorAll("tr.mx-todos td.mx-well").forEach(td=>{ const cb=td.querySelector(".mx-welltodos"); if(cb) cb.checked=wellAll(td.dataset.wid); });
+  const ev=cont.querySelector(".mx-all"); if(ev) ev.checked=wids.every(id=>wellAll(id));
+}
+document.getElementById("well-matrix").addEventListener("change",e=>{
+  const t=e.target, wids=mxWids();
+  if(t.classList.contains("mx-wellvis")){ const wid=t.closest("[data-wid]").dataset.wid; ensureVis(wid).well=t.checked; applyWellVis(wid); }
+  else if(t.classList.contains("mx-allwells")){ wids.forEach(id=>{ ensureVis(id).well=t.checked; applyWellVis(id); }); }
+  else if(t.classList.contains("mx-elemall")){ const k=t.dataset.el; wids.forEach(id=>{ ensureVis(id)[k]=t.checked; applyWellVis(id); }); }
+  else if(t.classList.contains("mx-welltodos")){ const wid=t.closest("[data-wid]").dataset.wid; ELEMS.forEach(([k])=>ensureVis(wid)[k]=t.checked); applyWellVis(wid); }
+  else if(t.classList.contains("mx-all")){ wids.forEach(id=>{ ELEMS.forEach(([k])=>ensureVis(id)[k]=t.checked); applyWellVis(id); }); }
+  else if(t.matches("td.mx-well input[data-el]")){ const wid=t.closest("[data-wid]").dataset.wid, k=t.dataset.el; ensureVis(wid)[k]=t.checked; applyWellVis(wid); }
+  else return;
+  mxSyncMasters(); saveViewCfg();
 });
-// filtro de etapas de punzados (caja de texto por pozo / para todos)
-document.getElementById("well-tree").addEventListener("input",e=>{
-  const t=e.target; if(!t.matches("[data-perffilter]")) return;
-  const node=t.closest(".wnode"), wid=node.dataset.wid||null, tree=document.getElementById("well-tree");
-  if(wid){ ensureVis(wid).perfStages=t.value; applyWellVis(wid); }
-  else {
-    tree.querySelectorAll(".wnode:not(.master)").forEach(n=>{ const id=n.dataset.wid;
-      ensureVis(id).perfStages=t.value; const inp=n.querySelector("[data-perffilter]"); if(inp) inp.value=t.value;
-      applyWellVis(id); });
-  }
+// filtro de etapas de punzados (campo de texto por pozo / para todos)
+document.getElementById("well-matrix").addEventListener("input",e=>{
+  const t=e.target; if(!t.classList.contains("mx-perf")) return;
+  const cont=document.getElementById("well-matrix");
+  if(t.hasAttribute("data-perffilter")){ const wid=t.closest("[data-wid]").dataset.wid; ensureVis(wid).perfStages=t.value; applyWellVis(wid); }
+  else if(t.hasAttribute("data-perfall")){ mxWids().forEach(id=>{ ensureVis(id).perfStages=t.value; applyWellVis(id); });
+    cont.querySelectorAll("td.mx-well .mx-perf[data-perffilter]").forEach(inp=>inp.value=t.value); }
   saveViewCfg();
 });
 function applyAllToggles(){
   Object.keys(wellObjects).forEach(applyWellVis);
-  gridGroup.visible=q("cfg-grid"); axes.visible=q("cfg-axes"); shoesGroup.visible=q("cfg-shoes");
+  applyGridVis(); axes.visible=q("cfg-axes"); shoesGroup.visible=q("cfg-shoes");
+  SHOW_GRIDNUMS=q("cfg-gridnums");
   SHOW_STAGE_LABELS=q("lbl-stage"); SHOW_TPN_LABELS=q("lbl-tpn"); SHOW_SHOE_LABELS=q("lbl-shoe");
   SHOW_SHORT_LABELS=q("lbl-short"); SHOW_INSTALL_LABELS=q("lbl-install");
   SHOW_SHOETRACK_LABELS=q("lbl-shoetrack"); SHOW_TOC_LABELS=q("lbl-toc"); SHOW_CURSOR_TIP=q("lbl-cursor");
@@ -701,7 +761,9 @@ document.getElementById("lbl-toc").addEventListener("change",e=>SHOW_TOC_LABELS=
 document.querySelectorAll("input[name='isomode']").forEach(r=>r.addEventListener("change",e=>{
   if(e.target.checked){ isoMode=e.target.value; refreshIsoColors(); }
 }));
-document.getElementById("cfg-grid").addEventListener("change",e=>gridGroup.visible=e.target.checked);
+document.getElementById("cfg-grid").addEventListener("change",e=>{ if(surfaceGrid) surfaceGrid.visible=e.target.checked; });
+document.getElementById("cfg-floor").addEventListener("change",e=>{ if(floorGrid) floorGrid.visible=e.target.checked; });
+document.getElementById("cfg-gridnums").addEventListener("change",e=>SHOW_GRIDNUMS=e.target.checked);
 document.getElementById("cfg-axes").addEventListener("change",e=>axes.visible=e.target.checked);
 document.getElementById("cfg-shoes").addEventListener("change",e=>shoesGroup.visible=e.target.checked);
 
@@ -726,35 +788,59 @@ setLabelSize(11); setLabelFont("mono");
 document.getElementById("lbl-cursor").addEventListener("change",e=>{ SHOW_CURSOR_TIP=e.target.checked;
   if(!SHOW_CURSOR_TIP) document.getElementById("hover-tip").style.display="none"; });
 
-/* ---- Panel Capas: grupos colapsables + colapsar todo + arrastrable ---- */
-document.querySelectorAll("#layers .grp .lbl").forEach(lbl=>{
-  lbl.addEventListener("click",()=>lbl.parentElement.classList.toggle("collapsed"));
-});
-document.getElementById("collapse-all").addEventListener("click",e=>{
-  e.stopPropagation();
-  const grps=[...document.querySelectorAll("#layers .grp")];
-  const anyOpen=grps.some(g=>!g.classList.contains("collapsed"));
-  grps.forEach(g=>g.classList.toggle("collapsed",anyOpen));
-  e.target.textContent=anyOpen?"expandir":"plegar";
-});
-(function(){                    // arrastrar el panel por su header
-  const panel=document.getElementById("layers"), head=document.getElementById("layers-head");
+/* ---- Cuadros flotantes: colapsar (por cuadro y, en Pozos, en X/Y) + arrastrar + persistir ---- */
+const PANELS_KEY="vv-panels-v1";
+function savePanels(){
+  try{
+    const st={};
+    document.querySelectorAll("#panels .panel").forEach(p=>{
+      st[p.id]={ left:p.style.left||"", top:p.style.top||"", right:p.style.right||"", collapsed:p.classList.contains("collapsed"),
+        x:p.classList.contains("x-collapsed"), y:p.classList.contains("y-collapsed") };
+    });
+    localStorage.setItem(PANELS_KEY, JSON.stringify(st));
+  }catch(e){}
+}
+function loadPanels(){
+  let st=null; try{ st=JSON.parse(localStorage.getItem(PANELS_KEY)||"null"); }catch(e){}
+  if(!st) return;
+  document.querySelectorAll("#panels .panel").forEach(p=>{
+    const s=st[p.id]; if(!s) return;
+    if(s.left){ p.style.left=s.left; p.style.right="auto"; p.style.bottom="auto"; }
+    if(s.top) p.style.top=s.top;
+    p.classList.toggle("collapsed",!!s.collapsed);
+    p.classList.toggle("x-collapsed",!!s.x);
+    p.classList.toggle("y-collapsed",!!s.y);
+  });
+}
+document.querySelectorAll("#panels .panel").forEach(panel=>{
+  const head=panel.querySelector(".panel-head");
+  // botones: colapsar cuadro; en Pozos, colapso independiente en X (pozos) e Y (elementos)
+  panel.querySelector(".panel-collapse")?.addEventListener("click",e=>{
+    e.stopPropagation(); panel.classList.toggle("collapsed"); savePanels(); });
+  panel.querySelector(".mx-xtog")?.addEventListener("click",e=>{
+    e.stopPropagation(); panel.classList.toggle("x-collapsed"); savePanels(); });
+  panel.querySelector(".mx-ytog")?.addEventListener("click",e=>{
+    e.stopPropagation(); panel.classList.toggle("y-collapsed"); savePanels(); });
+  // arrastrar por el header (a cualquier parte del área 3D)
   let drag=false,ox=0,oy=0;
   head.addEventListener("mousedown",e=>{
-    if(e.target.id==="collapse-all") return;
-    drag=true; const r=panel.getBoundingClientRect();
-    ox=e.clientX-r.left; oy=e.clientY-r.top;
-    panel.style.right="auto"; panel.style.left=r.left+"px"; panel.style.top=r.top+"px";
+    if(e.target.closest(".panel-btn")) return;
+    drag=true; panel.classList.add("dragging");
+    const r=panel.getBoundingClientRect(); ox=e.clientX-r.left; oy=e.clientY-r.top;
+    const mainR=document.querySelector("main").getBoundingClientRect();
+    panel.style.right="auto"; panel.style.bottom="auto";
+    panel.style.left=(r.left-mainR.left)+"px"; panel.style.top=(r.top-mainR.top)+"px";
     e.preventDefault();
   });
   window.addEventListener("mousemove",e=>{ if(!drag) return;
     const mainR=document.querySelector("main").getBoundingClientRect();
     let x=e.clientX-ox-mainR.left, y=e.clientY-oy-mainR.top;
-    x=Math.max(0,Math.min(mainR.width-60,x)); y=Math.max(0,Math.min(mainR.height-40,y));
+    x=Math.max(0,Math.min(mainR.width-60,x)); y=Math.max(0,Math.min(mainR.height-32,y));
     panel.style.left=x+"px"; panel.style.top=y+"px";
   });
-  window.addEventListener("mouseup",()=>drag=false);
-})();
+  window.addEventListener("mouseup",()=>{ if(drag){ drag=false; panel.classList.remove("dragging"); savePanels(); } });
+});
+loadPanels();
 
 /* ---- Mouse-over MD/TVD en vivo ----
    raycast a las trayectorias; del punto de hit se recupera el MD proyectando sobre los
@@ -1067,7 +1153,7 @@ function saveViewCfg(){
       lblSize:parseInt(document.getElementById("cfg-lblsize").value,10),
       font:document.getElementById("cfg-font").value, checks:{} };
     ["lbl-stage","lbl-tpn","lbl-short","lbl-install","lbl-shoetrack","lbl-shoe","lbl-toc","lbl-cursor",
-     "cfg-grid","cfg-axes","cfg-shoes","cfg-autodiam"].forEach(id=>cfg.checks[id]=document.getElementById(id).checked);
+     "cfg-grid","cfg-floor","cfg-gridnums","cfg-axes","cfg-shoes","cfg-autodiam"].forEach(id=>cfg.checks[id]=document.getElementById(id).checked);
     localStorage.setItem(VIEWCFG_KEY, JSON.stringify(cfg));
   }catch(e){ /* almacenamiento no disponible: la vista simplemente no persiste */ }
 }
@@ -1096,7 +1182,7 @@ function loadViewCfg(){
   applyAllToggles();
 }
 // cualquier cambio en el panel de capas o en Configuración guarda la vista
-document.getElementById("layers").addEventListener("change",saveViewCfg);
+document.getElementById("panels").addEventListener("change",saveViewCfg);
 document.getElementById("vconfig").addEventListener("change",saveViewCfg);
 loadViewCfg();
 
@@ -1133,7 +1219,7 @@ document.getElementById("forget").addEventListener("click",()=>{
   PAD=null; clearWorld();
   document.getElementById("summary-body").innerHTML="—";
   document.getElementById("foot-pad").textContent="—"; document.getElementById("foot-wells").textContent="—";
-  document.getElementById("well-tree").innerHTML="";
+  document.getElementById("well-matrix").innerHTML=""; buildGrids();
   ING.wells=[];
   ["b-name","b-id","b-field","b-operator","b-campaign","b-rkb"].forEach(id=>document.getElementById(id).value="");
   document.getElementById("b-spacing").value=10;
