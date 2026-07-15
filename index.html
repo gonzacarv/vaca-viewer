@@ -52,42 +52,66 @@
         <div class="pill" id="hud-sel">F = encuadrar · doble-click = enfocar</div><br>
         <div class="pill" id="hud-measure" style="pointer-events:auto; cursor:pointer">📏 Medir (M)</div>
       </div>
-      <div class="layers" id="layers">
-        <h3 id="layers-head"><span class="grip">⠿</span>Capas<span class="collapse-all" id="collapse-all">plegar</span></h3>
-        <div class="grp">
-          <div class="lbl">Pozos y elementos</div>
-          <div class="grp-body"><div id="well-tree"></div></div>
+      <div class="panels-layer" id="panels">
+        <!-- ===== Cuadro 1: Pozos y elementos (matriz, colapsable en X=pozos / Y=elementos) ===== -->
+        <div class="panel panel-wells" id="panel-wells" style="top:14px; right:14px">
+          <div class="panel-head">
+            <span class="grip">⠿</span>
+            <span class="panel-title">Pozos y elementos</span>
+            <span class="panel-tools">
+              <button class="panel-btn mx-xtog" title="Pozos: individuales ⇄ todos (X)">⇔</button>
+              <button class="panel-btn mx-ytog" title="Elementos: individuales ⇄ todos (Y)">⇕</button>
+              <button class="panel-btn panel-collapse" title="Colapsar cuadro">▾</button>
+            </span>
+          </div>
+          <div class="panel-body"><div id="well-matrix"></div></div>
         </div>
-        <div class="grp" id="grp-isomode">
-          <div class="lbl">Modo aislación</div>
-          <div class="grp-body">
-          <label class="row"><input type="radio" name="isomode" value="normal" checked>Normal (gris)</label>
-          <label class="row"><input type="radio" name="isomode" value="stages"><span class="sw" style="background:#18d94a"></span>Por etapas</label>
-          <label class="row"><input type="radio" name="isomode" value="dogleg_lateral"><span class="sw" style="background:linear-gradient(90deg,#00e33a,#ffe500,#ff1e1e)"></span>Dogleg · lateral</label>
-          <label class="row"><input type="radio" name="isomode" value="dogleg_build"><span class="sw" style="background:linear-gradient(90deg,#00e33a,#ffe500,#ff1e1e)"></span>Dogleg · curva</label>
-          <label class="row"><input type="radio" name="isomode" value="dogleg_total"><span class="sw" style="background:linear-gradient(90deg,#00e33a,#ffe500,#ff1e1e)"></span>Dogleg · total</label>
-          <div class="stub" style="font-size:10px; margin-top:4px; line-height:1.4">Lateral: última→primera etapa (resalta dogleg fino). Curva: superficie→última etapa (resalta la curva de asentamiento). Total: superficie→fondo, un único rango.</div>
+
+        <!-- ===== Cuadro 2: Modo aislación ===== -->
+        <div class="panel" id="grp-isomode" style="top:14px; right:290px">
+          <div class="panel-head">
+            <span class="grip">⠿</span><span class="panel-title">Modo aislación</span>
+            <span class="panel-tools"><button class="panel-btn panel-collapse" title="Colapsar cuadro">▾</button></span>
+          </div>
+          <div class="panel-body">
+            <label class="row"><input type="radio" name="isomode" value="normal" checked>Normal (gris)</label>
+            <label class="row"><input type="radio" name="isomode" value="stages"><span class="sw" style="background:#18d94a"></span>Por etapas</label>
+            <label class="row"><input type="radio" name="isomode" value="dogleg_lateral"><span class="sw" style="background:linear-gradient(90deg,#00e33a,#ffe500,#ff1e1e)"></span>Dogleg · lateral</label>
+            <label class="row"><input type="radio" name="isomode" value="dogleg_build"><span class="sw" style="background:linear-gradient(90deg,#00e33a,#ffe500,#ff1e1e)"></span>Dogleg · curva</label>
+            <label class="row"><input type="radio" name="isomode" value="dogleg_total"><span class="sw" style="background:linear-gradient(90deg,#00e33a,#ffe500,#ff1e1e)"></span>Dogleg · total</label>
           </div>
         </div>
-        <div class="grp">
-          <div class="lbl">Etiquetas</div>
-          <div class="grp-body">
-          <label class="row"><input type="checkbox" id="lbl-stage" checked><span class="sw" style="background:var(--stage)"></span>Etapas</label>
-          <label class="row"><input type="checkbox" id="lbl-tpn"><span class="sw" style="background:var(--plug)"></span>Tapones</label>
-          <label class="row"><input type="checkbox" id="lbl-short"><span class="sw" style="background:var(--short)"></span>Caños cortos</label>
-          <label class="row"><input type="checkbox" id="lbl-install"><span class="sw" style="background:#00c2d1"></span>Instalación (detalle)</label>
-          <label class="row"><input type="checkbox" id="lbl-shoetrack"><span class="sw" style="background:#c9a3ff"></span>Shoetrack (detalle)</label>
-          <label class="row"><input type="checkbox" id="lbl-shoe"><span class="sw" style="background:var(--casing)"></span>Zapatos (datos)</label>
-          <label class="row"><input type="checkbox" id="lbl-toc"><span class="sw" style="background:#cbb78a"></span>TOC (cemento)</label>
-          <label class="row"><input type="checkbox" id="lbl-cursor" checked><span class="sw" style="background:var(--accent)"></span>Cursor MD/TVD (hover)</label>
+
+        <!-- ===== Cuadro 3: Etiquetas ===== -->
+        <div class="panel" id="panel-labels" style="top:250px; right:290px">
+          <div class="panel-head">
+            <span class="grip">⠿</span><span class="panel-title">Etiquetas</span>
+            <span class="panel-tools"><button class="panel-btn panel-collapse" title="Colapsar cuadro">▾</button></span>
+          </div>
+          <div class="panel-body">
+            <label class="row"><input type="checkbox" id="lbl-stage" checked><span class="sw" style="background:var(--stage)"></span>Etapas</label>
+            <label class="row"><input type="checkbox" id="lbl-tpn"><span class="sw" style="background:var(--plug)"></span>Tapones</label>
+            <label class="row"><input type="checkbox" id="lbl-short"><span class="sw" style="background:var(--short)"></span>Caños cortos</label>
+            <label class="row"><input type="checkbox" id="lbl-install"><span class="sw" style="background:#00c2d1"></span>Instalación (detalle)</label>
+            <label class="row"><input type="checkbox" id="lbl-shoetrack"><span class="sw" style="background:#c9a3ff"></span>Shoetrack (detalle)</label>
+            <label class="row"><input type="checkbox" id="lbl-shoe"><span class="sw" style="background:var(--casing)"></span>Zapatos (datos)</label>
+            <label class="row"><input type="checkbox" id="lbl-toc"><span class="sw" style="background:#cbb78a"></span>TOC (cemento)</label>
+            <label class="row"><input type="checkbox" id="lbl-cursor" checked><span class="sw" style="background:var(--accent)"></span>Cursor MD/TVD (hover)</label>
           </div>
         </div>
-        <div class="grp">
-          <div class="lbl">Referencia</div>
-          <div class="grp-body">
-          <label class="row"><input type="checkbox" id="cfg-grid" checked>Grilla de superficie</label>
-          <label class="row"><input type="checkbox" id="cfg-axes" checked>Ejes N/E/TVD</label>
-          <label class="row"><input type="checkbox" id="cfg-shoes" checked>Marcas de zapato</label>
+
+        <!-- ===== Cuadro 4: Referencia / grilla ===== -->
+        <div class="panel" id="panel-ref" style="top:520px; right:290px">
+          <div class="panel-head">
+            <span class="grip">⠿</span><span class="panel-title">Grilla de referencia</span>
+            <span class="panel-tools"><button class="panel-btn panel-collapse" title="Colapsar cuadro">▾</button></span>
+          </div>
+          <div class="panel-body">
+            <label class="row"><input type="checkbox" id="cfg-grid" checked>Grilla de superficie</label>
+            <label class="row"><input type="checkbox" id="cfg-floor">Grilla de fondo (piso)</label>
+            <label class="row"><input type="checkbox" id="cfg-gridnums">Numeración de grilla (m)</label>
+            <label class="row"><input type="checkbox" id="cfg-axes" checked>Ejes N/E/TVD</label>
+            <label class="row"><input type="checkbox" id="cfg-shoes" checked>Marcas de zapato</label>
           </div>
         </div>
       </div>
