@@ -1,7 +1,7 @@
 # CLAUDE.md — Vaca Viewer
 
 Visor web de pozos y pads no convencionales (plug-and-perf). 100% navegador, **offline**, los datos
-**nunca salen del equipo**. Autor: Gonzalo Carvallo (@gonzacarv). Versión actual: **v0.3**.
+**nunca salen del equipo**. Autor: Gonzalo Carvallo (@gonzacarv). Versión actual: **v0.4**.
 
 ## Arquitectura
 
@@ -58,20 +58,25 @@ El usuario rechazó explícitamente seguir el survey real. Ver [[corte-2d-estilo
   anular TOC→zapato. Zapatos: triángulos macizos hacia afuera, **tamaño fijo** (no proporcional al Ø).
   Tapones: bloque negro fino. Packers: 2 bloques por fuera del TBG. Punzados: "dientes" esquemáticos
   (NO 1:1 con los tiros). TBG con cartel propio (MD/TVD).
-- Etiquetas: tronco/arco → cajas con recuadro a la **derecha**; lateral (etapas/tapones) → rotadas
-  −90° **por encima** del caño. Nunca solaparse ni tapar el pozo; el lienzo crece para contenerlas.
+- Etiquetas: en el lateral SOLO los tapones (y N° de etapa sobre el caño) van rotados −90° por encima;
+  TODO lo demás (TOC, TBG, PKR, zapatos, caños cortos, shoetrack) va en cajas horizontales — tronco/
+  arco a la columna derecha, lateral flotando sobre el caño. Nunca solaparse ni tapar el pozo; el
+  lienzo crece para contenerlas (incluye corrimiento anti-desborde superior vía `<g translate>`).
 - Preview: zoom rubber-band (arrastrar rect / click resetea) y cajas arrastrables (el export usa el
   SVG del DOM para conservar cajas movidas).
-- Sliders/opts: cx/cy (aspecto), diam (Ø cañería), elw (ancho tpn/pkr), shoe (tamaño zapato), font,
-  perfStages (filtro de etapas a punzar), rango desde/hasta, tema color|dogleg|bw, checkboxes por elemento.
+- Sliders/opts: cx/cy (aspecto), margin (borde blanco extra alrededor), diam (Ø cañería), elw (ancho
+  tpn/pkr), shoe (tamaño zapato), font, perfStages (filtro de etapas a punzar), rango desde/hasta,
+  tema color|dogleg|bw, checkboxes por elemento.
 - Temas: `color` = banda de etapa + N° blanco; `dogleg` = interior pintado por DLS (rampa verde→
   amarillo→rojo de la Vista 3D, auto-normalizada al máx del rango visible, con leyenda de escala) y
   etapas SOLO N° con halo blanco (sin banda); `bw` = solo N° en tinta. Punzados: misma geometría en
-  los 3 temas (color de etapa en color/dogleg, tinta en bw). Caños cortos y shoetrack llevan cartel
-  (desc + MD/TVD) como el resto.
-- Regla de extensión (MD, opcional `els.extruler`): línea horizontal DEBAJO del esquema, del tope del
-  cluster más somero a TD, con el mismo mapeo `P(md).x` del lateral (ticks alineados con tapones y
-  demás elementos). No aplica a pozos verticales.
+  los 3 temas (color de etapa en color/dogleg, tinta en bw). Caños cortos: cartel horizontal —
+  desc/detalle + `5,87m - @2490m MD` (longitud 2 decimales con COMA, sin "L" ni "desde"). Shoetrack:
+  UNA sola caja "Shoetrack" que lista sus componentes línea por línea con ese mismo formato
+  (compacta, arrastrable entera).
+- Regla de extensión (MD, opcional `els.extruler`): línea horizontal DEBAJO del esquema, pegada al
+  pozo (justo bajo los dientes), del tope del cluster más somero a TD, con el mismo mapeo `P(md).x`
+  del lateral (ticks alineados con tapones y demás elementos). No aplica a pozos verticales.
 
 ## Marca
 

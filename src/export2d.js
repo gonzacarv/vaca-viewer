@@ -63,7 +63,7 @@ function findKick(st, landingMD, tvdLand, Rm){
 
 /* ============ construcción del SVG ============ */
 export function buildWellSVG(w, opts={}){
-  const o = { cx:1, cy:1, diam:1, elw:6, shoe:1, font:10.5, perfStages:"", from:null, to:null, theme:"color",
+  const o = { cx:1, cy:1, diam:1, elw:6, shoe:1, font:10.5, margin:0, perfStages:"", from:null, to:null, theme:"color",
     els:{ casings:true, cement:true, shoes:true, plugs:true, tbg:true, instel:true, stages:true,
           perf:true, shorts:false, shoetrack:false, ruler:true, extruler:false, labels:true }, ...opts };
   const bw = o.theme==="bw";
@@ -296,15 +296,13 @@ export function buildWellSVG(w, opts={}){
   }
 
   // ---------- packers / TPN de instalación (checkbox propio) ----------
+  // Cartel SIEMPRE horizontal (caja): en el lateral solo los tapones de frac van rotados.
   if(o.els.instel && w.installation){
     (w.installation.elements||[]).forEach(el=>{
       if(el.md==null||el.md<fromMD||el.md>toMD) return;
       const f=P(el.md); const isPkr=el.type==="PKR";
       S.push(isPkr ? drawPacker(f, tbgHalf, o.elw) : blockAcross(f, tbgHalf+2, o.elw, INK));
-      if(o.els.labels){
-        if(el.md>=landingMD) lanes.push({ f, text:`${el.type} ${Math.round(el.md)} m`, color:INK });
-        else queueLabel(f, [el.type, `${Math.round(el.md)} m`], INK, tbgHalf+8, el.md);
-      }
+      if(o.els.labels) queueLabel(f, [el.type, `${Math.round(el.md)} m`], INK, tbgHalf+8, el.md);
     });
   }
 
@@ -322,22 +320,34 @@ export function buildWellSVG(w, opts={}){
     });
   }
 
-  // ---------- caños cortos / shoetrack (con cartel MD/TVD + detalle, como el resto) ----------
+  // ---------- caños cortos / shoetrack ----------
+  // Cartel SIEMPRE horizontal (caja, nunca rotado). Formato de longitud/posición: "5,87m - @2490m MD"
+  // (2 decimales con coma, sin "L" ni "desde"). El shoetrack es "una sola cosa": UNA caja "Shoetrack"
+  // que lista sus componentes línea por línea (compacto) — al ser una caja, se arrastra entera.
   if(o.els.shorts||o.els.shoetrack){
-    // cartel de un elemento puntual: etiqueta rotada en el lateral, caja MD/TVD en tronco/arco
-    const pointLabel=(md,f,name,color)=>{
-      if(md>=landingMD) lanes.push({ f, text:`${name} · ${Math.round(md)} m`, color });
-      else queueLabel(f, [name, `${Math.round(md)} m · TVD ${Math.round(tvdAt(md))} m`], color, prodHalf, md);
+    const lenOf=x=>x.length_m!=null?x.length_m:(x.bottom_md!=null&&x.top_md!=null?x.bottom_md-x.top_md:null);
+    const lenPos=x=>{
+      const L=lenOf(x);
+      return [L!=null?`${L.toFixed(2).replace(".",",")}m`:null, `@${Math.round(x.top_md)}m MD`].filter(Boolean).join(" - ");
     };
     casings.forEach(c=>{
       if(o.els.shorts)(c.short_joints||[]).forEach(sj=>{ if(sj.top_md==null||sj.top_md<fromMD||sj.top_md>toMD) return;
         const f=P(sj.top_md);
         S.push(blockAcross(f, prodHalf, 4, bw?"#666":"#d9b800"));
-        if(o.els.labels) pointLabel(sj.top_md, f, sj.desc||(sj.xover?"XOVER":"Caño corto"), bw?INK:"#8a6d00"); });
-      if(o.els.shoetrack)(c.shoetrack?.elements||[]).forEach(el=>{ if(el.top_md==null||el.top_md<fromMD||el.top_md>toMD) return;
-        const f=P(el.top_md);
-        S.push(blockAcross(f, prodHalf, 4, bw?"#888":"#9a6cff"));
-        if(o.els.labels) pointLabel(el.top_md, f, el.desc||"Shoetrack", bw?INK:"#7a4fd6"); });
+        if(o.els.labels) queueLabel(f, [sj.desc||(sj.xover?"XOVER":"Caño corto"), lenPos(sj)],
+          bw?INK:"#8a6d00", prodHalf, sj.top_md); });
+      if(o.els.shoetrack){
+        const els=(c.shoetrack?.elements||[]).filter(el=>el.top_md!=null&&el.top_md>=fromMD&&el.top_md<=toMD);
+        if(els.length){
+          els.forEach(el=>S.push(blockAcross(P(el.top_md), prodHalf, 4, bw?"#888":"#9a6cff")));
+          if(o.els.labels){
+            const md0=Math.min(...els.map(e=>e.top_md));
+            const md1=Math.max(...els.map(e=>e.bottom_md??e.top_md));
+            const lines=["Shoetrack", ...els.map(el=>`${el.desc||"—"} · ${lenPos(el)}`)];
+            queueLabel(P((md0+md1)/2), lines, bw?INK:"#7a4fd6", prodHalf, (md0+md1)/2);
+          }
+        }
+      }
     });
   }
 
@@ -364,7 +374,7 @@ export function buildWellSVG(w, opts={}){
     const mdA=Math.max(fromMD, kickMD, tops.length?Math.min(...tops):landingMD);
     const mdB=toMD;
     if(mdB>mdA+1){
-      const yR=maxY+dy+maxHalf+teethLen+38;                // debajo de dientes/zapatos del lateral
+      const yR=maxY+dy+teethLen+14;                        // pegada al pozo: justo bajo los dientes
       const x0=P(mdA).x, x1=P(mdB).x;
       const pxPerM=(x1-x0)/(mdB-mdA);
       const step=niceStep(58/Math.max(pxPerM,1e-6));       // ticks "lindos" sin encimarse (~58 px)
@@ -409,9 +419,13 @@ export function buildWellSVG(w, opts={}){
   // ---------- título ----------
   S.unshift(`<text x="${leftMargin}" y="30" font-family="Arial,Helvetica,sans-serif" font-size="${f1(Math.max(15,FS*1.6))}" font-weight="bold" fill="${INK}">${esc(w.id||"pozo")}</text>`);
 
+  // ---------- margen blanco extra (aire para reordenar cajas y editar tras exportar) ----------
+  const M=Math.max(0, Math.round(o.margin||0));
+  if(M>0){ const inner=S.join(""); S.length=0; S.push(`<g transform="translate(${M} ${M})">${inner}</g>`); }
+
   // ---------- dimensiones del lienzo: crecen para contener TODO (cajas incluidas, sin recortes) ----------
-  const width  = Math.round(Math.max(maxX+dx+maxHalf+teethLen+24, boxRight+18, extRight+12, 460));
-  const height = Math.round(Math.max(maxY+dy+maxHalf+teethLen+26, rulerBottomTvd*yScale+dy+28, boxBottom+18, extBottom+12)+shift);
+  const width  = Math.round(Math.max(maxX+dx+maxHalf+teethLen+24, boxRight+18, extRight+12, 460)+2*M);
+  const height = Math.round(Math.max(maxY+dy+maxHalf+teethLen+26, rulerBottomTvd*yScale+dy+28, boxBottom+18, extBottom+12)+shift+2*M);
 
   const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`+
     `<rect width="${width}" height="${height}" fill="#ffffff"/>`+S.join("")+`</svg>`;

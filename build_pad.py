@@ -157,7 +157,10 @@ def parse_run_tally(text, max_len=10.0, edge_m=150):
         length=float(mm.group(1).replace(",",""))
         setd=float(mm.group(3).replace(",",""))
         if length<=0 or setd<=0 or length>30: continue
-        rows.append({"length":length, "setd":setd, "desc":line[mm.end():].strip()})
+        # tras el Set Depth pueden venir MÁS columnas numéricas (peso acumulado, etc.):
+        # se descartan los decimales sueltos del principio de la "descripción"
+        desc=re.sub(rf'^(?:{dec}\s+)+', '', line[mm.end():].strip())
+        rows.append({"length":length, "setd":setd, "desc":desc})
     if not rows: return [], None
     max_md=max(r["setd"]+r["length"] for r in rows)      # fondo de la sarta (≈ zapato)
     shorts=[]; st_els=[]

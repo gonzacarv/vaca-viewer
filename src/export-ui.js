@@ -111,7 +111,7 @@ function read2DOpts(){
   const el=k=>document.querySelector(`[data-ex2d-el="${k}"]`)?.checked;
   return { cx:parseFloat($("ex2d-cx").value), cy:parseFloat($("ex2d-cy").value),
     diam:parseFloat($("ex2d-diam").value), elw:parseFloat($("ex2d-elw").value),
-    shoe:parseFloat($("ex2d-shoe").value),
+    shoe:parseFloat($("ex2d-shoe").value), margin:parseFloat($("ex2d-margin").value),
     font:parseFloat($("ex2d-font").value), perfStages:$("ex2d-perfstages").value,
     from: $("ex2d-from").value===""?null:parseFloat($("ex2d-from").value),
     to: $("ex2d-to").value===""?null:parseFloat($("ex2d-to").value),
@@ -137,6 +137,7 @@ function wire2D(){
     $(id+"-val").textContent=parseFloat(e.target.value).toFixed(id==="ex2d-diam"||id==="ex2d-shoe"?1:2)+"×"; render2D();
   }));
   $("ex2d-elw")?.addEventListener("input",e=>{ $("ex2d-elw-val").textContent=e.target.value+" px"; render2D(); });
+  $("ex2d-margin")?.addEventListener("input",e=>{ $("ex2d-margin-val").textContent=e.target.value+" px"; render2D(); });
   $("ex2d-font")?.addEventListener("input",e=>{ $("ex2d-font-val").textContent=e.target.value+" px"; render2D(); });
   $("ex2d-perfstages")?.addEventListener("input",render2D);
   document.querySelectorAll("[data-ex2d-el]").forEach(cb=>cb.addEventListener("change",render2D));
@@ -216,7 +217,8 @@ function wireZoom(boxId){
   });
 }
 
-/* ---- cajas de etiqueta arrastrables: mouse-over muestra el puntero, drag las mueve y el líder sigue ---- */
+/* ---- cajas de etiqueta arrastrables: mouse-over muestra el puntero, drag las mueve y el líder sigue.
+   El shoetrack es UNA caja (lista sus componentes), así que el pack se mueve entero con este drag. ---- */
 function wireBoxDrag(boxId){
   const box=$(boxId); if(!box) return;
   let drag=null;

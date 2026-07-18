@@ -29,7 +29,7 @@
       </span>
       <div class="brandtext">
         <div class="brandname"><span class="bn-a">vaca</span> <span class="bn-b">viewer</span></div>
-        <div class="sub">subsuelo · v0.3</div>
+        <div class="sub">subsuelo · v0.4</div>
       </div>
     </div>
     <nav>
@@ -50,18 +50,17 @@
         <div class="pill" id="hud-cam">orbit · pan · zoom</div><br>
         <div class="pill" id="hud-scale">escala real 1:1</div><br>
         <div class="pill" id="hud-sel">F = encuadrar · doble-click = enfocar</div><br>
-        <div class="pill" id="hud-measure" style="pointer-events:auto; cursor:pointer">📏 Medir (M)</div>
+        <div class="pill" id="hud-measure" style="pointer-events:auto; cursor:pointer">📏 Medir (M)</div><br>
+        <div class="pill" id="panels-reset" style="pointer-events:auto; cursor:pointer" title="Devolver los cuadros a su posición original">⤒ Reordenar cuadros</div>
       </div>
       <div class="panels-layer" id="panels">
         <!-- ===== Cuadro 1: Pozos y elementos (matriz, colapsable en X=pozos / Y=elementos) ===== -->
-        <div class="panel panel-wells" id="panel-wells" style="top:14px; right:14px">
+        <div class="panel panel-wells wide" id="panel-wells" style="top:14px; right:14px">
           <div class="panel-head">
             <span class="grip">⠿</span>
             <span class="panel-title">Pozos y elementos</span>
             <span class="panel-tools">
-              <button class="panel-btn mx-xtog" title="Pozos: individuales ⇄ todos (X)">⇔</button>
-              <button class="panel-btn mx-ytog" title="Elementos: individuales ⇄ todos (Y)">⇕</button>
-              <button class="panel-btn panel-collapse" title="Colapsar cuadro">▾</button>
+              <button class="panel-btn panel-widen" title="Mostrar pozos ⇄ solo lista de elementos">⇔</button>
             </span>
           </div>
           <div class="panel-body"><div id="well-matrix"></div></div>
@@ -70,12 +69,11 @@
         <!-- ===== Cuadro 2: Modo aislación ===== -->
         <div class="panel" id="grp-isomode" style="top:14px; right:290px">
           <div class="panel-head">
-            <span class="grip">⠿</span><span class="panel-title">Modo aislación</span>
-            <span class="panel-tools"><button class="panel-btn panel-collapse" title="Colapsar cuadro">▾</button></span>
+            <span class="grip">⠿</span><span class="panel-title">Vista de pozo</span>
           </div>
           <div class="panel-body">
             <label class="row"><input type="radio" name="isomode" value="normal" checked>Normal (gris)</label>
-            <label class="row"><input type="radio" name="isomode" value="stages"><span class="sw" style="background:#18d94a"></span>Por etapas</label>
+            <label class="row"><input type="radio" name="isomode" value="stages"><span class="sw" id="iso-stage-sw" style="background:linear-gradient(90deg,#2fa84a,#8fe063)"></span>Por etapas</label>
             <label class="row"><input type="radio" name="isomode" value="dogleg_lateral"><span class="sw" style="background:linear-gradient(90deg,#00e33a,#ffe500,#ff1e1e)"></span>Dogleg · lateral</label>
             <label class="row"><input type="radio" name="isomode" value="dogleg_build"><span class="sw" style="background:linear-gradient(90deg,#00e33a,#ffe500,#ff1e1e)"></span>Dogleg · curva</label>
             <label class="row"><input type="radio" name="isomode" value="dogleg_total"><span class="sw" style="background:linear-gradient(90deg,#00e33a,#ffe500,#ff1e1e)"></span>Dogleg · total</label>
@@ -86,7 +84,6 @@
         <div class="panel" id="panel-labels" style="top:250px; right:290px">
           <div class="panel-head">
             <span class="grip">⠿</span><span class="panel-title">Etiquetas</span>
-            <span class="panel-tools"><button class="panel-btn panel-collapse" title="Colapsar cuadro">▾</button></span>
           </div>
           <div class="panel-body">
             <label class="row"><input type="checkbox" id="lbl-stage" checked><span class="sw" style="background:var(--stage)"></span>Etapas</label>
@@ -103,12 +100,11 @@
         <!-- ===== Cuadro 4: Referencia / grilla ===== -->
         <div class="panel" id="panel-ref" style="top:520px; right:290px">
           <div class="panel-head">
-            <span class="grip">⠿</span><span class="panel-title">Grilla de referencia</span>
-            <span class="panel-tools"><button class="panel-btn panel-collapse" title="Colapsar cuadro">▾</button></span>
+            <span class="grip">⠿</span><span class="panel-title">Referencias</span>
           </div>
           <div class="panel-body">
             <label class="row"><input type="checkbox" id="cfg-grid" checked>Grilla de superficie</label>
-            <label class="row"><input type="checkbox" id="cfg-floor">Grilla de fondo (piso)</label>
+            <label class="row"><input type="checkbox" id="cfg-planes">Planos envolventes (piso + fondo + lateral)</label>
             <label class="row"><input type="checkbox" id="cfg-gridnums">Numeración de grilla (m)</label>
             <label class="row"><input type="checkbox" id="cfg-axes" checked>Ejes N/E/TVD</label>
             <label class="row"><input type="checkbox" id="cfg-shoes" checked>Marcas de zapato</label>
@@ -202,7 +198,11 @@
                 <label class="row">Compresión Y
                   <input type="range" id="ex2d-cy" min="0.25" max="2.5" step="0.05" value="1" style="flex:1; accent-color:var(--accent)">
                   <span class="meta" id="ex2d-cy-val">1.0×</span></label>
-                <div class="stub" style="margin-top:6px">Comprime/estira el dibujo para cambiar la proporción final (no es escala real).</div>
+                <label class="row">Margen blanco
+                  <input type="range" id="ex2d-margin" min="0" max="200" step="10" value="0" style="flex:1; accent-color:var(--accent)">
+                  <span class="meta" id="ex2d-margin-val">0 px</span></label>
+                <div class="stub" style="margin-top:6px">Comprime/estira el dibujo para cambiar la proporción final (no es escala real).
+                  El margen agrega borde blanco alrededor: aire para mover cajas y editar después de exportar.</div>
               </div>
               <div class="card"><h4>Diámetros y símbolos</h4>
                 <label class="row">Diámetro de cañería
@@ -262,9 +262,6 @@
     <section class="view" id="vdata">
       <div class="pad">
         <h2>Datos</h2>
-        <p class="lead">Construí el pad cargando los archivos crudos (survey <span class="stub">.xlsx</span>,
-          tally <span class="stub">.pdf</span> de OpenWells y fracplan <span class="stub">.xlsx</span>), o cargá un
-          <span class="stub">pad.vvwp</span> ya armado. Todo se procesa en el navegador; los datos no salen del equipo.</p>
         <div class="card">
           <h4>Cargar pad existente</h4>
           <div class="drop" id="drop">Arrastrá tu <b>pad.vvwp</b> aquí, o
@@ -274,10 +271,6 @@
 
         <div class="card" id="builder">
           <h4>Construir pad desde archivos crudos</h4>
-          <div class="stub" style="margin-bottom:14px">Elegí la cantidad de pozos. Por cada fase podés cargar el
-            tally (.pdf) — que autocompleta OD/libraje/acero/MD y queda editable — o elegir todo a mano en los picklists.
-            El survey y el fracplan son opcionales (sin survey se asume pozo vertical perfecto). Todo queda en un único
-            <span style="color:var(--ink)">pad.vvwp</span>.</div>
           <div class="build-grid">
             <label>Nombre del pad <input id="b-name" type="text"></label>
             <label>ID <input id="b-id" type="text"></label>
@@ -293,6 +286,7 @@
               </select>
             </label>
           </div>
+          <div style="margin:12px 0 0"><button class="btn" id="b-collapse-all">Colapsar pozos</button></div>
           <div id="b-wells"></div>
           <div style="margin-top:16px; display:flex; align-items:center; gap:8px; flex-wrap:wrap">
             <button class="btn primary" id="b-generate">Generar y ver pad</button>
@@ -300,10 +294,21 @@
             <span class="stub" id="b-status"></span>
           </div>
         </div>
-        <div class="card" id="data-summary"><h4>Pad cargado</h4><div class="stub" id="summary-body">—</div></div>
+        <div class="card" id="data-summary">
+          <h4 id="summary-head" class="collapser" title="Click para colapsar/expandir">
+            <span class="caret">▸</span> Pad cargado
+            <span class="head-actions">
+              <button class="btn" id="summary-xlsx" title="Descargar la tabla como planilla">.xlsx</button>
+              <button class="btn" id="summary-png" title="Descargar la tabla como imagen (fondo blanco)">imagen</button>
+            </span>
+          </h4>
+          <div class="collapsible"><div class="stub" id="summary-body">—</div></div>
+        </div>
         <div class="card">
-          <h4>Exportar</h4>
-          <button class="btn" id="ex-json">Descargar pad.vvwp</button>
+          <h4>Guardar / exportar</h4>
+          <button class="btn primary" id="save-pad" title="Escribe sobre el .vvwp abierto; si es nuevo, pide dónde guardarlo">Guardar</button>
+          <button class="btn" id="saveas-pad">Guardar como…</button>
+          <button class="btn" id="export-pad" title="Descarga una copia del pad.vvwp">Exportar copia</button>
           <button class="btn" id="forget">Olvidar pad guardado</button>
           <span class="stub">Para imágenes (PNG/JPG/PDF, corte de pozo o vista 3D) usá la sección <b>Exportar</b>.</span>
         </div>
@@ -342,6 +347,9 @@
           <label class="row" style="max-width:420px">Tamaño de letra
             <input type="range" id="cfg-lblsize" min="9" max="18" step="1" value="11" style="flex:1; accent-color:var(--accent)">
             <span class="meta" id="lblsize-val">11 px</span></label>
+          <label class="row" style="max-width:420px; margin-top:6px">N° de grilla
+            <input type="range" id="cfg-gridsize" min="10" max="30" step="1" value="16" style="flex:1; accent-color:var(--accent)">
+            <span class="meta" id="gridsize-val">16 px</span></label>
           <label class="row" style="max-width:420px; margin-top:6px">Tipografía
             <select id="cfg-font" style="flex:1; background:var(--panel-2); color:var(--ink); border:1px solid var(--line); border-radius:5px; padding:4px 8px; font-size:12.5px">
               <option value="mono">Monoespaciada</option>
@@ -350,6 +358,19 @@
               <option value="cond">Condensada</option>
             </select></label>
           <div class="stub" style="margin-top:8px">Afecta las etiquetas 3D (zapatos, tapones, etapas) y el cartelito de cursor.</div>
+        </div>
+        <div class="card"><h4>Regla de ramas horizontales</h4>
+          <label class="row" style="max-width:420px">Cero de la regla
+            <select id="cfg-hzero" style="flex:1; background:var(--panel-2); color:var(--ink); border:1px solid var(--line); border-radius:5px; padding:4px 8px; font-size:12.5px">
+              <option value="landing">Inicio de rama efectiva (1ª etapa)</option>
+              <option value="boca">Boca de pozo (superficie)</option>
+            </select></label>
+          <div class="stub" style="margin-top:8px">Dónde arranca el "0" de la numeración que mide las ramas (se aplica al eje por el que corren los laterales, N/S o E/O). "Inicio de rama" usa el mismo criterio que el dogleg de rama (md de la primera etapa; sin fracplan, el landing) y toma el más cercano a los heels — así el lateral queda mejor medido.</div>
+        </div>
+        <div class="card"><h4>Vista de pozo · colores de etapa</h4>
+          <label class="row" style="max-width:420px">Par de colores
+            <select id="cfg-stagepair" style="flex:1; background:var(--panel-2); color:var(--ink); border:1px solid var(--line); border-radius:5px; padding:4px 8px; font-size:12.5px"></select></label>
+          <div class="stub" style="margin-top:8px">Colores alternados de etapas pares/impares en el modo "Por etapas" de la Vista 3D. Elegí el par con más contraste para tu caso.</div>
         </div>
         <div class="card"><h4>Diámetro de cañería</h4>
           <div class="lbl" style="font-family:var(--mono); font-size:10px; color:var(--ink-dim); text-transform:uppercase; letter-spacing:.08em; margin-bottom:6px">Formato del OD en etiquetas</div>

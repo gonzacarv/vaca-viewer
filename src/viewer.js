@@ -34,7 +34,9 @@ const dir=new THREE.DirectionalLight(0xffffff,0.85); dir.position.set(1,2,3); sc
    profundo). Se reconstruyen por pad en buildGrids() para adaptar la huella (N/S sigue las ramas,
    E/O ±1000 m). export3d togglea gridGroup.visible en bloque; acá controlamos cada grilla por hijo. */
 const gridGroup=new THREE.Group(); world.add(gridGroup);
-let surfaceGrid=null, floorGrid=null;
+let surfaceGrid=null, floorGrid=null, backGrid=null, sideGrid=null;
+let sideAxis="x", sidePos=[0,0];  // eje ("x"|"z") y posiciones [max,min] del plano lateral dinámico
+let sideNumLabels=[];             // etiquetas que viven sobre ese plano y lo siguen al rotar (tick)
 const axes=new THREE.AxesHelper(400); world.add(axes);
 const shoesGroup=new THREE.Group(); world.add(shoesGroup);
 const measureGroup=new THREE.Group(); world.add(measureGroup);   // regla medidora
@@ -93,9 +95,25 @@ function updateAutoDiam(){
      → vista de conjunto; la curva suele dominar el rojo.
    El coloreo se hace con vertex colors sobre el MISMO tubo (sin geometría extra). */
 let isoMode="normal";
+let hzero="landing";   // origen del "0" de la regla de ramas horizontales: "boca" | "landing"
 const ISO_BASE=new THREE.Color(0xf2ede2);          // gris cálido casi blanco (fase produccion)
-const STAGE_GREEN_A=new THREE.Color(0x18d94a);     // verde etapa par (vivo)
-const STAGE_GREEN_B=new THREE.Color(0xa6ff2e);     // verde-lima etapa impar (vivo)
+/* Colores alternados de etapa (par/impar) en modo "stages". Configurable: pares con buen contraste.
+   `a` = etapa par, `b` = etapa impar. El primero es el default (verdes de alto contraste). */
+const STAGE_PAIRS={
+  greens:      {label:"Verdes (suave)",          a:0x2fa84a, b:0x8fe063},   // contraste bajo
+  tealblue:    {label:"Turquesa / Azul (suave)", a:0x1fb0a6, b:0x5290da},   // contraste bajo
+  greenblue:   {label:"Verde / Azul",            a:0x18c04a, b:0x2e8fe0},   // medio
+  orangeblue:  {label:"Naranja / Azul",          a:0xff8a1e, b:0x2e9bff},   // alto
+  magentacyan: {label:"Magenta / Cian",          a:0xff3ea5, b:0x1fd8d8},   // alto
+};
+let stagePair="greens";
+const STAGE_A=new THREE.Color(STAGE_PAIRS.greens.a), STAGE_B=new THREE.Color(STAGE_PAIRS.greens.b);
+function setStagePair(key){
+  const p=STAGE_PAIRS[key]||STAGE_PAIRS.greens; stagePair=(key in STAGE_PAIRS)?key:"greens";
+  STAGE_A.set(p.a); STAGE_B.set(p.b);
+  const sw=document.getElementById("iso-stage-sw");
+  if(sw) sw.style.background=`linear-gradient(90deg,#${p.a.toString(16).padStart(6,"0")},#${p.b.toString(16).padStart(6,"0")})`;
+}
 /* rampa dogleg SATURADA: 0→verde puro, medio→amarillo intenso, max→rojo puro.
    El máximo se pasa por parámetro: cada sub-modo usa el máximo real de SU tramo (auto-normalizado),
    así el gradiente ocupa todo el rango de color aunque los dos tramos tengan escalas muy distintas. */
@@ -131,7 +149,8 @@ function addLabel(text, pos3, kind, wellId, html){
   const el=document.createElement("div");
   el.className="lbl3d "+kind; el[html?"innerHTML":"textContent"]=text;
   labelsLayer.appendChild(el);
-  LABELS.push({pos:pos3.clone(), el, kind, wellId, idx:LABELS.length});
+  const o={pos:pos3.clone(), el, kind, wellId, idx:LABELS.length};
+  LABELS.push(o); return o;
 }
 const escHtml=s=>String(s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
 const escAttr=s=>String(s??"").replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;");
@@ -146,10 +165,16 @@ function labelStep(radius){
   return 1;                       // cerca: todas
 }
 const _projV=new THREE.Vector3();
+const _occRay=new THREE.Raycaster(), _occDir=new THREE.Vector3(), _occ=[];
 function updateLabels(){
   const step=labelStep(sph.radius);
   const W=canvas.clientWidth, H=canvas.clientHeight;
   let shownStage=0, shownTpn=0;
+  // Oclusión de los números de grilla: son referencias de FONDO, los pozos van por delante.
+  // Junto las trayectorias visibles como oclusores (baratas; con un grosor ~tubo vía threshold).
+  _occ.length=0;
+  if(SHOW_GRIDNUMS) for(const id in wellObjects){ const g=wellObjects[id]; if(!g.visible) continue;
+    g.traverse(o=>{ if(o.visible && o.userData.kind==="traj") _occ.push(o); }); }
   // Escala por zoom: a `R0` (o más cerca) las etiquetas tienen su tamaño normal (k=1); al alejarse
   // más allá de ese umbral se encogen ∝ R0/radio (se ven de lejos, pero apenas legibles). Piso 0.14.
   const R0 = Math.max(500, _sceneRadius*0.5);
@@ -173,6 +198,13 @@ function updateLabels(){
     }
     _projV.copy(l.pos).project(camera);
     if(_projV.z>1){ l.el.style.display="none"; continue; }
+    // referencia de fondo tapada por un pozo → se oculta (los pozos van por delante)
+    if(l.kind==="gridnum" && _occ.length){
+      _occDir.subVectors(l.pos, camera.position); const dist=_occDir.length(); _occDir.normalize();
+      _occRay.set(camera.position, _occDir); _occRay.near=0; _occRay.far=dist*0.985;
+      _occRay.params.Line.threshold=sph.radius*0.012;
+      if(_occRay.intersectObjects(_occ,false).length){ l.el.style.display="none"; continue; }
+    }
     const x=(_projV.x*0.5+0.5)*W, y=(-_projV.y*0.5+0.5)*H;
     l.el.style.display="block";
     l.el.style.left=x+"px"; l.el.style.top=y+"px";
@@ -242,7 +274,7 @@ function applyIsoColors(tube){
     const md=iso.ringMD(i);
     if(isoMode==="stages"){
       const sr=iso.stageRanges.find(r=>md>=r.md0 && md<=r.md1);
-      if(sr) c.copy(sr.stage%2===0?STAGE_GREEN_A:STAGE_GREEN_B);
+      if(sr) c.copy(sr.stage%2===0?STAGE_A:STAGE_B);
       else   c.copy(ISO_BASE);                  // fuera de etapas (arriba del 1er cluster)
     } else { // dogleg_lateral | dogleg_build | dogleg_total
       if(dlsInSeg(md)) c.copy(dlsColor(iso.dlsAtMD(md), segMax));
@@ -589,6 +621,51 @@ function gridBounds(){
       maxTVD=Math.max(maxTVD,tvd); any=true; }); });
   return {minEW,maxEW,minNS,maxNS,maxTVD,any};
 }
+/* MD de inicio de la rama efectiva de un pozo — MISMO criterio que el dogleg de rama (dogleg_lateral):
+   md0 de la primera etapa (primer cluster). Sin fracplan: landing por inclinación (incl del survey, o
+   derivada de la geometría). */
+function branchStartMD(w){
+  const st=(w.survey&&w.survey.stations)||[]; if(st.length<2) return null;
+  let startMD=Infinity;
+  for(const s of (w.frac&&w.frac.stages)||[])
+    for(const c of (s.clusters||[])){
+      if(c.top_md!=null)    startMD=Math.min(startMD,c.top_md);
+      if(c.bottom_md!=null) startMD=Math.min(startMD,c.bottom_md); }
+  if(isFinite(startMD)) return startMD;
+  // sin fracplan → landing: primera estación con inclinación ≥88° (o la de mayor inclinación)
+  let landMD=null, maxInc=-1, maxIncMD=st[0].md||0;
+  for(let i=0;i<st.length;i++){ const s=st[i];
+    let inc=s.incl;
+    if(inc==null){ const p=st[i-1]||st[i+1];
+      inc=Math.atan2(Math.hypot((s.ew||0)-(p.ew||0),(s.ns||0)-(p.ns||0)), Math.abs((s.tvd||0)-(p.tvd||0)))*180/Math.PI; }
+    if(inc>maxInc){ maxInc=inc; maxIncMD=s.md; }
+    if(landMD==null && inc>=88) landMD=s.md; }
+  return landMD!=null?landMD:maxIncMD;
+}
+/* Eje y origen de la regla que mide las ramas horizontales. Los laterales pueden correr en N/S o
+   en E/O (según el azimut del pad): se toma el eje con mayor desplazamiento del inicio de rama al toe.
+   `origin` = coordenada (en ese eje) del inicio de rama más cercano a los heels (menor |coord|).
+   Devuelve null si no hay survey (→ numeración absoluta desde la boca). */
+function lateralAxisInfo(){
+  const wells=(PAD&&PAD.pad&&PAD.pad.wells)||[];
+  let sumNS=0,sumEW=0; const starts=[], toes=[];
+  for(const w of wells){
+    const md=branchStartMD(w); if(md==null) continue;
+    const st=w.survey.stations, wx=(w.wellhead&&w.wellhead.x)||0;
+    const p=interpAtMD(st,md,wx), t=st[st.length-1];        // p:{x:EW abs, y:NS, tvd}
+    const toe={ns:t.ns||0, ew:wx+(t.ew||0)};
+    sumNS+=Math.abs(toe.ns-p.y); sumEW+=Math.abs(toe.ew-p.x);
+    starts.push({ns:p.y, ew:p.x}); toes.push(toe);
+  }
+  if(!starts.length) return null;
+  const axis = sumNS>=sumEW ? "ns" : "ew";
+  let origin=0, best=Infinity;
+  for(const s of starts){ const c=axis==="ns"?s.ns:s.ew; if(Math.abs(c)<best){ best=Math.abs(c); origin=c; } }
+  // dirección del toe respecto de los heels en ese eje (para poner la "espalda" detrás de los pozos)
+  let sAvg=0,tAvg=0; for(let i=0;i<starts.length;i++){ sAvg+=starts[i][axis]; tAvg+=toes[i][axis]; }
+  const toeSign = Math.sign((tAvg-sAvg)/starts.length) || -1;
+  return {axis, origin, toeSign};
+}
 // grilla horizontal a una TVD dada (líneas cada `step` m; realce cada 1000 m). world X = -ew, Z = ns.
 function makeGridPlane(tvd, ewMin, ewMax, nsMin, nsMax, step){
   const grp=new THREE.Group(); const y=-tvd*vexag, minor=[], major=[];
@@ -601,8 +678,41 @@ function makeGridPlane(tvd, ewMin, ewMax, nsMin, nsMax, step){
   mk(minor,0x2a3441); mk(major,0x3d4f63);
   return grp;
 }
+// helper común: arma un grid de líneas (minor/major) desde un arreglo de coords ya en mundo
+function gridFromSegs(minor,major){
+  const grp=new THREE.Group();
+  const mk=(arr,col)=>{ if(!arr.length) return; const g=new THREE.BufferGeometry();
+    g.setAttribute("position",new THREE.Float32BufferAttribute(arr,3));
+    grp.add(new THREE.LineSegments(g,new THREE.LineBasicMaterial({color:col,transparent:true,opacity:.6}))); };
+  mk(minor,0x2a3441); mk(major,0x3d4f63);
+  return grp;
+}
+// pared vertical en el plano E/O–TVD (ns fijo): recorre toda la línea E/O y se proyecta hacia abajo.
+// world X = -ew, world Y = -tvd*vexag, world Z = ns.
+function makeWallEW(ns, ewMin, ewMax, tvdMax, step){
+  const minor=[], major=[], z=ns;
+  const seg=(a,ew1,t1,ew2,t2)=>{ a.push(-ew1,-t1*vexag,z, -ew2,-t2*vexag,z); };
+  for(let ew=Math.ceil(ewMin/step)*step; ew<=ewMax+1e-6; ew+=step) seg(Math.abs(ew)%1000<1e-6?major:minor, ew,0, ew,tvdMax);
+  for(let t=0; t<=tvdMax+1e-6; t+=step) seg(Math.abs(t)%1000<1e-6?major:minor, ewMin,t, ewMax,t);
+  return gridFromSegs(minor,major);
+}
+// pared vertical en el plano N/S–TVD (ew fijo): pared lateral, del piso hasta el terreno.
+function makeWallNS(ew, nsMin, nsMax, tvdMax, step){
+  const minor=[], major=[], x=-ew;
+  const seg=(a,ns1,t1,ns2,t2)=>{ a.push(x,-t1*vexag,ns1, x,-t2*vexag,ns2); };
+  for(let ns=Math.ceil(nsMin/step)*step; ns<=nsMax+1e-6; ns+=step) seg(Math.abs(ns)%1000<1e-6?major:minor, ns,0, ns,tvdMax);
+  for(let t=0; t<=tvdMax+1e-6; t+=step) seg(Math.abs(t)%1000<1e-6?major:minor, nsMin,t, nsMax,t);
+  return gridFromSegs(minor,major);
+}
 function clearGridLabels(){ LABELS=LABELS.filter(l=>{ if(l.kind==="gridnum"){ l.el.remove(); return false; } return true; }); }
-function applyGridVis(){ if(surfaceGrid) surfaceGrid.visible=q("cfg-grid"); if(floorGrid) floorGrid.visible=q("cfg-floor"); }
+function applyGridVis(){
+  if(surfaceGrid) surfaceGrid.visible=q("cfg-grid");
+  // los 3 planos envolventes (piso + pared de fondo E/O + pared lateral N/S) van juntos con un solo check
+  const planes=q("cfg-planes");
+  if(floorGrid) floorGrid.visible=planes;
+  if(backGrid)  backGrid.visible=planes;
+  if(sideGrid)  sideGrid.visible=planes;
+}
 function buildGrids(){
   clearGridLabels();
   gridGroup.children.slice().forEach(c=>{ gridGroup.remove(c);
@@ -611,18 +721,58 @@ function buildGrids(){
   const ewHalf=Math.max(1000, Math.ceil((Math.max(Math.abs(b.minEW),Math.abs(b.maxEW))+200)/step)*step);
   const nsMin=b.any?Math.floor((Math.min(0,b.minNS)-200)/step)*step:-1000;
   const nsMax=b.any?Math.ceil((Math.max(0,b.maxNS)+200)/step)*step:1000;
-  const floorTVD=b.any?Math.ceil((b.maxTVD+50)/step)*step:0;
+  // El PISO va 10 m por debajo del punto más profundo del pad; los planos envolventes llegan hasta ahí.
+  const floorTVD=b.any?(b.maxTVD+10):0;
   surfaceGrid=makeGridPlane(0,-ewHalf,ewHalf,nsMin,nsMax,step); gridGroup.add(surfaceGrid);
-  floorGrid=(b.any&&floorTVD>0)?makeGridPlane(floorTVD,-ewHalf,ewHalf,nsMin,nsMax,step):null;
-  if(floorGrid) gridGroup.add(floorGrid);
-  // numeración (metros, cero en boca): N/S y E/O sobre el plano de piso; profundidad en un canto vertical
+  // --- planos envolventes (cajón; los 3 planos comparten borde y se tocan en un único vértice) ---
+  // La "espalda" (grilla de altura/profundidad) es la pared PERPENDICULAR a los laterales, ubicada
+  // SIEMPRE detrás de los heels (lado opuesto al toe) según la orientación dominante del pad. La otra
+  // pared vertical es PARALELA a los laterales y se reubica cada frame para verse por detrás (tick()).
   const lblTVD=floorTVD||0, mstep=500;
-  for(let ns=Math.ceil(nsMin/mstep)*mstep; ns<=nsMax+1e-6; ns+=mstep)
-    addLabel(ns===0?"0":`${Math.abs(ns)} ${ns>0?"N":"S"}`, toThree(ewHalf,ns,lblTVD), "gridnum", null, false);
-  for(let ew=Math.ceil(-ewHalf/mstep)*mstep; ew<=ewHalf+1e-6; ew+=mstep)
-    addLabel(ew===0?"0":`${Math.abs(ew)} ${ew>0?"E":"O"}`, toThree(ew,nsMax,lblTVD), "gridnum", null, false);
-  if(lblTVD>0) for(let tvd=0; tvd<=lblTVD+1e-6; tvd+=mstep)
-    addLabel(`${Math.round(tvd)} m`, toThree(ewHalf,nsMin,tvd), "gridnum", null, false);
+  const dir=t=>`<span class="gdir">${t}</span>`;   // sufijo cardinal/unidad en otro color (clase propia)
+  const ewMin=-ewHalf, ewMax=ewHalf;
+  const lat = lateralAxisInfo();                    // {axis,origin,toeSign} | null (sin survey → N/S por defecto)
+  const runEW = !!(lat && lat.axis==="ew");         // laterales corren E/O
+  const branchOrig = (hzero==="landing" && lat) ? lat.origin : 0;   // cero de la regla de ramas
+  backGrid=sideGrid=floorGrid=null; sideAxis="x"; sidePos=[0,0]; sideNumLabels=[];
+  if(b.any&&floorTVD>0){
+    floorGrid=makeGridPlane(floorTVD,ewMin,ewMax,nsMin,nsMax,step); gridGroup.add(floorGrid);
+    if(!runEW){
+      // laterales N/S: espalda = pared E/O–TVD detrás de los heels; lateral dinámico = pared N/S–TVD (mueve en X)
+      const espaldaNS = (lat && lat.toeSign>0) ? nsMin : nsMax;     // toe al Norte → espalda al Sur, y viceversa
+      backGrid=makeWallEW(espaldaNS, ewMin, ewMax, floorTVD, step); gridGroup.add(backGrid);
+      sideGrid=makeWallNS(0, nsMin, nsMax, floorTVD, step);         gridGroup.add(sideGrid);
+      sideAxis="x"; sidePos=[ewHalf, -ewHalf];                      // world X = -ew: [borde Oeste, borde Este]
+      // N/S sobre el plano lateral (sigue al plano en X); cero de rama si el lateral corre N/S
+      for(let k=Math.ceil((nsMin-branchOrig)/mstep); branchOrig+k*mstep<=nsMax+1e-6; k++){
+        const ns=branchOrig+k*mstep, dd=k*mstep;
+        sideNumLabels.push(addLabel(dd===0?"0":`${Math.round(Math.abs(dd))}${dir(dd>0?"N":"S")}`, toThree(ewHalf,ns,lblTVD), "gridnum", null, true));
+      }
+      // profundidad en la arista vertical (plano lateral ∩ espalda); sigue al plano en X
+      if(lblTVD>0) for(let tvd=0; tvd<=lblTVD+1e-6; tvd+=mstep)
+        sideNumLabels.push(addLabel(`${Math.round(tvd)}${dir("m")}`, toThree(ewHalf,espaldaNS,tvd), "gridnum", null, true));
+      // E/O sobre la espalda (fija en ns=espaldaNS), absoluto desde la boca
+      for(let ew=Math.ceil(ewMin/mstep)*mstep; ew<=ewMax+1e-6; ew+=mstep)
+        addLabel(ew===0?"0":`${Math.round(Math.abs(ew))}${dir(ew>0?"E":"O")}`, toThree(ew,espaldaNS,lblTVD), "gridnum", null, true);
+    } else {
+      // laterales E/O: espalda = pared N/S–TVD detrás de los heels; lateral dinámico = pared E/O–TVD (mueve en Z)
+      const espaldaEW = (lat.toeSign>0) ? ewMin : ewMax;           // toe al Este(+ew) → espalda al Oeste, y viceversa
+      backGrid=makeWallNS(espaldaEW, nsMin, nsMax, floorTVD, step); gridGroup.add(backGrid);
+      sideGrid=makeWallEW(0, ewMin, ewMax, floorTVD, step);         gridGroup.add(sideGrid);
+      sideAxis="z"; sidePos=[nsMax, nsMin];
+      // E/O sobre el plano lateral (sigue al plano en Z); cero de rama
+      for(let k=Math.ceil((ewMin-branchOrig)/mstep); branchOrig+k*mstep<=ewMax+1e-6; k++){
+        const ew=branchOrig+k*mstep, dd=k*mstep;
+        sideNumLabels.push(addLabel(dd===0?"0":`${Math.round(Math.abs(dd))}${dir(dd>0?"E":"O")}`, toThree(ew,nsMax,lblTVD), "gridnum", null, true));
+      }
+      // profundidad en la arista vertical (espalda ∩ plano lateral); sigue al plano en Z
+      if(lblTVD>0) for(let tvd=0; tvd<=lblTVD+1e-6; tvd+=mstep)
+        sideNumLabels.push(addLabel(`${Math.round(tvd)}${dir("m")}`, toThree(espaldaEW,nsMax,tvd), "gridnum", null, true));
+      // N/S sobre la espalda (fija en ew=espaldaEW), absoluto desde la boca
+      for(let ns=Math.ceil(nsMin/mstep)*mstep; ns<=nsMax+1e-6; ns+=mstep)
+        addLabel(ns===0?"0":`${Math.round(Math.abs(ns))}${dir(ns>0?"N":"S")}`, toThree(espaldaEW,ns,lblTVD), "gridnum", null, true);
+    }
+  }
   applyGridVis();
 }
 
@@ -668,10 +818,10 @@ function applyWellVis(wid){
   });
 }
 /* ===== Matriz pozos × elementos =====
-   Columnas = pozos (colapsables a "Pozos"), filas = elementos (colapsables a "Todos").
-   Celda (pozo, elemento) = VIS[pozo][elemento]. La columna "Pozos" es el maestro por elemento
-   (todos los pozos) y la fila "Todos" es el maestro por pozo (todos los elementos). El cruce
-   Pozos×Todos togglea todo. La cabecera de cada pozo togglea su visibilidad (VIS.well). */
+   Columnas = pozos, filas = elementos. Celda (pozo, elemento) = VIS[pozo][elemento].
+   - Cabecera de cada pozo: checkbox = visibilidad del pozo (VIS.well) → togglea toda la columna.
+   - Cabecera de cada elemento (fila): checkbox = ese elemento en TODOS los pozos → togglea la fila.
+   - Esquina: vacía (sin maestro global). */
 function mxWids(){ return [...document.querySelectorAll("#well-matrix th.mx-well")].map(th=>th.dataset.wid); }
 function buildWellMatrix(wells){
   const cont=document.getElementById("well-matrix");
@@ -679,27 +829,22 @@ function buildWellMatrix(wells){
   wells.forEach(w=>ensureVis(w.id));
   const wids=wells.map(w=>w.id);
   const elemAll = k => wids.every(id=>ensureVis(id)[k]!==false);
-  const wellAll = id => ELEMS.every(([k])=>ensureVis(id)[k]!==false);
   const sw = c => `<span class="sw" style="background:${c}"></span>`;
-  let h='<table class="wmx"><thead><tr><th class="mx-corner"></th>'
-      +`<th class="mx-pozos"><label class="mxh"><input type="checkbox" class="mx-allwells" ${wids.every(id=>ensureVis(id).well)?"checked":""}><span>Pozos</span></label></th>`;
+  // cabecera: esquina vacía + un pozo por columna (nombre horizontal)
+  let h='<table class="wmx"><thead><tr><th class="mx-corner"></th>';
   wells.forEach((w,idx)=>{
     const col="#"+WELL_COLORS[idx%WELL_COLORS.length].toString(16).padStart(6,"0");
-    h+=`<th class="mx-well" data-wid="${escAttr(w.id)}"><label class="mxh" title="${escAttr(w.id)}">${sw(col)}<span class="wname">${escHtml(w.id)}</span>`
-      +`<input type="checkbox" class="mx-wellvis" ${ensureVis(w.id).well?"checked":""}></label></th>`;
+    h+=`<th class="mx-well" data-wid="${escAttr(w.id)}"><label class="mxh" title="${escAttr(w.id)}">`
+      +`<input type="checkbox" class="mx-wellvis" ${ensureVis(w.id).well?"checked":""}>${sw(col)}`
+      +`<span class="wname">${escHtml(w.id)}</span></label></th>`;
   });
   h+='</tr></thead><tbody>';
-  // fila "Todos" (maestro por pozo)
-  h+='<tr class="mx-todos"><th class="mx-rowh">Todos</th>'
-    +`<td class="mx-pozos"><input type="checkbox" class="mx-all" ${wids.every(id=>wellAll(id))?"checked":""}></td>`;
-  wells.forEach(w=>{ h+=`<td class="mx-well" data-wid="${escAttr(w.id)}"><input type="checkbox" class="mx-welltodos" ${wellAll(w.id)?"checked":""}></td>`; });
-  h+='</tr>';
-  // una fila por elemento
+  // una fila por elemento; el checkbox del encabezado de fila togglea el elemento en todos los pozos
   ELEMS.forEach(([k,label,col])=>{
-    h+=`<tr class="mx-elem" data-el="${k}"><th class="mx-rowh">${sw(col)}${escHtml(label)}</th>`;
-    h+=`<td class="mx-pozos"><input type="checkbox" class="mx-elemall" data-el="${k}" ${elemAll(k)?"checked":""}>`;
+    h+=`<tr class="mx-elem" data-el="${k}"><th class="mx-rowh" title="${escHtml(label)} en todos los pozos">`
+      +`<label class="mxr"><input type="checkbox" class="mx-elemall" data-el="${k}" ${elemAll(k)?"checked":""}>${sw(col)}${escHtml(label)}</label>`;
     if(k==="perf") h+=`<input type="text" class="mx-perf" data-perfall placeholder="1,3,10-15">`;
-    h+='</td>';
+    h+='</th>';
     wells.forEach(w=>{
       h+=`<td class="mx-well" data-wid="${escAttr(w.id)}"><input type="checkbox" data-el="${k}" ${ensureVis(w.id)[k]!==false?"checked":""}>`;
       if(k==="perf") h+=`<input type="text" class="mx-perf" data-perffilter value="${escAttr(ensureVis(w.id).perfStages||"")}" placeholder="todas">`;
@@ -709,27 +854,20 @@ function buildWellMatrix(wells){
   });
   cont.innerHTML=h+'</tbody></table>';
 }
-// recomputa los estados "maestro" (Pozos / Todos / cruce) tras cualquier cambio de celda
+// recomputa los estados "maestro" (esquina / encabezados de fila) tras cualquier cambio de celda
 function mxSyncMasters(){
   const cont=document.getElementById("well-matrix"); if(!cont) return;
   const wids=mxWids(); if(!wids.length) return;
   const elemAll = k => wids.every(id=>ensureVis(id)[k]!==false);
-  const wellAll = id => ELEMS.every(([k])=>ensureVis(id)[k]!==false);
   cont.querySelectorAll("th.mx-well").forEach(th=>{ const cb=th.querySelector(".mx-wellvis"); if(cb) cb.checked=!!ensureVis(th.dataset.wid).well; });
-  const aw=cont.querySelector(".mx-allwells"); if(aw) aw.checked=wids.every(id=>ensureVis(id).well);
   cont.querySelectorAll(".mx-elemall").forEach(cb=>cb.checked=elemAll(cb.dataset.el));
   cont.querySelectorAll("tr.mx-elem").forEach(tr=>{ const k=tr.dataset.el;
     tr.querySelectorAll("td.mx-well").forEach(td=>{ const cb=td.querySelector("input[data-el]"); if(cb) cb.checked=ensureVis(td.dataset.wid)[k]!==false; }); });
-  cont.querySelectorAll("tr.mx-todos td.mx-well").forEach(td=>{ const cb=td.querySelector(".mx-welltodos"); if(cb) cb.checked=wellAll(td.dataset.wid); });
-  const ev=cont.querySelector(".mx-all"); if(ev) ev.checked=wids.every(id=>wellAll(id));
 }
 document.getElementById("well-matrix").addEventListener("change",e=>{
   const t=e.target, wids=mxWids();
   if(t.classList.contains("mx-wellvis")){ const wid=t.closest("[data-wid]").dataset.wid; ensureVis(wid).well=t.checked; applyWellVis(wid); }
-  else if(t.classList.contains("mx-allwells")){ wids.forEach(id=>{ ensureVis(id).well=t.checked; applyWellVis(id); }); }
   else if(t.classList.contains("mx-elemall")){ const k=t.dataset.el; wids.forEach(id=>{ ensureVis(id)[k]=t.checked; applyWellVis(id); }); }
-  else if(t.classList.contains("mx-welltodos")){ const wid=t.closest("[data-wid]").dataset.wid; ELEMS.forEach(([k])=>ensureVis(wid)[k]=t.checked); applyWellVis(wid); }
-  else if(t.classList.contains("mx-all")){ wids.forEach(id=>{ ELEMS.forEach(([k])=>ensureVis(id)[k]=t.checked); applyWellVis(id); }); }
   else if(t.matches("td.mx-well input[data-el]")){ const wid=t.closest("[data-wid]").dataset.wid, k=t.dataset.el; ensureVis(wid)[k]=t.checked; applyWellVis(wid); }
   else return;
   mxSyncMasters(); saveViewCfg();
@@ -762,7 +900,7 @@ document.querySelectorAll("input[name='isomode']").forEach(r=>r.addEventListener
   if(e.target.checked){ isoMode=e.target.value; refreshIsoColors(); }
 }));
 document.getElementById("cfg-grid").addEventListener("change",e=>{ if(surfaceGrid) surfaceGrid.visible=e.target.checked; });
-document.getElementById("cfg-floor").addEventListener("change",e=>{ if(floorGrid) floorGrid.visible=e.target.checked; });
+document.getElementById("cfg-planes").addEventListener("change",applyGridVis);
 document.getElementById("cfg-gridnums").addEventListener("change",e=>SHOW_GRIDNUMS=e.target.checked);
 document.getElementById("cfg-axes").addEventListener("change",e=>axes.visible=e.target.checked);
 document.getElementById("cfg-shoes").addEventListener("change",e=>shoesGroup.visible=e.target.checked);
@@ -779,26 +917,54 @@ function setLabelSize(px){ labelsEl.style.setProperty("--lbl-size",px+"px"); hov
   document.getElementById("lblsize-val").textContent=px+" px"; }
 function setLabelFont(key){ const f=LABEL_FONTS[key]||LABEL_FONTS.mono;
   labelsEl.style.setProperty("--lbl-font",f); hoverEl.style.setProperty("--lbl-font",f); }
+function setGridSize(px){ labelsEl.style.setProperty("--grid-size",px+"px");
+  document.getElementById("gridsize-val").textContent=px+" px"; }
 document.getElementById("cfg-lblsize").addEventListener("input",e=>setLabelSize(parseInt(e.target.value,10)));
+document.getElementById("cfg-gridsize").addEventListener("input",e=>setGridSize(parseInt(e.target.value,10)));
 document.getElementById("cfg-font").addEventListener("change",e=>setLabelFont(e.target.value));
 document.querySelectorAll("input[name='odfmt']").forEach(r=>r.addEventListener("change",e=>{
   if(e.target.checked){ odFormat=e.target.value; if(PAD) buildPad(PAD); renderWellCards(); }   // reetiqueta zapatos 3D y picklists del constructor
 }));
-setLabelSize(11); setLabelFont("mono");
+// selector de par de colores de etapa (modo aislación "por etapas")
+(function(){ const sel=document.getElementById("cfg-stagepair");
+  if(sel){ sel.innerHTML=Object.entries(STAGE_PAIRS).map(([k,p])=>`<option value="${k}">${p.label}</option>`).join("");
+    sel.value=stagePair;
+    sel.addEventListener("change",e=>{ setStagePair(e.target.value); refreshIsoColors(); saveViewCfg(); }); } })();
+// cero de la regla de ramas horizontales (boca | landing) → reconstruye la numeración de grilla
+document.getElementById("cfg-hzero")?.addEventListener("change",e=>{ hzero=e.target.value; buildGrids(); saveViewCfg(); });
+setLabelSize(11); setGridSize(16); setLabelFont("mono"); setStagePair("greens");
 document.getElementById("lbl-cursor").addEventListener("change",e=>{ SHOW_CURSOR_TIP=e.target.checked;
   if(!SHOW_CURSOR_TIP) document.getElementById("hover-tip").style.display="none"; });
 
-/* ---- Cuadros flotantes: colapsar (por cuadro y, en Pozos, en X/Y) + arrastrar + persistir ---- */
-const PANELS_KEY="vv-panels-v1";
+/* ---- Cuadros flotantes: colapsar (click en el título) + ensanchar (Pozos) + arrastrar + persistir ----
+   Posiciones por defecto (mismas que el markup): sirven para "Reordenar" cuando algún cuadro quedó
+   fuera de la vista al cambiar de monitor/resolución. */
+const PANELS_KEY="vv-panels-v2";
+const PANEL_DEFAULTS={
+  "panel-wells":{top:"14px", right:"14px"},
+  "grp-isomode":{top:"14px", right:"290px"},
+  "panel-labels":{top:"250px", right:"290px"},
+  "panel-ref":{top:"520px", right:"290px"},
+};
 function savePanels(){
   try{
     const st={};
     document.querySelectorAll("#panels .panel").forEach(p=>{
-      st[p.id]={ left:p.style.left||"", top:p.style.top||"", right:p.style.right||"", collapsed:p.classList.contains("collapsed"),
-        x:p.classList.contains("x-collapsed"), y:p.classList.contains("y-collapsed") };
+      st[p.id]={ left:p.style.left||"", top:p.style.top||"", right:p.style.right||"",
+        collapsed:p.classList.contains("collapsed"), wide:p.classList.contains("wide") };
     });
     localStorage.setItem(PANELS_KEY, JSON.stringify(st));
   }catch(e){}
+}
+// mantiene un cuadro anclado por `left/top` dentro del área visible (por si cambió la resolución)
+function clampPanel(p){
+  if(!p.style.left) return;                 // anclado por `right`: siempre visible
+  const mainR=document.querySelector("main").getBoundingClientRect();
+  const r=p.getBoundingClientRect();
+  let x=parseFloat(p.style.left)||0, y=parseFloat(p.style.top)||0;
+  x=Math.max(0, Math.min(mainR.width  - Math.min(r.width,120),  x));
+  y=Math.max(0, Math.min(mainR.height - 32, y));
+  p.style.left=x+"px"; p.style.top=y+"px";
 }
 function loadPanels(){
   let st=null; try{ st=JSON.parse(localStorage.getItem(PANELS_KEY)||"null"); }catch(e){}
@@ -808,39 +974,59 @@ function loadPanels(){
     if(s.left){ p.style.left=s.left; p.style.right="auto"; p.style.bottom="auto"; }
     if(s.top) p.style.top=s.top;
     p.classList.toggle("collapsed",!!s.collapsed);
-    p.classList.toggle("x-collapsed",!!s.x);
-    p.classList.toggle("y-collapsed",!!s.y);
+    p.classList.toggle("wide",!!s.wide);
+    clampPanel(p);
   });
 }
+// devuelve todos los cuadros a su posición original (y los des-colapsa/des-ensancha)
+function resetPanels(){
+  document.querySelectorAll("#panels .panel").forEach(p=>{
+    const d=PANEL_DEFAULTS[p.id]; if(!d) return;
+    p.style.left="auto"; p.style.bottom="auto";
+    p.style.right=d.right||"auto"; p.style.top=d.top||"auto";
+    p.classList.remove("collapsed");
+  });
+  savePanels();
+}
+document.getElementById("panels-reset")?.addEventListener("click",resetPanels);
+// el cuadro con el que se interactúa pasa al frente (z-index incremental)
+let panelTopZ=10;
+function bringPanelToFront(p){ p.style.zIndex=++panelTopZ; }
 document.querySelectorAll("#panels .panel").forEach(panel=>{
   const head=panel.querySelector(".panel-head");
-  // botones: colapsar cuadro; en Pozos, colapso independiente en X (pozos) e Y (elementos)
-  panel.querySelector(".panel-collapse")?.addEventListener("click",e=>{
-    e.stopPropagation(); panel.classList.toggle("collapsed"); savePanels(); });
-  panel.querySelector(".mx-xtog")?.addEventListener("click",e=>{
-    e.stopPropagation(); panel.classList.toggle("x-collapsed"); savePanels(); });
-  panel.querySelector(".mx-ytog")?.addEventListener("click",e=>{
-    e.stopPropagation(); panel.classList.toggle("y-collapsed"); savePanels(); });
-  // arrastrar por el header (a cualquier parte del área 3D)
-  let drag=false,ox=0,oy=0;
+  panel.addEventListener("mousedown",()=>bringPanelToFront(panel));
+  // botón "ensanchar" (solo Pozos y elementos): libera el ancho fijo para que quepan los pozos
+  panel.querySelector(".panel-widen")?.addEventListener("click",e=>{
+    e.stopPropagation(); panel.classList.toggle("wide"); savePanels(); });
+  // arrastrar por el header; un click "limpio" (sin arrastrar) colapsa/expande el cuadro
+  let drag=false,moved=false,ox=0,oy=0,sx=0,sy=0;
   head.addEventListener("mousedown",e=>{
-    if(e.target.closest(".panel-btn")) return;
-    drag=true; panel.classList.add("dragging");
+    if(e.target.closest(".panel-btn")||e.target.closest("input")) return;
+    drag=true; moved=false; sx=e.clientX; sy=e.clientY;
     const r=panel.getBoundingClientRect(); ox=e.clientX-r.left; oy=e.clientY-r.top;
-    const mainR=document.querySelector("main").getBoundingClientRect();
-    panel.style.right="auto"; panel.style.bottom="auto";
-    panel.style.left=(r.left-mainR.left)+"px"; panel.style.top=(r.top-mainR.top)+"px";
     e.preventDefault();
   });
   window.addEventListener("mousemove",e=>{ if(!drag) return;
+    if(!moved){
+      if(Math.abs(e.clientX-sx)+Math.abs(e.clientY-sy)<=4) return;
+      moved=true; panel.classList.add("dragging");           // reancla a left/top recién al empezar a arrastrar
+      const r=panel.getBoundingClientRect(), mainR0=document.querySelector("main").getBoundingClientRect();
+      panel.style.right="auto"; panel.style.bottom="auto";
+      panel.style.left=(r.left-mainR0.left)+"px"; panel.style.top=(r.top-mainR0.top)+"px";
+    }
     const mainR=document.querySelector("main").getBoundingClientRect();
     let x=e.clientX-ox-mainR.left, y=e.clientY-oy-mainR.top;
     x=Math.max(0,Math.min(mainR.width-60,x)); y=Math.max(0,Math.min(mainR.height-32,y));
     panel.style.left=x+"px"; panel.style.top=y+"px";
   });
-  window.addEventListener("mouseup",()=>{ if(drag){ drag=false; panel.classList.remove("dragging"); savePanels(); } });
+  window.addEventListener("mouseup",e=>{ if(!drag) return; drag=false; panel.classList.remove("dragging");
+    if(moved){ savePanels(); }
+    else if(head.contains(e.target) && !e.target.closest(".panel-btn") && !e.target.closest("input")){
+      panel.classList.toggle("collapsed"); savePanels(); }   // click sin arrastre = colapsar/expandir
+  });
 });
 loadPanels();
+window.addEventListener("resize",()=>document.querySelectorAll("#panels .panel").forEach(clampPanel));
 
 /* ---- Mouse-over MD/TVD en vivo ----
    raycast a las trayectorias; del punto de hit se recupera el MD proyectando sobre los
@@ -1149,11 +1335,12 @@ const VIEWCFG_KEY="vv-viewcfg-v1";
 function saveViewCfg(){
   try{
     const cfg={ VIS, isoMode, odFormat, vexag, diamExag, autoDiam, perfRadiusM,
-      plugInv:plugCountInverted,
+      plugInv:plugCountInverted, stagePair, hzero,
       lblSize:parseInt(document.getElementById("cfg-lblsize").value,10),
+      gridSize:parseInt(document.getElementById("cfg-gridsize").value,10),
       font:document.getElementById("cfg-font").value, checks:{} };
     ["lbl-stage","lbl-tpn","lbl-short","lbl-install","lbl-shoetrack","lbl-shoe","lbl-toc","lbl-cursor",
-     "cfg-grid","cfg-floor","cfg-gridnums","cfg-axes","cfg-shoes","cfg-autodiam"].forEach(id=>cfg.checks[id]=document.getElementById(id).checked);
+     "cfg-grid","cfg-planes","cfg-gridnums","cfg-axes","cfg-shoes","cfg-autodiam"].forEach(id=>cfg.checks[id]=document.getElementById(id).checked);
     localStorage.setItem(VIEWCFG_KEY, JSON.stringify(cfg));
   }catch(e){ /* almacenamiento no disponible: la vista simplemente no persiste */ }
 }
@@ -1174,6 +1361,9 @@ function loadViewCfg(){
     document.getElementById("cfg-dexag").value=cfg.diamExag;
     document.getElementById("dexag-val").textContent=Math.round(diamExag)+"×"; }
   if(typeof cfg.lblSize==="number"){ document.getElementById("cfg-lblsize").value=cfg.lblSize; setLabelSize(cfg.lblSize); }
+  if(typeof cfg.gridSize==="number"){ document.getElementById("cfg-gridsize").value=cfg.gridSize; setGridSize(cfg.gridSize); }
+  if(cfg.stagePair){ setStagePair(cfg.stagePair); const s=document.getElementById("cfg-stagepair"); if(s) s.value=stagePair; }
+  if(cfg.hzero){ hzero=cfg.hzero; const s=document.getElementById("cfg-hzero"); if(s) s.value=hzero; }
   if(cfg.font){ document.getElementById("cfg-font").value=cfg.font; setLabelFont(cfg.font); }
   if(cfg.plugInv!=null){ plugCountInverted=!!cfg.plugInv; document.getElementById("cfg-pluginv").checked=plugCountInverted; }
   if(typeof cfg.perfRadiusM==="number"){ perfRadiusM=cfg.perfRadiusM;
@@ -1196,27 +1386,73 @@ IDB.open().then(()=>IDB.load()).then(saved=>{
   fetch("samples/pad_MMo-35.json").then(r=>r.json()).then(o=>loadPadObject(o))
     .catch(()=>{ toast("Cargá un pad.vvwp desde Datos"); show("vdata"); });
 });
+/* Handle del .vvwp abierto/guardado (File System Access API, Chrome/Edge). Permite que
+   "Guardar" escriba sobre el mismo archivo. null = pad nunca guardado/abierto desde archivo. */
+let PAD_FH=null;
 function readFile(file){
+  PAD_FH=null;   // el origen no trae handle (input clásico / drop viejo); drop moderno lo repone
   const r=new FileReader();
   r.onload=()=>{ try{ loadPadObject(JSON.parse(r.result)); }catch(err){ toast("Error leyendo JSON: "+err.message); } };
   r.readAsText(file);
 }
+const FH_TYPES=[{description:"Pad vaca viewer", accept:{"application/json":[`.${PAD_EXT}`,".vvw",".json"]}}];
 document.getElementById("file-json").addEventListener("change",e=>{ if(e.target.files[0]) readFile(e.target.files[0]); });
+// "elegí archivo": si el navegador soporta FS Access, se usa el picker para retener el handle
+const openLbl=document.querySelector("#drop label");
+if(window.showOpenFilePicker && openLbl){
+  openLbl.addEventListener("click", async e=>{
+    e.preventDefault();
+    try{ const [fh]=await showOpenFilePicker({types:FH_TYPES});
+      const f=await fh.getFile(); readFile(f); PAD_FH=fh;
+    }catch(err){ /* cancelado */ }
+  });
+}
 const drop=document.getElementById("drop");
 ["dragenter","dragover"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add("hot");}));
 ["dragleave","drop"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove("hot");}));
-drop.addEventListener("drop",e=>{ const f=e.dataTransfer.files[0]; if(f) readFile(f); });
+drop.addEventListener("drop",e=>{
+  const it=e.dataTransfer.items?.[0], f=e.dataTransfer.files[0];
+  const hp=it?.getAsFileSystemHandle ? it.getAsFileSystemHandle() : null;   // pedirlo YA (dentro del evento)
+  if(f) readFile(f);
+  if(hp) hp.then(h=>{ if(h?.kind==="file") PAD_FH=h; }).catch(()=>{});
+});
 
-document.getElementById("ex-json").addEventListener("click",()=>{
-  if(!PAD){ toast("No hay pad cargado"); return; }
+/* ---- Guardar / Guardar como / Exportar (.vvwp) ---- */
+function downloadPad(){
   const blob=new Blob([JSON.stringify(PAD)],{type:"application/json"});
   const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
   a.download=`pad_${PAD.pad.id}.${PAD_EXT}`; a.click(); URL.revokeObjectURL(a.href);
+}
+async function writePadToHandle(fh){
+  if(fh.queryPermission && await fh.queryPermission({mode:"readwrite"})!=="granted"){
+    if(await fh.requestPermission({mode:"readwrite"})!=="granted") throw new Error("sin permiso de escritura");
+  }
+  const w=await fh.createWritable(); await w.write(JSON.stringify(PAD)); await w.close();
+}
+async function savePadAs(){
+  if(!PAD){ toast("No hay pad cargado"); return; }
+  if(!window.showSaveFilePicker){ downloadPad(); toast("Navegador sin 'Guardar como': se descargó una copia"); return; }
+  try{
+    const fh=await showSaveFilePicker({suggestedName:`pad_${PAD.pad.id||"nuevo"}.${PAD_EXT}`, types:FH_TYPES});
+    await writePadToHandle(fh); PAD_FH=fh; toast(`Guardado en ${fh.name}`);
+  }catch(err){ if(err?.name!=="AbortError") toast("No se pudo guardar: "+err.message); }
+}
+async function savePad(){
+  if(!PAD){ toast("No hay pad cargado"); return; }
+  if(!PAD_FH){ savePadAs(); return; }   // nunca guardado ni abierto de archivo → Guardar como
+  try{ await writePadToHandle(PAD_FH); toast(`Guardado en ${PAD_FH.name}`); }
+  catch(err){ toast("No se pudo guardar: "+err.message); }
+}
+document.getElementById("save-pad").addEventListener("click",savePad);
+document.getElementById("saveas-pad").addEventListener("click",savePadAs);
+document.getElementById("export-pad").addEventListener("click",()=>{
+  if(!PAD){ toast("No hay pad cargado"); return; }
+  downloadPad();
 });
 document.getElementById("forget").addEventListener("click",()=>{
   IDB.clear();
   // reset completo: gráfico, tabla, pie de página y formulario del constructor
-  PAD=null; clearWorld();
+  PAD=null; PAD_FH=null; clearWorld();
   document.getElementById("summary-body").innerHTML="—";
   document.getElementById("foot-pad").textContent="—"; document.getElementById("foot-wells").textContent="—";
   document.getElementById("well-matrix").innerHTML=""; buildGrids();
@@ -1383,7 +1619,10 @@ function parseRunTally(text, maxLen=10.0, edgeM=150){
     const mm=line.match(re); if(!mm) continue;
     const length=parseFloat(mm[1].replace(/,/g,"")), setd=parseFloat(mm[3].replace(/,/g,""));
     if(!(length>0) || !(setd>0) || length>30) continue;
-    rows.push({length, setd, desc:line.slice(mm.index+mm[0].length).trim()});
+    // tras el Set Depth pueden venir MÁS columnas numéricas (peso acumulado, etc.) que no son
+    // parte de la descripción: se descartan los decimales sueltos del principio
+    const desc=line.slice(mm.index+mm[0].length).trim().replace(/^(?:\d+(?:,\d{3})*\.\d+\s+)+/,"");
+    rows.push({length, setd, desc});
   }
   if(!rows.length) return {shorts:[], shoetrack:null};
   const maxMD=Math.max(...rows.map(r=>r.setd+r.length));   // fondo de la sarta (≈ zapato)
@@ -1445,6 +1684,16 @@ function fmtCasingStatus(c){
   if(c.short_joints?.length) s+=` · ${c.short_joints.length} caño(s) corto(s)`;
   return s;
 }
+/* listado de caños cortos detectados en el tally de aislación: longitud, MD desde y detalle
+   (cañería/acero + generales). Solo lectura: el dato vive en cas.short_joints del tally. */
+function shortsList(c){
+  const sjs=c.short_joints||[]; if(!sjs.length) return "";
+  const rows=sjs.map((sj,k)=>`<tr><td class="num">${k+1}</td><td>${sj.xover?"xover":"casing corto"}</td>
+      <td class="num">${Math.round(sj.top_md)} m</td><td class="num">${sj.length_m!=null?sj.length_m.toFixed(2)+" m":"—"}</td>
+      <td class="dim">${escHtml(sj.desc||"—")}</td></tr>`).join("");
+  return `<div class="cc-list"><div class="cc-title">↳ ${sjs.length} caño(s) corto(s) detectados</div>
+    <table class="tbl cc-tbl"><tr><th>#</th><th>Tipo</th><th>MD desde</th><th>Longitud</th><th>Cañería / acero · detalle</th></tr>${rows}</table></div>`;
+}
 function phaseBlock(i,ph,label,c){ c=c||{};
   return `<div class="phase-row"><span class="tag">${label}</span>
     <span class="btn filebtn">Tally .pdf<input type="file" accept=".pdf" data-w="${i}" data-kind="tally" data-phase="${ph}"></span>
@@ -1455,7 +1704,7 @@ function phaseBlock(i,ph,label,c){ c=c||{};
       <label>Acero<select data-w="${i}" data-ph="${ph}" data-c="gr">${grOptions(c.grade)}</select></label>
       <label>Zapato MD<input type="number" data-w="${i}" data-ph="${ph}" data-c="md" value="${c.shoe_md??""}"></label>
       <label>TOC MD<input type="number" data-w="${i}" data-ph="${ph}" data-c="toc" value="${c.toc_md??""}"></label>
-    </div></div>`;
+    </div>${ph==="produccion"?shortsList(c):""}</div>`;
 }
 function instBlock(i,w){
   const ins=w.install||{};
@@ -1560,23 +1809,34 @@ function renderWellCards(){
     const w=ING.wells[i]; if(!w.install) w.install={enabled:false,tbg_od:null,elements:[]};
     if(!w.shoetrack) w.shoetrack={enabled:false,elements:[]}; if(!w.casings) w.casings={};
     if(w.fracEnabled==null) w.fracEnabled=!!(w.frac&&(w.frac.stages||[]).length);
-    const card=document.createElement("div"); card.className="well-card";
+    const card=document.createElement("div"); card.className="well-card"+(w._collapsed?" collapsed":"");
     const survSt=w.survey?`MD ${Math.round(w.survey.stations.at(-1).md)} · ${w.survey.stations.length} est`:"— (vertical)";
     const fracSt=w.frac?`${w.frac.total_stages} etapas`:"— (opcional)";
-    card.innerHTML=`<h5>Pozo ${i+1}</h5>
-      <label style="max-width:280px; margin-bottom:8px">ID del pozo
-        <input type="text" data-w="${i}" data-f="id" value="${w.id||""}"></label>
+    card.innerHTML=`<h5 class="wc-head" data-wc="${i}" title="Click para colapsar/expandir">
+        <span class="caret">▸</span><span class="wc-num">${i+1}.</span>
+        <input type="text" class="wc-name" data-w="${i}" data-f="id" value="${escAttr(w.id||"")}"
+          placeholder="Nombre del pozo" title="Click para editar el nombre">
+      </h5>
+      <div class="wc-body">
       <div class="file-row"><span class="tag">Survey</span>
         <span class="btn filebtn">Cargar .xlsx<input type="file" accept=".xlsx,.xls" data-w="${i}" data-kind="survey"></span>
         <span class="st" data-st="survey-${i}">${survSt}</span></div>
       <div class="file-row"><span class="tag">Fracplan</span>
         <span class="btn filebtn">Cargar .xlsx<input type="file" accept=".xlsx,.xls" data-w="${i}" data-kind="frac"></span>
         <span class="st" data-st="frac-${i}">${fracSt}</span></div>
-      ${PHASES.map(([ph,label])=>phaseBlock(i,ph,label,w.casings[ph])+(ph==="produccion"?instBlock(i,w)+shoetrackBlock(i,w)+fracBlock(i,w):"")).join("")}`;
+      ${PHASES.map(([ph,label])=>phaseBlock(i,ph,label,w.casings[ph])+(ph==="produccion"?instBlock(i,w)+shoetrackBlock(i,w)+fracBlock(i,w):"")).join("")}
+      </div>`;
     cont.appendChild(card);
   }
+  const btn=document.getElementById("b-collapse-all");
+  if(btn) btn.textContent=ING.wells.some(w=>!w._collapsed)?"Colapsar pozos":"Expandir pozos";
 }
 document.getElementById("b-nwells").addEventListener("change",renderWellCards);
+document.getElementById("b-collapse-all")?.addEventListener("click",()=>{
+  const anyOpen=ING.wells.some(w=>!w._collapsed);
+  ING.wells.forEach(w=>w._collapsed=anyOpen);
+  renderWellCards();
+});
 
 function onWellField(e){
   const t=e.target, i=+t.dataset.w; if(!(i>=0)) return; const w=ING.wells[i]; if(!w) return;
@@ -1650,6 +1910,16 @@ document.getElementById("b-wells").addEventListener("click",e=>{
     const wrap=head.parentElement;
     const collapsed=wrap.classList.toggle("collapsed");   // la clase oculta el cuerpo por CSS
     if(!collapsed && wrap.dataset.fracwrap!=null) fillFracBody(+wrap.dataset.fracwrap);   // fracplan perezoso
+    return;
+  }
+  // colapsar/expandir el pozo entero (el input del nombre no colapsa)
+  const wh=e.target.closest(".wc-head");
+  if(wh && !e.target.closest(".wc-name")){
+    const i=+wh.dataset.wc, w=ING.wells[i]; if(!w) return;
+    w._collapsed=!w._collapsed;
+    wh.closest(".well-card").classList.toggle("collapsed",w._collapsed);
+    const btn=document.getElementById("b-collapse-all");
+    if(btn) btn.textContent=ING.wells.some(x=>!x._collapsed)?"Colapsar pozos":"Expandir pozos";
   }
 });
 function refillFrac(i){ const body=document.querySelector(`[data-fracbody="${i}"]`);
@@ -1802,6 +2072,111 @@ function updateSummary(){
     +`<table class="tbl"><tr><th>Pozo</th><th>Fase</th><th>OD</th><th>Zapato MD</th><th>TOC MD</th><th>lb/ft</th><th>Grado</th></tr>${out}</table>`;
 }
 
+/* Tabla del pad → filas planas (mismas celdas que updateSummary, sin rowspan) para exportarla
+   a .xlsx o a imagen. cls: ""=fase, "cc"=caño corto/shoetrack, "inst"=instalación, "dim"=vacío. */
+function summaryTableData(){
+  if(!PAD) return null;
+  const header=["Pozo","Fase","OD","Zapato MD","TOC MD","lb/ft","Grado"];
+  const rows=[];
+  PAD.pad.wells.forEach(w=>{
+    const mdf=Math.round((w.survey?.stations.at(-1).md)||0);
+    const meta=`${mdf} m · ${w.frac?.total_stages||0} et${w.architecture==="vertical"?" · vert":""}`;
+    let first=true;
+    const push=(cells,cls)=>{ rows.push({cells:[first?`${w.id}  (${meta})`:"",...cells], cls:cls||""}); first=false; };
+    (w.casings||[]).forEach(c=>{
+      push([PHASE_LABEL[c.phase]||c.phase, c.od_in!=null?fmtOD(c.od_in):"—",
+        c.shoe_md!=null?Math.round(c.shoe_md):"—", c.toc_md!=null?Math.round(c.toc_md):"—",
+        c.weight_ppf!=null?c.weight_ppf:"—", c.grade||"—"]);
+      (c.short_joints||[]).forEach((sj,k)=>{ const len=sj.length_m!=null?`${sj.length_m} m`:"";
+        push([`↳ ${sj.xover?"xover":"caño corto"} ${k+1}`,"—",`${Math.round(sj.top_md)}–${Math.round(sj.bottom_md)} m`,
+          `${len}${sj.desc?" · "+sj.desc:""}`,"",""],"cc"); });
+      const st=c.shoetrack?.elements||[];
+      if(st.length){
+        push(["↳ shoetrack","—",`desde ${Math.round(st[0].top_md)} m`,`${st.length} elemento(s), somero→profundo`,"",""],"cc");
+        st.forEach((el,k)=>push([`    ${k+1}.`,"—",`${Math.round(el.top_md)}–${Math.round(el.bottom_md)} m`,
+          `${el.length_m!=null?el.length_m+" m":""}${el.desc?" · "+el.desc:""}`,"",""],"cc"));
+      }
+    });
+    if(w.installation){ const ins=w.installation;
+      const tbgTxt=[ins.tbg_od_in!=null?"TBG "+fmtOD(ins.tbg_od_in):"—",
+        ins.tbg_weight_ppf!=null?ins.tbg_weight_ppf+" lb/ft":null, ins.tbg_grade,
+        ins.tbg_md_m!=null?"MD "+Math.round(ins.tbg_md_m)+" m":null].filter(Boolean).join(" · ");
+      push(["Instalación",tbgTxt,"",`${(ins.elements||[]).length} elemento(s)`,"",""],"inst");
+      (ins.elements||[]).forEach(el=>push([`↳ ${el.type}`,"—",`${Math.round(el.md)} m`,
+        el.type==="PKR"?"packer":"tapón","",""],"inst"));
+    }
+    if(first) push(["sin cañerías cargadas","","","","",""],"dim");
+  });
+  const p=PAD.pad;
+  const meta=[p.name||p.id, p.field, p.operator, p.campaign!=null?`campaña ${p.campaign}`:null]
+    .filter(Boolean).join(" · ");
+  return {id:p.id, meta, header, rows};
+}
+document.getElementById("summary-head")?.addEventListener("click",()=>{
+  document.getElementById("data-summary").classList.toggle("collapsed");
+});
+document.getElementById("summary-xlsx")?.addEventListener("click",e=>{
+  e.stopPropagation();
+  const d=summaryTableData(); if(!d){ toast("No hay pad cargado"); return; }
+  if(!window.XLSX){ toast("SheetJS no cargó (sin internet?)"); return; }
+  const aoa=[[d.id+(d.meta?" — "+d.meta:"")],[],d.header,...d.rows.map(r=>r.cells)];
+  const ws=XLSX.utils.aoa_to_sheet(aoa);
+  ws["!cols"]=[{wch:26},{wch:20},{wch:9},{wch:16},{wch:48},{wch:8},{wch:8}];
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,"Pad");
+  XLSX.writeFile(wb,`pad_${d.id}_resumen.xlsx`);
+});
+/* Imagen de la tabla: se dibuja en canvas con fondo blanco (tipografía de la marca, cebra suave)
+   y se descarga como PNG @2x. */
+function summaryCanvas(){
+  const d=summaryTableData(); if(!d) return null;
+  const F={ title:'600 17px "Space Grotesk", system-ui, sans-serif',
+    meta:'12px "Space Grotesk", system-ui, sans-serif',
+    head:'600 11.5px "Space Grotesk", system-ui, sans-serif',
+    cell:'12px ui-monospace, Consolas, monospace' };
+  const padX=20, rowH=26, headH=30, titleH=48;
+  const mctx=document.createElement("canvas").getContext("2d");
+  const widths=d.header.map((h,j)=>{ mctx.font=F.head; let w=mctx.measureText(h).width;
+    mctx.font=F.cell;
+    d.rows.forEach(r=>w=Math.max(w,mctx.measureText(String(r.cells[j]??"")).width));
+    return Math.min(Math.ceil(w)+22, 430); });
+  const W=padX*2+widths.reduce((a,b)=>a+b,0);
+  const H=titleH+headH+d.rows.length*rowH+padX;
+  const cv=document.createElement("canvas"); cv.width=W*2; cv.height=H*2;
+  const x=cv.getContext("2d"); x.scale(2,2);
+  x.fillStyle="#ffffff"; x.fillRect(0,0,W,H);
+  x.textBaseline="middle";
+  const fit=(t,w)=>{ t=String(t??""); if(x.measureText(t).width<=w) return t;
+    while(t.length && x.measureText(t+"…").width>w) t=t.slice(0,-1); return t+"…"; };
+  x.fillStyle="#18212e"; x.font=F.title; x.fillText(d.id,padX,20);
+  const titleW=x.measureText(d.id).width;
+  if(d.meta){ x.fillStyle="#6a7683"; x.font=F.meta;
+    x.fillText(fit(d.meta,W-padX*2-titleW-14),padX+titleW+12,21); }
+  let y=titleH;
+  x.fillStyle="#eef2f6"; x.fillRect(padX,y,W-padX*2,headH);
+  x.font=F.head; x.fillStyle="#3d4b5c";
+  let cx=padX; d.header.forEach((h,j)=>{ x.fillText(h,cx+10,y+headH/2); cx+=widths[j]; });
+  y+=headH;
+  const inkFor=cls=> cls==="cc"?"#6a7683" : cls==="inst"?"#0e7490" : cls==="dim"?"#9aa5b1" : "#18212e";
+  x.font=F.cell;
+  d.rows.forEach((r,k)=>{
+    if(k%2) { x.fillStyle="#f7f9fb"; x.fillRect(padX,y,W-padX*2,rowH); }
+    x.fillStyle=inkFor(r.cls);
+    let cx2=padX;
+    r.cells.forEach((t,j)=>{ x.fillText(fit(t,widths[j]-16),cx2+10,y+rowH/2); cx2+=widths[j]; });
+    x.strokeStyle="#e4e9ee"; x.lineWidth=1;
+    x.beginPath(); x.moveTo(padX,y+rowH); x.lineTo(W-padX,y+rowH); x.stroke();
+    y+=rowH;
+  });
+  x.strokeStyle="#d7dee6"; x.strokeRect(padX,titleH,W-padX*2,headH+d.rows.length*rowH);
+  return cv;
+}
+document.getElementById("summary-png")?.addEventListener("click",e=>{
+  e.stopPropagation();
+  const cv=summaryCanvas(); if(!cv){ toast("No hay pad cargado"); return; }
+  const a=document.createElement("a"); a.href=cv.toDataURL("image/png");
+  a.download=`pad_${PAD.pad.id}_resumen.png`; a.click();
+});
+
 /* ============ Debug panel ============ */
 function updateDbg(){
   if(!DBG) return;
@@ -1937,6 +2312,15 @@ let dbgFrame=0;
 let _sceneRadius=8000;   // radio aprox de la escena, se actualiza en frameAll
 function tick(){ camera.position.copy(target).add(new THREE.Vector3().setFromSpherical(sph));
   camera.lookAt(target);
+  // plano lateral dinámico: siempre del lado opuesto a la cámara para verse detrás del pad.
+  // Sus etiquetas (regla de rama + profundidad) viven sobre él, así que las llevo a la misma coordenada.
+  if(sideGrid&&sideGrid.visible){
+    const camC = sideAxis==="x" ? camera.position.x : camera.position.z;
+    const tgtC = sideAxis==="x" ? target.x : target.z;
+    const p = (camC >= tgtC) ? sidePos[1] : sidePos[0];   // sidePos=[max,min]: cámara del lado + → plano al lado −
+    if(sideAxis==="x"){ sideGrid.position.x=p; for(const l of sideNumLabels) l.pos.x=p; }
+    else             { sideGrid.position.z=p; for(const l of sideNumLabels) l.pos.z=p; }
+  }
   // near chico y far amplio, basados en distancia de cámara + tamaño de escena.
   // Evita recorte al acercarse (near fijo bajo) y al alejarse (far cubre toda la escena).
   const camDist=sph.radius;
