@@ -153,6 +153,83 @@ function casingRadius(phase, od_in){
   return (od/2)*0.0254*diamExag;   // metros, exagerado
 }
 
+/* ==== INSTALACIÓN (v0.6): modelo puro — sin DOM ni THREE (el harness de node lo evalúa tal cual) ====
+   installation.elements = lista de elementos tipados (ver docs/data-schema.md):
+     rango (top_md→bottom_md): TBG · VB (varillas) · TPNC (tapón de cemento) · FLUIDO
+     puntuales (md):           TPN · PKR · ANCLA · BBA (bomba) · BHA · CARTEL
+   Los pads v0.5 (un único TBG desde superficie: tbg_od_in/tbg_md_m/…) se convierten al leerlos. */
+const INST_RANGE_TYPES=["TBG","VB","TPNC","FLUIDO"];
+const INST_LABEL={TBG:"TBG", TPN:"TPN", PKR:"PKR", TPNC:"TPN cemento", FLUIDO:"Fluido", CARTEL:"Cartel",
+  BHA:"BHA", ANCLA:"Ancla", BBA:"BBA", VB:"VB"};
+// varillas de bombeo: valor guardado → texto. "vastago" = vástago pulido (el más grueso).
+const VB_DIAMS=[["3/4",'3/4"'],["7/8",'7/8"'],["1",'1"'],["1.5",'1,5"'],["vastago","Vástago"]];
+const vbDiamLabel=d=>(VB_DIAMS.find(x=>x[0]===d)||[null,d||"?"])[1];
+/* color elegible por elemento (`el.color`, "#rrggbb"). Si no se eligió, cada vista usa el suyo:
+   el corte 2D estos (lo que muestra el selector del constructor) y la Vista 3D colores visibles
+   sobre fondo oscuro. Lo validamos: el pad puede venir de un JSON editado a mano. */
+const INST_DEFCOLOR={TBG:"#111111", VB:"#111111", TPNC:"#b9b9b9", FLUIDO:"#3a8ee6", TPN:"#111111",
+  PKR:"#111111", ANCLA:"#111111", BBA:"#c8a24a", BHA:"#26333f", CARTEL:"#111111"};
+const instColor=el=>/^#[0-9a-f]{6}$/i.test(el?.color||"")?el.color:null;
+function normInstallation(w){
+  const inst=w?.installation; if(!inst) return null;
+  const els=(inst.elements||[]).map(e=>({...e}));
+  if(inst.tbg_md_m!=null||inst.tbg_od_in!=null||inst.tbg_weight_ppf!=null||inst.tbg_grade){
+    let bottom=inst.tbg_md_m;
+    if(bottom==null){ const ais=(w.casings||[]).find(c=>c.phase==="produccion");
+      bottom=ais?.shoe_md ?? w.survey?.stations?.at(-1)?.md ?? null; }
+    els.unshift({type:"TBG", top_md:0, bottom_md:bottom, od_in:inst.tbg_od_in??null,
+      weight_ppf:inst.tbg_weight_ppf??null, grade:inst.tbg_grade??null});
+  }
+  return {elements:els};
+}
+/* ID (pulgadas) por OD y libraje: peso API de tubo liso w ≈ 10.68·(OD−t)·t  ⇒  ID = √(OD² − w/2.67)
+   (difiere <0,5% de las tablas API). Sin libraje: ID ≈ 0,87·OD (aproximado). */
+function casingID(od, wt){
+  if(od==null) return null;
+  if(wt==null) return od*0.87;
+  const v=od*od-wt/2.67; return v>0?Math.sqrt(v):null;
+}
+const PHASE_DEPTH={guia:0,intermedia1:1,intermedia2:2,produccion:3};
+/* capacidad (L/m) de la cañería más interna que cubre `md` (la del tramo telescopado si lo hay) */
+function capacityAt(casings, md){
+  let best=null;
+  for(const c of casings||[]) if(c.shoe_md!=null && c.shoe_md>=md-1e-6
+      && (!best || (PHASE_DEPTH[c.phase]??0)>(PHASE_DEPTH[best.phase]??0))) best=c;
+  if(!best) return null;
+  const sg=(best.segments||[]).find(s=>s.top_md!=null&&s.bottom_md!=null&&md>=s.top_md-1e-6&&md<=s.bottom_md+1e-6);
+  const id=casingID(sg?.od_in??best.od_in, sg?.weight_ppf??best.weight_ppf);
+  return id ? 0.506707*id*id : null;          // π/4·(ID·0.0254 m)²·1000 L/m³
+}
+// MDs donde cambia la cañería que contiene (zapatos y tramos telescopados)
+const casingCuts=casings=>(casings||[]).flatMap(c=>[c.shoe_md, ...(c.segments||[]).flatMap(s=>[s.top_md,s.bottom_md])]).filter(m=>m!=null);
+/* volumen (L) entre dos MD, integrando por tramos de cañería. null si falta el OD en algún tramo
+   o si el rango sale de la cañería (pozo abierto). */
+function volBetween(casings, a, b){
+  if(a==null||b==null) return null; if(b<a) [a,b]=[b,a];
+  const xs=[...new Set([a,b,...casingCuts(casings).filter(m=>m>a&&m<b)])].sort((x,y)=>x-y);
+  let v=0;
+  for(let i=1;i<xs.length;i++){ const cap=capacityAt(casings,(xs[i-1]+xs[i])/2); if(cap==null) return null;
+    v+=cap*(xs[i]-xs[i-1]); }
+  return v;
+}
+/* MD "hasta" que llena `liters` arrancando en `a` (inversa de volBetween) */
+function mdForVolume(casings, a, liters){
+  if(a==null||liters==null||liters<0) return null;
+  const cuts=[...new Set(casingCuts(casings).filter(m=>m>a))].sort((x,y)=>x-y);
+  let md=a, left=liters;
+  for(const next of cuts){
+    const cap=capacityAt(casings,(md+next)/2); if(!cap) return null;
+    if(md+left/cap<=next) return md+left/cap;
+    left-=cap*(next-md); md=next;
+  }
+  return null;                                 // más allá del zapato más profundo: no hay ID
+}
+/* volumen de un TPNC/FLUIDO: el guardado (calculado al generar el pad) o calculado al vuelo */
+const instVolume=(w,el)=>el.volume_l ?? volBetween(w.casings, el.top_md, el.bottom_md);
+const fmtVol=L=>L==null?"":`${Math.round(L).toLocaleString("es-AR")} L`;
+const fmtDec=(v,d=2)=>String(+(+v).toFixed(d)).replace(".",",");
+/* ==== FIN instalación (modelo puro) ==== */
+
 /* world transform: (x=E/O, y=N/S, tvd abajo) → three Y-up.
    El Este se mapea a -X (no +X) para que el marco sea diestro y geográficamente correcto:
    con Este=+X, Norte=+Z, Arriba=+Y el producto E×N daba "abajo" (marco zurdo) y el par E/O
@@ -337,6 +414,7 @@ let LAST_WARN="";
 function buildPad(pad){
   clearWorld(); PAD=pad;
   const wells=pad.pad.wells;
+  wells.forEach(w=>{ if(w.installation) w.installation=normInstallation(w); });   // pads v0.5 → lista de elementos
   document.getElementById("foot-pad").textContent=pad.pad.id;
   document.getElementById("foot-wells").textContent=wells.length;
 
@@ -585,39 +663,84 @@ function buildPad(pad){
       addLabel(`Etapa ${stg.stage}`, toThree(p.x,p.y,p.tvd).add(new THREE.Vector3(0, prodR*9, 0)), "stage", w.id);
     });
 
-    // --- INSTALACIÓN: TBG (caño fino desde superficie hasta su MD final) + TPN/PKR ---
+    // --- INSTALACIÓN (v0.6): elementos tipados — rangos como tubos sobre la trayectoria, puntuales
+    // como anillos/sólidos orientados al eje. Todo kind "install" (capa y etiquetas "Instalación").
     if(w.installation){
-      const inst=w.installation;
-      // fondo del TBG = MD final indicada (obligatoria). Fallback histórico si faltara.
-      let instBottom=inst.tbg_md_m;
-      if(instBottom==null){
-        (w.frac?.stages||[]).forEach(s=>(s.clusters||[]).forEach(cl=>{ const m=cl.bottom_md??cl.top_md; if(m!=null) instBottom=Math.max(instBottom??0,m); }));
-        if(instBottom==null){ const ais=(w.casings||[]).find(c=>c.phase==="produccion"); instBottom=ais?.shoe_md ?? st.at(-1).md; }
-      }
       const tbgR=prodR*0.5;
-      const seg=[]; for(const s of st){ if(s.md<=instBottom) seg.push(toThree(wx+(s.ew||0),s.ns||0,s.tvd)); }
-      const bp=interpAtMD(st,instBottom,wx); seg.push(toThree(bp.x,bp.y,bp.tvd));
-      if(seg.length>=2){
-        const tube=new THREE.Mesh(
-          new THREE.TubeGeometry(new THREE.CatmullRomCurve3(seg), Math.max(80,seg.length), tbgR, 12, false),
-          new THREE.MeshStandardMaterial({color:0x00c2d1, metalness:.2, roughness:.5, emissive:0x00343a, emissiveIntensity:.4}));
-        tube.userData.kind="install"; tube.userData.wellId=w.id; g.add(tube);
-        if(inst.tbg_od_in!=null){
-          const tbgSpec=[`TBG ${fmtOD(inst.tbg_od_in)}`];
-          if(inst.tbg_weight_ppf!=null) tbgSpec.push(`${inst.tbg_weight_ppf} lb/ft`);
-          if(inst.tbg_grade) tbgSpec.push(inst.tbg_grade);
-          addLabel(tbgSpec.join(" "), toThree(bp.x,bp.y,bp.tvd).add(new THREE.Vector3(0, tbgR*6, 0)), "install", w.id);
+      const at=md=>{ const p=interpAtMD(st,md,wx); return toThree(p.x,p.y,p.tvd); };
+      const mark=(o)=>{ o.userData.kind="install"; o.userData.wellId=w.id; g.add(o); return o; };
+      const lbl=(txt,md,up)=>addLabel(txt, at(md).add(new THREE.Vector3(0, up, 0)), "install", w.id);
+      // tubo entre dos MD siguiendo el survey (estaciones intermedias + extremos interpolados)
+      const rangeTube=(a,b,R,mat)=>{
+        if(a==null||b==null||b-a<0.01) return;
+        const seg=[at(a)]; for(const s of st) if(s.md>a && s.md<b) seg.push(toThree(wx+(s.ew||0),s.ns||0,s.tvd));
+        seg.push(at(b));
+        mark(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(seg), Math.max(40,seg.length*2), R, 14, false), mat));
+      };
+      // sólido de revolución centrado en md, eje = tangente del pozo
+      const axial=(geo,mat,md)=>{ const m=new THREE.Mesh(geo,mat);
+        m.quaternion.copy(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0), tangentAtMD(md)));
+        m.position.copy(at(md)); return mark(m); };
+      const std=(color,extra={})=>new THREE.MeshStandardMaterial({color, metalness:.2, roughness:.5, ...extra});
+      let nFluid=0;
+      // con varillas cargadas el TBG se vuelve traslúcido para verlas adentro
+      const hasVB=(w.installation.elements||[]).some(el=>el.type==="VB");
+      (w.installation.elements||[]).forEach(el=>{
+        const a=el.top_md, b=el.bottom_md, mid=(a!=null&&b!=null)?(a+b)/2:null;
+        const C=def=>instColor(el)??def;                 // color elegido, o el default 3D del tipo
+        const rng=()=>`${Math.round(a)}–${Math.round(b)}`;
+        switch(el.type){
+          case "TBG":
+            rangeTube(a,b,tbgR,std(C(0x00c2d1),{emissive:0x00343a, emissiveIntensity:.4,
+              ...(hasVB?{transparent:true, opacity:.4, depthWrite:false}:{})}));
+            if(b!=null) lbl([el.od_in!=null?`TBG ${fmtOD(el.od_in)}`:"TBG", el.weight_ppf!=null?`${el.weight_ppf} lb/ft`:null, el.grade,
+              `· MD ${rng()}`].filter(Boolean).join(" "), b, tbgR*6);
+            break;
+          case "VB":
+            rangeTube(a,b,tbgR*0.28,std(C(0x30363d)));
+            if(b!=null) lbl(["VB", el.diam?vbDiamLabel(el.diam):null, el.cc?"c/ CC":null, `· MD ${rng()}`].filter(Boolean).join(" "), b, tbgR*4);
+            break;
+          case "TPNC":
+            rangeTube(a,b,prodR*0.92,std(C(0x9a9a9a),{roughness:.95, transparent:true, opacity:.9}));
+            if(mid!=null) lbl(["TPN cemento", `MD ${rng()}`, fmtVol(instVolume(w,el))].filter(Boolean).join(" · "), mid, prodR*6);
+            break;
+          case "FLUIDO":{
+            // radio levemente decreciente por fluido: los solapados no se pisan (z-fighting)
+            const R=prodR*Math.max(0.55, 0.9-0.07*nFluid++);
+            rangeTube(a,b,R,std(C("#3a8ee6"),{transparent:true, opacity:.5, depthWrite:false}));
+            if(mid!=null) lbl([el.name||"Fluido", el.density_gcm3!=null?`${fmtDec(el.density_gcm3)} g/cm³`:null,
+              `MD ${rng()}`, fmtVol(instVolume(w,el))].filter(Boolean).join(" · "), mid, prodR*6);
+            break; }
+          case "TPN": case "PKR": case "ANCLA":{
+            if(el.md==null) break;
+            const isPkr=el.type==="PKR", isAn=el.type==="ANCLA";
+            const R2=prodR*(isPkr?1.28:isAn?1.2:1.12), H2=prodR*(isPkr?1.2:isAn?1.5:0.9);
+            axial(new THREE.CylinderGeometry(R2,R2,H2,20), std(C(isPkr?0x3fb950:isAn?0xd96bd0:0xf2a03d)), el.md);
+            lbl(`${INST_LABEL[el.type]} · MD ${Math.round(el.md)}`, el.md, prodR*6);
+            break; }
+          case "BBA":
+            if(el.md==null) break;
+            axial(new THREE.CylinderGeometry(tbgR*1.3,tbgR*1.3,prodR*3.5,16), std(C(0xc8a24a),{emissive:0x1d2228, emissiveIntensity:.5}), el.md);
+            lbl(`BBA · MD ${Math.round(el.md)}`, el.md, prodR*6);
+            break;
+          case "BHA":{
+            if(el.md==null) break;
+            // fresa = cono con la punta en el MD apuntando pozo abajo; con MDF suma el cuerpo del motor
+            const tan=tangentAtMD(el.md), Lf=prodR*2.4, mat=std(C(0x6a8299));
+            const cone=new THREE.Mesh(new THREE.ConeGeometry(prodR*0.85, Lf, 18), mat);
+            cone.quaternion.copy(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0), tan));
+            cone.position.copy(at(el.md).sub(tan.clone().multiplyScalar(Lf/2))); mark(cone);
+            if(el.mdf){ const Lm=prodR*5;
+              const body=new THREE.Mesh(new THREE.CylinderGeometry(prodR*0.45,prodR*0.45,Lm,14), mat);
+              body.quaternion.copy(cone.quaternion);
+              body.position.copy(at(el.md).sub(tan.clone().multiplyScalar(Lf+Lm/2))); mark(body); }
+            lbl(`BHA${el.mdf?" c/ MDF":""} · MD ${Math.round(el.md)}`, el.md, prodR*6);
+            break; }
+          case "CARTEL":
+            if(el.md!=null && el.text){ const o=lbl(el.text, el.md, prodR*6);
+              if(instColor(el)) o.el.style.borderColor=o.el.style.color=instColor(el); }   // solo si se eligió
+            break;
         }
-      }
-      (inst.elements||[]).forEach(el=>{
-        if(el.md==null) return;
-        const p=interpAtMD(st,el.md,wx); const center=toThree(p.x,p.y,p.tvd);
-        const isPkr=el.type==="PKR"; const R2=prodR*(isPkr?1.28:1.12), H2=prodR*(isPkr?1.2:0.9);
-        const mk=new THREE.Mesh(new THREE.CylinderGeometry(R2,R2,H2,20),
-          new THREE.MeshStandardMaterial({color:isPkr?0x3fb950:0xf2a03d, metalness:.2, roughness:.5}));
-        mk.quaternion.copy(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0), tangentAtMD(el.md)));
-        mk.position.copy(center); mk.userData.kind="install"; mk.userData.wellId=w.id; g.add(mk);
-        addLabel(`${el.type} · MD ${Math.round(el.md)}`, center.clone().add(new THREE.Vector3(0, prodR*6, 0)), "install", w.id);
       });
     }
 
@@ -1370,11 +1493,8 @@ function syncBuilderFromPad(pad){
     (w.casings||[]).forEach(c=>{ casings[c.phase]={od_in:c.od_in??null, shoe_md:c.shoe_md??null,
       toc_md:c.toc_md??null, weight_ppf:c.weight_ppf??null, grade:c.grade??null,
       segments:c.segments||undefined, short_joints:c.short_joints||undefined}; });
-    const inst=w.installation ? {enabled:true, tbg_od:w.installation.tbg_od_in??null,
-        tbg_weight:w.installation.tbg_weight_ppf??null, tbg_grade:w.installation.tbg_grade??null,
-        tbg_md:w.installation.tbg_md_m??null,
-        elements:(w.installation.elements||[]).map(el=>({type:el.type, md:el.md}))}
-      : {enabled:false, tbg_od:null, tbg_weight:null, tbg_grade:null, tbg_md:null, elements:[]};
+    const ni=normInstallation(w);
+    const inst=ni ? {enabled:true, elements:ni.elements.map(el=>({...el}))} : {enabled:false, elements:[]};
     const prod=(w.casings||[]).find(c=>c.phase==="produccion");
     const stEls=prod?.shoetrack?.elements||[];
     const shoetrack = stEls.length ? {enabled:true, elements:stEls.map(el=>({desc:el.desc,
@@ -1907,29 +2027,67 @@ function phaseBlock(i,ph,label,c){ c=c||{};
       <label>TOC MD<input type="number" data-w="${i}" data-ph="${ph}" data-c="toc" value="${c.toc_md??""}"></label>
     </div>${segmentsList(c)}${ph==="produccion"?shortsList(c):""}</div>`;
 }
+/* Instalación (v0.6): lista de elementos, uno por fila, agregados con botones. Cada input lleva
+   data-if = nombre del campo del elemento (mismo nombre que en el pad JSON). */
+const INST_ADD=[["TBG","TBG"],["TPN","TPN"],["PKR","PKR"],["TPNC","TPN cemento"],["FLUIDO","FLUIDO"],
+  ["ANCLA","ANCLA"],["BBA","BBA"],["VB","VB"],["BHA","BHA"],["CARTEL","Cartel"]];
+const INST_NUM_FIELDS=["md","top_md","bottom_md","volume_l","density_gcm3","od_in","weight_ppf"];
+const FLUID_COLORS=["#3a8ee6","#e0a33a","#4caf50","#d64545","#9b59b6","#17a2b8"];
+// cañerías del constructor (objeto por fase) → array con `phase`, como en el pad
+const builderCasings=w=>Object.entries(w.casings||{}).filter(([,c])=>c).map(([phase,c])=>({phase,...c}));
+function capHint(w,el){
+  if(el.top_md==null) return "";
+  const cap=capacityAt(builderCasings(w), el.top_md);
+  return cap==null ? "⚠ sin cañería en ese MD (cargá OD/zapato)" : `${fmtDec(cap)} L/m`;
+}
+function instRow(i,w,el,k){
+  const a=f=>`data-w="${i}" data-ie="${k}" data-if="${f}"`;
+  const num=(f,ph,wd=86)=>`<input type="number" step="any" ${a(f)} value="${el[f]??""}" placeholder="${ph}" style="width:${wd}px">`;
+  const txt=(f,ph,wd)=>`<input type="text" ${a(f)} value="${escAttr(el[f]??"")}" placeholder="${ph}" style="width:${wd}px">`;
+  const chk=(f,lbl,title)=>`<label class="inst-chk" title="${title}"><input type="checkbox" ${a(f)} ${el[f]?"checked":""}>${lbl}</label>`;
+  const sel=(f,html,title)=>`<select ${a(f)} title="${title}">${html}</select>`;
+  const cap=`<span class="inst-cap">${capHint(w,el)}</span>`;
+  let body;
+  switch(el.type){
+    case "TBG": body=num("top_md","desde (0)")+num("bottom_md","hasta MD")
+      +sel("od_in",tbgOptions(el.od_in),"OD")+sel("weight_ppf",tbgWtOptions(el.od_in,el.weight_ppf),"lb/ft")
+      +sel("grade",grOptions(el.grade),"Acero"); break;
+    case "VB": body=num("top_md","desde (0)")+num("bottom_md","hasta MD")
+      +sel("diam",`<option value="">Ø —</option>`+VB_DIAMS.map(([v,t])=>opt(v,t,el.diam)).join(""),"Diámetro de varilla")
+      +chk("cc","CC","Con centralizadores"); break;
+    case "TPNC": body=num("top_md","desde MD")+num("bottom_md","hasta MD")+num("volume_l","vol (L)")+cap; break;
+    case "FLUIDO": body=txt("name","nombre",110)+num("density_gcm3","dens. g/cm³",92)
+      +num("top_md","desde MD")+num("bottom_md","hasta MD")+num("volume_l","vol (L)")+cap; break;
+    case "CARTEL": body=num("md","MD (m)")+txt("text","texto del cartel",230); break;
+    case "BHA": body=num("md","MD (m)")+chk("mdf","MDF","Con motor de fondo"); break;
+    default: body=num("md","MD (m)");                     // TPN · PKR · ANCLA · BBA
+  }
+  const col=`<input type="color" class="inst-color" ${a("color")} value="${instColor(el)||INST_DEFCOLOR[el.type]||"#111111"}"
+    title="Color del elemento${el.type==="FLUIDO"?"":" (sin tocar: el de cada vista)"}">`;
+  return `<div class="inst-el"><span class="inst-tag">${INST_LABEL[el.type]||el.type}</span>${col}${body}
+    <button class="btn" data-w="${i}" data-ie="${k}" data-iact="del" title="Quitar">✕</button></div>`;
+}
 function instBlock(i,w){
   const ins=w.install||{};
-  const els=(ins.elements||[]).map((el,k)=>`<div class="inst-el">
-      <select data-w="${i}" data-ie="${k}" data-if="type">
-        ${opt("TPN","TPN (tapón)",el.type)}${opt("PKR","PKR (packer)",el.type)}</select>
-      <input type="number" data-w="${i}" data-ie="${k}" data-if="md" value="${el.md??""}" placeholder="MD (m)">
-      <button class="btn" data-w="${i}" data-ie="${k}" data-iact="del">✕</button></div>`).join("");
-  return `<div class="inst-wrap collapsed">
+  const rows=(ins.elements||[]).map((el,k)=>instRow(i,w,el,k)).join("");
+  return `<div class="inst-wrap${w._open?.inst?"":" collapsed"}" data-blk="inst" data-bw="${i}">
     <div class="inst-head"><span class="caret">▸</span><span class="inst-title">Instalación</span>
       <span class="inst-sub">completación · dentro de la aislación</span>
       <label class="inst-en"><input type="checkbox" data-w="${i}" data-iact="enable" ${ins.enabled?"checked":""}> activar</label></div>
     <div class="inst-body${ins.enabled?"":" disabled"}">
-      <div class="cas-grid" style="margin-left:0">
-        <label>TBG OD<select data-w="${i}" data-iact="tbg-od">${tbgOptions(ins.tbg_od)}</select></label>
-        <label>lb/ft<select data-w="${i}" data-iact="tbg-wt">${tbgWtOptions(ins.tbg_od,ins.tbg_weight)}</select></label>
-        <label>Acero<select data-w="${i}" data-iact="tbg-gr">${grOptions(ins.tbg_grade)}</select></label>
-        <label>MD final (m) *<input type="number" data-w="${i}" data-iact="tbg-md" value="${ins.tbg_md??""}"></label>
-      </div>
-      <div class="stub" style="font-size:10px">* profundidad (MD desde superficie) hasta donde baja la sarta de TBG. Obligatorio.</div>
-      <div class="inst-list">${els}</div>
-      <div><button class="btn" data-w="${i}" data-iact="add-TPN">+ TPN</button>
-        <button class="btn" data-w="${i}" data-iact="add-PKR">+ PKR</button></div>
+      ${rows?`<div class="inst-list">${rows}</div>`:`<div class="stub" style="font-size:10px">Agregá elementos con los botones. Rangos en MD (m); TBG y VB arrancan en 0 si "desde" queda vacío. En TPN cemento y fluidos, desde+hasta calcula el volumen y desde+volumen ajusta el hasta (ID de la cañería).</div>`}
+      <div class="inst-add">${INST_ADD.map(([t,lbl])=>`<button class="btn" data-w="${i}" data-iact="add" data-itype="${t}">+ ${lbl}</button>`).join("")}</div>
     </div></div>`;
+}
+/* TPN cemento / fluido: desde+hasta → volumen; volumen → hasta (desde fijo). Actualiza los inputs
+   hermanos sin re-renderizar (no se pierde el foco). */
+function syncInstVolume(w,el,f,row){
+  const cas=builderCasings(w);
+  if(f==="volume_l"){ const h=mdForVolume(cas, el.top_md, el.volume_l);
+    if(h!=null){ el.bottom_md=+h.toFixed(1); const hb=row.querySelector('[data-if="bottom_md"]'); if(hb) hb.value=el.bottom_md; } }
+  else if(f==="top_md"||f==="bottom_md"){ const v=volBetween(cas, el.top_md, el.bottom_md);
+    if(v!=null){ el.volume_l=Math.round(v); const vb=row.querySelector('[data-if="volume_l"]'); if(vb) vb.value=el.volume_l; } }
+  const cs=row.querySelector(".inst-cap"); if(cs) cs.textContent=capHint(w,el);
 }
 function shoetrackBlock(i,w){
   const s=w.shoetrack||{enabled:false,elements:[]};
@@ -1938,7 +2096,7 @@ function shoetrackBlock(i,w){
       <input type="number" data-w="${i}" data-se="${k}" data-sf="top" value="${el.top_md??""}" placeholder="tope MD">
       <input type="number" data-w="${i}" data-se="${k}" data-sf="len" value="${el.length_m??""}" placeholder="largo m">
       <button class="btn" data-w="${i}" data-se="${k}" data-sact="del">✕</button></div>`).join("");
-  return `<div class="inst-wrap collapsed">
+  return `<div class="inst-wrap${w._open?.st?"":" collapsed"}" data-blk="st" data-bw="${i}">
     <div class="inst-head"><span class="caret">▸</span><span class="inst-title">Shoetrack</span>
       <span class="inst-sub">zapato, collar, camisas, cortos · autocarga del tally</span>
       <label class="inst-en"><input type="checkbox" data-w="${i}" data-sact="enable" ${s.enabled?"checked":""}> activar</label></div>
@@ -1953,7 +2111,7 @@ function shoetrackBlock(i,w){
 function fracBlock(i,w){
   const n=w.frac?(w.frac.stages||[]).length:0;
   const enabled = w.fracEnabled!==false && n>0 ? true : !!w.fracEnabled;
-  return `<div class="inst-wrap collapsed" data-fracwrap="${i}">
+  return `<div class="inst-wrap${w._open?.frac?"":" collapsed"}" data-blk="frac" data-bw="${i}" data-fracwrap="${i}">
     <div class="inst-head"><span class="caret">▸</span><span class="inst-title">Fracplan</span>
       <span class="inst-sub">${n} etapa(s) · tapones y punzados</span>
       <label class="inst-en"><input type="checkbox" data-w="${i}" data-fact="enable" ${enabled?"checked":""}> activar</label></div>
@@ -2003,11 +2161,11 @@ function fracFromRows(rows){
 function renderWellCards(){
   const n=parseInt(document.getElementById("b-nwells").value,10)||0;
   const cont=document.getElementById("b-wells");
-  while(ING.wells.length<n) ING.wells.push({id:"", survey:null, frac:null, casings:{}, install:{enabled:false,tbg_od:null,elements:[]}, shoetrack:{enabled:false,elements:[]}});
+  while(ING.wells.length<n) ING.wells.push({id:"", survey:null, frac:null, casings:{}, install:{enabled:false,elements:[]}, shoetrack:{enabled:false,elements:[]}});
   ING.wells.length=n;
   cont.innerHTML="";
   for(let i=0;i<n;i++){
-    const w=ING.wells[i]; if(!w.install) w.install={enabled:false,tbg_od:null,elements:[]};
+    const w=ING.wells[i]; if(!w.install) w.install={enabled:false,elements:[]};
     if(!w.shoetrack) w.shoetrack={enabled:false,elements:[]}; if(!w.casings) w.casings={};
     if(w.fracEnabled==null) w.fracEnabled=!!(w.frac&&(w.frac.stages||[]).length);
     const card=document.createElement("div"); card.className="well-card"+(w._collapsed?" collapsed":"");
@@ -2031,6 +2189,7 @@ function renderWellCards(){
       ${PHASES.map(([ph,label])=>phaseBlock(i,ph,label,w.casings[ph])+(ph==="produccion"?instBlock(i,w)+shoetrackBlock(i,w)+fracBlock(i,w):"")).join("")}
       </div>`;
     cont.appendChild(card);
+    if(w._open?.frac) fillFracBody(i);        // bloque fracplan abierto: se rellena (es perezoso)
   }
   const btn=document.getElementById("b-collapse-all");
   if(btn) btn.textContent=ING.wells.some(w=>!w._collapsed)?"Colapsar pozos":"Expandir pozos";
@@ -2056,16 +2215,15 @@ function onWellField(e){
     else if(f==="toc") cas.toc_md=v===""?null:parseFloat(v);
     return;
   }
-  if(t.dataset.if){ const el=w.install.elements[+t.dataset.ie]; if(!el) return;
-    if(t.dataset.if==="type") el.type=t.value; else if(t.dataset.if==="md") el.md=t.value===""?null:parseFloat(t.value);
+  if(t.dataset.if){ const el=w.install.elements[+t.dataset.ie]; if(!el) return; const f=t.dataset.if;
+    if(t.type==="checkbox") el[f]=t.checked;
+    else if(INST_NUM_FIELDS.includes(f)){ const v=parseFloat(t.value); el[f]=isFinite(v)?v:null; }
+    else el[f]=t.value||null;                  // texto / color / Ø de varilla / acero
+    const row=t.closest(".inst-el");
+    if(f==="od_in"){ const ws=row.querySelector('[data-if="weight_ppf"]');   // libraje según OD del TBG
+      if(ws) ws.innerHTML=tbgWtOptions(el.od_in,null); el.weight_ppf=null; }
+    if(el.type==="TPNC"||el.type==="FLUIDO") syncInstVolume(w,el,f,row);
     return; }
-  const ia=t.dataset.iact;
-  if(ia==="tbg-od"){ w.install.tbg_od=t.value===""?null:parseFloat(t.value);
-    const wtSel=t.closest(".cas-grid").querySelector('[data-iact="tbg-wt"]');
-    if(wtSel){ wtSel.innerHTML=tbgWtOptions(w.install.tbg_od,null); } w.install.tbg_weight=null; return; }
-  if(ia==="tbg-wt"){ w.install.tbg_weight=t.value===""?null:parseFloat(t.value); return; }
-  if(ia==="tbg-gr"){ w.install.tbg_grade=t.value||null; return; }
-  if(ia==="tbg-md"){ w.install.tbg_md=t.value===""?null:parseFloat(t.value); return; }
   if(t.dataset.sf){ if(!w.shoetrack) return; const el=w.shoetrack.elements[+t.dataset.se]; if(!el) return;
     if(t.dataset.sf==="desc") el.desc=t.value;
     else if(t.dataset.sf==="top") el.top_md=t.value===""?null:parseFloat(t.value);
@@ -2086,7 +2244,19 @@ document.getElementById("b-wells").addEventListener("click",e=>{
     if(act==="enable"){ w.install.enabled=e.target.checked;
       const body=ti.closest(".inst-wrap").querySelector(".inst-body");
       if(body) body.classList.toggle("disabled",!e.target.checked); return; }   // visible pero no editable
-    if(act==="add-TPN"||act==="add-PKR"){ w.install.elements.push({type:act.slice(4), md:null}); renderWellCards(); return; }
+    if(act==="add"){ const type=ti.dataset.itype, el={type};
+      if(INST_RANGE_TYPES.includes(type)){ el.top_md=null; el.bottom_md=null; } else el.md=null;
+      if(type==="FLUIDO"){ const nf=w.install.elements.filter(x=>x.type==="FLUIDO").length;
+        Object.assign(el,{name:null, color:FLUID_COLORS[nf%FLUID_COLORS.length], density_gcm3:null, volume_l:null}); }
+      if(type==="TPNC") el.volume_l=null;
+      if(type==="BHA") el.mdf=false;
+      if(type==="VB") Object.assign(el,{diam:null, cc:false});
+      if(type==="CARTEL") el.text=null;
+      w.install.elements.push(el); (w._open||(w._open={})).inst=true; renderWellCards();
+      // foco en el primer campo de la fila nueva
+      const rows=document.querySelectorAll(`.inst-wrap[data-blk="inst"][data-bw="${i}"] .inst-el`);
+      rows[rows.length-1]?.querySelector("input:not([type=color]),select")?.focus();
+      return; }
     if(act==="del"){ w.install.elements.splice(+ti.dataset.ie,1); renderWellCards(); return; }
   } else if(ts){ const i=+ts.dataset.w, w=ING.wells[i]; if(!w) return; if(!w.shoetrack) w.shoetrack={enabled:false,elements:[]};
     const act=ts.dataset.sact;
@@ -2113,6 +2283,8 @@ document.getElementById("b-wells").addEventListener("click",e=>{
   if(head && !e.target.closest(".inst-en")){       // el checkbox "activar" no colapsa
     const wrap=head.parentElement;
     const collapsed=wrap.classList.toggle("collapsed");   // la clase oculta el cuerpo por CSS
+    const bw=ING.wells[+wrap.dataset.bw];
+    if(bw && wrap.dataset.blk) (bw._open||(bw._open={}))[wrap.dataset.blk]=!collapsed;
     if(!collapsed && wrap.dataset.fracwrap!=null) fillFracBody(+wrap.dataset.fracwrap);   // fracplan perezoso
     return;
   }
@@ -2273,7 +2445,7 @@ document.getElementById("b-wells").addEventListener("click",e=>{
 function synthVertical(w){
   let td=0;
   Object.values(w.casings||{}).forEach(c=>{ if(c.shoe_md) td=Math.max(td,c.shoe_md); if(c.toc_md) td=Math.max(td,c.toc_md); });
-  (w.install?.elements||[]).forEach(el=>{ if(el.md) td=Math.max(td,el.md); });
+  (w.install?.elements||[]).forEach(el=>{ for(const m of [el.md, el.bottom_md]) if(m) td=Math.max(td,m); });
   (w.frac?.stages||[]).forEach(s=>(s.clusters||[]).forEach(cl=>{ const m=cl.bottom_md??cl.top_md; if(m) td=Math.max(td,m); }));
   if(td<=0) td=1000;
   const stations=[]; for(let md=0; md<td; md+=100) stations.push({md, incl:0, azim:0, tvd:md, ns:0, ew:0, vsec:md, dls:0});
@@ -2314,11 +2486,27 @@ function assemblePad(){
       architecture:vertical?"vertical":"horizontal",
       wellhead:{x:i*spacing, y:0, rkb_elev_m:rkb, ground_elev_m:rkb},
       survey, casings, frac:(w.fracEnabled===false)?{total_stages:0,stages:[]}:(w.frac||{total_stages:0, stages:[]}) };
-    if(w.install?.enabled && (w.install.tbg_od!=null || w.install.tbg_md!=null || (w.install.elements||[]).some(el=>el.md!=null))){
-      if(w.install.tbg_md==null){ toast(`Indicá la MD final del TBG en el pozo ${w.id||i+1}`); err=1; return; }
-      wobj.installation={ tbg_od_in:w.install.tbg_od??null, tbg_weight_ppf:w.install.tbg_weight??null,
-        tbg_grade:w.install.tbg_grade??null, tbg_md_m:w.install.tbg_md,
-        elements:(w.install.elements||[]).filter(el=>el.md!=null).map(el=>({type:el.type, md:el.md})) };
+    // instalación: filas vacías se ignoran; rangos incompletos frenan la generación con aviso.
+    // TPN cemento / fluidos: el volumen se recalcula acá con las cañerías finales (queda en el pad).
+    if(w.install?.enabled){
+      const els=[];
+      for(const el0 of w.install.elements||[]){
+        const el={...el0}, t=el.type, who=`${INST_LABEL[t]||t} del pozo ${w.id||i+1}`;
+        if(INST_RANGE_TYPES.includes(t)){
+          if(el0.top_md==null && el0.bottom_md==null && el0.volume_l==null) continue;
+          if(t==="TBG"||t==="VB") el.top_md=el.top_md??0;           // sin "desde": boca de pozo
+          if(el.bottom_md==null && el.top_md!=null && el.volume_l!=null){
+            const h=mdForVolume(casings, el.top_md, el.volume_l); if(h!=null) el.bottom_md=+h.toFixed(1); }
+          if(el.top_md==null || el.bottom_md==null){ toast(`Indicá desde y hasta (MD) de ${who}`); err=1; return; }
+          if(el.bottom_md<el.top_md) [el.top_md,el.bottom_md]=[el.bottom_md,el.top_md];
+          if(t==="TPNC"||t==="FLUIDO"){ const v=volBetween(casings, el.top_md, el.bottom_md); if(v!=null) el.volume_l=Math.round(v); }
+        } else {
+          if(el.md==null){ if(t==="CARTEL" && el.text){ toast(`Indicá la MD de ${who}`); err=1; return; } continue; }
+          if(t==="CARTEL" && !el.text) continue;
+        }
+        els.push(el);
+      }
+      if(els.length) wobj.installation={elements:els};
     }
     wells.push(wobj);
   });
@@ -2342,6 +2530,28 @@ document.getElementById("b-download").addEventListener("click",()=>{
 });
 renderWellCards();
 
+/* filas de la instalación para las tablas resumen: nombre, OD/Ø, MD o rango, detalle */
+function instSummaryRows(w){
+  return (w.installation?.elements||[]).map(el=>{
+    const where=(el.top_md!=null&&el.bottom_md!=null)?`${Math.round(el.top_md)}–${Math.round(el.bottom_md)} m`
+      : el.md!=null?`${Math.round(el.md)} m`:"—";
+    let od="—", det="";
+    switch(el.type){
+      case "TBG": if(el.od_in!=null) od=fmtOD(el.od_in);
+        det=[el.weight_ppf!=null?el.weight_ppf+" lb/ft":null, el.grade].filter(Boolean).join(" · "); break;
+      case "VB": if(el.diam) od=vbDiamLabel(el.diam); det=el.cc?"varillas c/ centralizadores":"varillas de bombeo"; break;
+      case "TPNC": det=fmtVol(instVolume(w,el)); break;
+      case "FLUIDO": det=[el.name, el.density_gcm3!=null?fmtDec(el.density_gcm3)+" g/cm³":null, fmtVol(instVolume(w,el))].filter(Boolean).join(" · "); break;
+      case "TPN": det="tapón"; break;
+      case "PKR": det="packer"; break;
+      case "ANCLA": det="ancla"; break;
+      case "BBA": det="bomba"; break;
+      case "BHA": det=el.mdf?"con motor de fondo (MDF)":"fresa"; break;
+      case "CARTEL": det=el.text||""; break;
+    }
+    return {name:INST_LABEL[el.type]||el.type, od, where, det};
+  });
+}
 function updateSummary(){
   if(!PAD) return;
   let out="";
@@ -2366,14 +2576,10 @@ function updateSummary(){
           +`<td colspan="3" class="dim">${el.length_m!=null?el.length_m+" m":""}${el.desc?" · "+el.desc:""}</td>`}));
       }
     });
-    if(w.installation){ const ins=w.installation;
-      const tbgTxt=[ins.tbg_od_in!=null?"TBG "+fmtOD(ins.tbg_od_in):"—",
-        ins.tbg_weight_ppf!=null?ins.tbg_weight_ppf+" lb/ft":null, ins.tbg_grade,
-        ins.tbg_md_m!=null?"MD "+Math.round(ins.tbg_md_m)+" m":null].filter(Boolean).join(" · ");
-      rws.push({cls:"inst", c:`<td>Instalación</td><td colspan="2">${tbgTxt}</td>`
-        +`<td colspan="3" class="dim">${(ins.elements||[]).length} elemento(s)</td>`});
-      (ins.elements||[]).forEach(el=>rws.push({cls:"inst", c:`<td>↳ ${el.type}</td><td>—</td>`
-        +`<td class="num">${Math.round(el.md)} m</td><td colspan="3" class="dim">${el.type==="PKR"?"packer":"tapón"}</td>`}));
+    if(w.installation){ const ir=instSummaryRows(w);
+      rws.push({cls:"inst", c:`<td>Instalación</td><td colspan="2">—</td><td colspan="3" class="dim">${ir.length} elemento(s)</td>`});
+      ir.forEach(r=>rws.push({cls:"inst", c:`<td>↳ ${escHtml(r.name)}</td><td>${escHtml(r.od)}</td>`
+        +`<td class="num">${r.where}</td><td colspan="3" class="dim">${escHtml(r.det)}</td>`}));
     }
     if(!rws.length) rws.push({cls:"dim", c:`<td colspan="6">sin cañerías cargadas</td>`});
     const meta=`${mdf} m · ${w.frac?.total_stages||0} et${w.architecture==="vertical"?" · vert":""}`;
@@ -2413,13 +2619,9 @@ function summaryTableData(){
           `${el.length_m!=null?el.length_m+" m":""}${el.desc?" · "+el.desc:""}`,"",""],"cc"));
       }
     });
-    if(w.installation){ const ins=w.installation;
-      const tbgTxt=[ins.tbg_od_in!=null?"TBG "+fmtOD(ins.tbg_od_in):"—",
-        ins.tbg_weight_ppf!=null?ins.tbg_weight_ppf+" lb/ft":null, ins.tbg_grade,
-        ins.tbg_md_m!=null?"MD "+Math.round(ins.tbg_md_m)+" m":null].filter(Boolean).join(" · ");
-      push(["Instalación",tbgTxt,"",`${(ins.elements||[]).length} elemento(s)`,"",""],"inst");
-      (ins.elements||[]).forEach(el=>push([`↳ ${el.type}`,"—",`${Math.round(el.md)} m`,
-        el.type==="PKR"?"packer":"tapón","",""],"inst"));
+    if(w.installation){ const ir=instSummaryRows(w);
+      push(["Instalación","—","",`${ir.length} elemento(s)`,"",""],"inst");
+      ir.forEach(r=>push([`↳ ${r.name}`, r.od, r.where, r.det, "", ""],"inst"));
     }
     if(first) push(["sin cañerías cargadas","","","","",""],"dim");
   });
@@ -2665,6 +2867,8 @@ export {
   SHOW_TPN_LABELS, SHOW_STAGE_LABELS, SHOW_SHOE_LABELS, SHOW_SHORT_LABELS,
   SHOW_INSTALL_LABELS, SHOW_SHOETRACK_LABELS, SHOW_TOC_LABELS,
   buildPad, setView, frameAll, toThree, interpAtMD, fmtOD, casingRadius,
+  normInstallation, instVolume, volBetween, capacityAt, fmtVol, fmtDec, vbDiamLabel, INST_LABEL,
+  INST_DEFCOLOR, instColor,
   setDiamExagForExport, parseStages,
   escHtml, escAttr, onResize,
   WELL_COLORS, OD_IN, CASING_COLOR, PHASE_LABEL, PERF_LIGHT, PERF_DARK,

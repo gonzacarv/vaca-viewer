@@ -136,20 +136,37 @@ los archivos de origen adjuntos para trazabilidad).
     "planned_vs_actual": "planned"  // "planned" | "actual"
   },
 
-  // --- INSTALACIÓN (opcional): TBG de producción + tapones/packers de completación ---
-  // El TBG se dibuja como caño fino desde superficie hasta la punta del fracplan.
+  // --- INSTALACIÓN (opcional, v0.6): lista de elementos tipados, en orden de carga ---
+  // Rango (top_md → bottom_md, MD en m) o puntual (md). Todo se dibuja DENTRO de la aislación.
+  // Cualquier elemento acepta "color": "#rrggbb" (opcional; sin él cada vista usa su color por defecto).
   "installation": {
-    "tbg_od_in": 2.875,           // OD del tubing: 2 | 2.375 | 2.875 | 3.5
-    "tbg_weight_ppf": 6.5,        // libraje API del tubing (según OD)
-    "tbg_grade": "N80",           // acero API del tubing
-    "tbg_md_m": 2400,             // OBLIGATORIO: MD (desde superficie) hasta donde baja la sarta de TBG
-    "elements": [                 // en su MD; TPN se dibuja naranja, PKR verde
-      { "type": "PKR", "md": 3200 },   // "TPN" (tapón) | "PKR" (packer)
-      { "type": "TPN", "md": 3450 }
+    "elements": [
+      { "type": "TBG", "top_md": 0, "bottom_md": 2900,      // sarta de tubing solo en ese rango
+        "od_in": 2.875, "weight_ppf": 6.5, "grade": "N80" },  // OD 2|2.375|2.875|3.5 · libraje API · acero
+      { "type": "VB", "top_md": 0, "bottom_md": 2850,       // varillas de bombeo
+        "diam": "7/8", "cc": true },                        // "3/4"|"7/8"|"1"|"1.5"|"vastago" · CC = c/ centralizadores
+      { "type": "BBA", "md": 2860 },                        // bomba
+      { "type": "ANCLA", "md": 2880 },                      // ancla de tubing
+      { "type": "PKR", "md": 3200, "color": "#d64545" },    // packer (color elegido)
+      { "type": "TPN", "md": 3450 },                        // tapón
+      { "type": "TPNC", "top_md": 3000, "bottom_md": 3050,  // tapón de cemento
+        "volume_l": 430 },                                  // L, calculado con el ID de la cañería
+      { "type": "FLUIDO", "top_md": 0, "bottom_md": 3500, "name": "Salmuera",
+        "color": "#3a8ee6", "density_gcm3": 1.15,           // color del gráfico · densidad opcional
+        "volume_l": 30122 },
+      { "type": "BHA", "md": 5200, "mdf": true },           // fresa; mdf = con motor de fondo
+      { "type": "CARTEL", "md": 1200, "text": "Nivel dinámico" }   // cartel libre con flecha al MD
     ]
   }
 }
 ```
+
+> **Volumen** (TPNC / FLUIDO): capacidad de la cañería **más interna** que cubre cada MD (por tramo
+> telescopado si hay `segments`), con ID = √(OD² − peso/2.67) (tubo liso API; sin libraje ≈ 0,87·OD).
+> 1 m de 5" 21.4 lb/ft ≈ 8,61 L. Fuera de toda cañería (pozo abierto) no se calcula.
+>
+> **Compatibilidad**: el formato v0.5 (`tbg_od_in`, `tbg_weight_ppf`, `tbg_grade`, `tbg_md_m` + `elements`
+> solo TPN/PKR) se sigue leyendo: se convierte a un elemento `TBG` de 0 a `tbg_md_m`.
 
 > `survey` y `frac` son **opcionales**. Sin `survey`, la app asume un pozo **vertical
 > perfecto** (`architecture: "vertical"`, TVD=MD, ns=ew=0) hasta el punto más profundo conocido.
