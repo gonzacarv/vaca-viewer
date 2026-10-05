@@ -1,7 +1,7 @@
 # CLAUDE.md — Vaca Viewer
 
 Visor web de pozos y pads no convencionales (plug-and-perf). 100% navegador, **offline**, los datos
-**nunca salen del equipo**. Autor: Gonzalo Carvallo (@gonzacarv). Versión actual: **v0.4**.
+**nunca salen del equipo**. Autor: Gonzalo Carvallo (@gonzacarv). Versión actual: **v0.5**.
 
 ## Arquitectura
 
@@ -24,19 +24,25 @@ src/
   util.js            helpers puros: saveDataURL, rasterizeSVG, canvasToFile, canvasToPDF, color.
   main.js            bootstrap: importa viewer + initExport().
   styles.css         estilos (incluye @font-face Space Grotesk embebida como data-URI, línea 1-2).
-build.py             empaqueta src/*.js + styles.css → dist/index.html (single-file offline).
+build.py             empaqueta src/*.js + styles.css → dist/index.html (libs por CDN → necesita servidor+internet).
+build_dist.py        dist/vaca-viewer.html: single-file 100% OFFLINE (three UMD+xlsx+pdf.js+worker+jsPDF embebidos).
 build_pad.py         parsers de survey/tally/fracplan en Python (paridad con los del navegador).
-docs/data-schema.md  formato del pad (JSON). docs/brand-kit.md  sistema de marca portable.
+docs/data-schema.md  formato del pad (JSON). docs/archivos-input.md  qué debe cumplir cada .xlsx/.pdf de ingesta.
+docs/plantillas/     .xlsx modelo (survey/fracplan/tally) + gen_plantillas.py. docs/brand-kit.md  marca.
 ```
 
-### build.py (bundle offline)
-Envuelve cada módulo en un IIFE con `exports` y expone cada símbolo como **getter**
-(`Object.defineProperty`), replicando exactamente las live-bindings ES (clave para que export3d lea el
-PAD/flags actuales). Un solo `import * as THREE`. Inlina el CSS. `dist/` está en `.gitignore`.
+### build.py / build_dist.py (bundles)
+Envuelven cada módulo en un IIFE con `exports` y exponen cada símbolo como **getter**
+(`Object.defineProperty`), replicando las live-bindings ES (clave para que export3d lea el PAD/flags
+actuales). Inlinan el CSS. `dist/` y `vendor/` están en `.gitignore`.
+- **build.py**: un `import * as THREE` + libs por CDN + `type=module` → requiere HTTP e internet.
+- **build_dist.py** (release/distribución): three como **UMD global** (sin `import`, sin `type=module`),
+  worker de pdf.js vía Blob desde el fuente inlineado; libs cacheadas en `vendor/` (descarga de cdnjs
+  al compilar si faltan). Chequea que no quede NINGUNA dependencia de red. Abre con doble-click (file://).
 
-### Dependencias (CDN en dev, a embeber en release)
-three (importmap), xlsx (SheetJS), pdf.js, jsPDF. La fuente Space Grotesk **ya está embebida** en
-styles.css. El isotipo y favicon son **SVG inline** (sin assets externos).
+### Dependencias
+three, xlsx (SheetJS), pdf.js, jsPDF. En dev van por CDN; `build_dist.py` las **embebe**. Space Grotesk
+ya está embebida en styles.css. Isotipo y favicon = **SVG inline**.
 
 ## Formato de datos
 
@@ -46,7 +52,28 @@ styles.css. El isotipo y favicon son **SVG inline** (sin assets externos).
   (x=E/O, y=N/S, z=TVD↓). `survey` y `frac` son opcionales (sin survey → vertical sintético).
 - Fases de casing (externa→interna): `guia`(13⅜) → `intermedia1`(9⅝) → `intermedia2`(7⅝) →
   `produccion`(5", aislación). Spec completa en `docs/data-schema.md`.
+- **`stage.plan`** (opcional, de la hoja *Resumen* del fracplan): `sand_t, fluid_m3, prop_int_lbft,
+  fluid_int_m3m, length_m, wl`. Habilita la Vista de pozo "Fracplan" y el "cursor frac".
+- **`casing.segments`** (opcional): casing telescopado — tramos `{top_md,bottom_md,od_in,weight_ppf,
+  grade}`. shoe/od/peso/grado "resumen" = tramo más profundo; cada xover se etiqueta en 3D.
 - Los samples reales van en `samples/` (gitignored). No commitear data operativa.
+
+## Vista de pozo (isoMode) e ingesta — v0.5
+
+- **isoMode** (panel "Vista de pozo"): `normal`(Cañería) · `fracplan`(intensidad de arena `prop_int_lbft`,
+  rampa verde→rojo auto-normalizada a pozos visibles) · `stages`(par de colores configurable, `STAGE_PAIRS`)
+  · `dogleg_lateral|build|total`. El coloreo se aplica al tubo de `produccion` en `applyIsoColors`.
+- **Cursor**: "cursor slim" (MD/TVD/dogleg) + "cursor frac" dependiente (agrega AS/Fluido/LongEt/PropInt/
+  FluidInt/WL de la etapa en hover).
+- **Ingesta** (parsers en `viewer.js` + gemelos en `build_pad.py`, MISMA lógica): survey `.xlsx`,
+  fracplan `.xlsx` (`Punzados` posición fija + `Resumen` por grupo de etapas), tally `.pdf` (Run Tally de
+  OpenWells/Landmark) **o** `.xlsx` (una solapa, todas las fases, con telescopado desde/hasta MD).
+  **Las filas OCULTAS del Excel se ignoran** (dato borrado, ej. "etapa 29"). Ver `docs/archivos-input.md`
+  y [[ingestor-filas-ocultas]].
+- **Exportar ingesta**: botón ⤓ por pozo (Survey/Fracplan/Tally) → `.xlsx` con formato de plantilla y los
+  datos cargados, editable y recargable (`surveyAOA`/`fracplanSheets`/`tallyAOA` + `dlXlsx`).
+- **Planos envolventes**: la "espalda" (grilla de profundidad) se ubica siempre detrás de los heels según
+  la orientación dominante del lateral (`lateralAxisInfo`); el plano lateral sigue a la cámara.
 
 ## Corte 2D (export2d.js) — REGLAS DE DISEÑO (no romper)
 
@@ -91,8 +118,10 @@ Grotesk, minúsculas). Sistema completo en `docs/brand-kit.md` y en un proyecto 
   bundle; y un harness node que stubbea `./viewer.js` (con `interpAtMD`, `escHtml`, `fmtOD`,
   `plugCountInverted`, `parseStages`) para ejecutar `buildWellSVG` contra un pad y chequear que el SVG
   sea XML bien formado, sin `NaN/undefined`, y que cajas/etiquetas no se salgan del lienzo.
-- Tras cambios: `python3 build.py` y confirmar que el bundle pasa `node --check`.
-- La verificación **visual** siempre la hace el usuario en el navegador (`python3 -m http.server`).
+- Tras cambios: `python3 build.py` y confirmar que el bundle pasa `node --check`. Para release offline:
+  `python3 build_dist.py` (chequea que no queden dependencias de red).
+- Ingesta: validar los parsers Python contra los `.xlsx` reales de `samples/` y contra `docs/plantillas/`
+  (round-trip). La verificación **visual** siempre la hace el usuario en el navegador (`python3 -m http.server`).
 - Convenciones: mantener todo **self-contained/offline**; reusar los helpers exportados por viewer.js
   en vez de reimplementar; respetar las reglas del corte 2D de arriba.
 

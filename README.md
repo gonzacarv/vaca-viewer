@@ -6,7 +6,7 @@
 
 *Navegá el subsuelo de tu pad a escala real, prendé y apagá lo que querés ver, y exportá esquemas listos para informes y correos.*
 
-[![Estado](https://img.shields.io/badge/estado-v0.4_en_desarrollo-4ea1d3)]()
+[![Estado](https://img.shields.io/badge/estado-v0.5_en_desarrollo-4ea1d3)]()
 [![Web](https://img.shields.io/badge/100%25-web-3fb950)]()
 [![Offline](https://img.shields.io/badge/sin_servidor-offline-6cc04a)]()
 [![Datos privados](https://img.shields.io/badge/datos-nunca_salen_del_equipo-e5484d)]()
@@ -36,6 +36,16 @@ Está pensada para el flujo real de campo —survey de geonavegación, tally de 
 | ⚙️ | **Configuración** | Exageración vertical, diámetros, radios de punzado, formato de etiquetas y demás preferencias de vista. |
 
 ---
+
+## Novedades (v0.5)
+
+- **Vista de pozo → "Fracplan"**: colorea cada etapa de verde a rojo según la **intensidad de arena** planificada (lb/ft), auto-normalizada a los pozos visibles del pad. Toma los datos de la hoja *Resumen* del fracplan.
+- **Cursor frac**: además del MD/TVD/dogleg al hacer hover, muestra los datos planificados de la etapa — arena (t), fluido (m³), longitud, intensidades de arena y fluido, y el detalle de cañón (`Gun 3 1/8" · 2 spf · EHO 45`). Depende del "cursor slim".
+- **Tally de cañerías en `.xlsx`**: una alternativa al PDF — un Excel de **una solapa** con **todas las fases**. Soporta **casing telescopado** (varios tramos con *desde/hasta MD*, mismo OD y distinto peso/grado, p. ej. 5" 18.4 N80 hasta el xover y 5" 21.4 P110 hasta el fondo); cada xover se marca en la Vista 3D.
+- **Exportá lo cargado**: botón ⤓ junto a Survey / Fracplan / Tally descarga un `.xlsx` **con formato de plantilla y los datos cargados** — editable y recargable.
+- **Plantillas + documentación de ingesta**: `.xlsx` listos para completar en [`docs/plantillas/`](docs/plantillas/) y el detalle de cada formato en [`docs/archivos-input.md`](docs/archivos-input.md). Los PDF de tally son los *Run Tally Report* exportados como **Drillers Tally de OpenWells (Landmark)**. Al ingerir, las **filas ocultas** del Excel se ignoran (dato borrado).
+- **Planos envolventes adaptativos**: la grilla de profundidad se ubica siempre en la "espalda" de los pozos según su orientación dominante (N↔S o E↔O).
+- **Distribución 100% offline**: `build_dist.py` genera un único `dist/vaca-viewer.html` con todo embebido (three, SheetJS, pdf.js, jsPDF) — se abre con **doble-click**, sin servidor ni internet.
 
 ## Novedades (v0.4)
 
@@ -75,7 +85,10 @@ Está pensada para el flujo real de campo —survey de geonavegación, tally de 
 python3 -m http.server 8080     # abrí http://localhost:8080
 ```
 
-> Para un único archivo portable y offline: `python3 build.py` genera `dist/index.html` con todo embebido.
+> **Archivo único portable (recomendado para distribuir):** `python3 build_dist.py` genera
+> `dist/vaca-viewer.html` — **100% offline y self-contained** (three, SheetJS, pdf.js y jsPDF
+> embebidos). Se abre con **doble-click**, sin servidor ni internet. (`python3 build.py` genera
+> `dist/index.html`, más liviano pero con las libs por CDN → requiere servidor + internet.)
 
 **2. Cargá un pad.** En la sección **Datos**, arrastrá un `pad.vvwp` existente, o construilo cargando los archivos crudos por pozo (el survey y el fracplan son opcionales; sin survey se asume pozo vertical).
 
@@ -98,12 +111,15 @@ python3 -m http.server 8080     # abrí http://localhost:8080
 
 ```
 vaca-viewer/
-├── index.html       → shell HTML (markup + libs)
+├── index.html       → shell HTML (markup + libs CDN en dev)
 ├── src/             → módulos ES: viewer, export3d, export2d, export-ui, util, main + styles.css
-├── build.py         → empaqueta todo en dist/index.html (single-file offline)
+├── build.py         → dist/index.html (single-file, libs por CDN)
+├── build_dist.py    → dist/vaca-viewer.html (single-file 100% offline; libs en vendor/)
 ├── build_pad.py     → parsers de survey/tally/fracplan en Python
-├── docs/data-schema.md  → especificación del formato JSON del pad
-└── samples/         → pads de ejemplo
+└── docs/
+    ├── data-schema.md      → formato JSON del pad
+    ├── archivos-input.md   → qué debe cumplir cada .xlsx/.pdf de ingesta
+    └── plantillas/         → .xlsx modelo + gen_plantillas.py
 ```
 
 El formato de intercambio es un **JSON propio y versionado** (`schema_version`); profundidades en metros, diámetros en pulgadas, coordenadas locales al pad. Especificación completa en [`docs/data-schema.md`](docs/data-schema.md).

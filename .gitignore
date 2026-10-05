@@ -24,6 +24,7 @@ Thumbs.db
 node_modules/
 dist/
 samples/
+vendor/
 
 
 # Configuración local de Claude (directorio)

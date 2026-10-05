@@ -125,6 +125,27 @@ function dlsColor(dls, dmax){
   else       c.lerpColors(DLS_MID,DLS_HIGH,(t-0.5)/0.5);
   return c;
 }
+/* Coloreo "por fracplan": misma rampa verde→amarillo→rojo, normalizada al rango de intensidad de
+   arena (Prop Intensity, lb/ft) del pad. */
+function rampColor(val, mn, mx){
+  const t = mx>mn ? Math.max(0,Math.min(1,(val-mn)/(mx-mn))) : 0;
+  const c=new THREE.Color();
+  if(t<0.5) c.lerpColors(DLS_LOW,DLS_MID,t/0.5);
+  else       c.lerpColors(DLS_MID,DLS_HIGH,(t-0.5)/0.5);
+  return c;
+}
+/* rango [min,max] de Prop Intensity (lb/ft) para auto-normalizar el coloreo "por fracplan".
+   Solo cuenta pozos con la AISLACIÓN visible (pozo visible + fase producción encendida): así la
+   escala se ajusta a lo que se está viendo. */
+function fracIntensityRange(){
+  let mn=Infinity, mx=-Infinity;
+  ((PAD&&PAD.pad&&PAD.pad.wells)||[]).forEach(w=>{
+    const v=VIS[w.id]; if(v && (v.well===false || v.produccion===false)) return;
+    (w.frac?.stages||[]).forEach(s=>{ const p=s.plan?.prop_int_lbft;
+      if(typeof p==="number"&&isFinite(p)){ mn=Math.min(mn,p); mx=Math.max(mx,p); } });
+  });
+  return isFinite(mn)?{min:mn,max:mx}:null;
+}
 
 /* radio visual (m) de una cañería según su OD real y la exageración de diámetro */
 function casingRadius(phase, od_in){
@@ -211,7 +232,7 @@ function updateLabels(){
     l.el.style.transform=`translate(-50%,-50%) scale(${kScale})`;
   }
 }
-let SHOW_TPN_LABELS=false, SHOW_STAGE_LABELS=true, SHOW_SHOE_LABELS=false, SHOW_SHORT_LABELS=false, SHOW_INSTALL_LABELS=false, SHOW_SHOETRACK_LABELS=false, SHOW_TOC_LABELS=false, SHOW_CURSOR_TIP=true, SHOW_GRIDNUMS=false;
+let SHOW_TPN_LABELS=false, SHOW_STAGE_LABELS=true, SHOW_SHOE_LABELS=false, SHOW_SHORT_LABELS=false, SHOW_INSTALL_LABELS=false, SHOW_SHOETRACK_LABELS=false, SHOW_TOC_LABELS=false, SHOW_CURSOR_TIP=true, SHOW_CURSOR_FRAC=false, SHOW_GRIDNUMS=false;
 
 /* interpola X,Y,TVD (coords locales del pad) a un MD dado desde las stations */
 function interpAtMD(st, md, wx){
@@ -246,6 +267,8 @@ function applyIsoColors(tube){
     if(mat.userData._emissivePatched){ mat.onBeforeCompile=()=>{}; mat.userData._emissivePatched=false; mat.needsUpdate=true; }
     mat.needsUpdate=true; return;
   }
+  const isFrac = isoMode==="fracplan";
+  const fracRng = isFrac ? fracIntensityRange() : null;
   const isDogleg = isoMode==="dogleg_lateral" || isoMode==="dogleg_build" || isoMode==="dogleg_total";
   // frontera curva/lateral = MD del inicio de la primera etapa (primer cluster de la etapa más somera)
   let firstStageMD=Infinity, lastStageMD=-Infinity;
@@ -276,6 +299,10 @@ function applyIsoColors(tube){
       const sr=iso.stageRanges.find(r=>md>=r.md0 && md<=r.md1);
       if(sr) c.copy(sr.stage%2===0?STAGE_A:STAGE_B);
       else   c.copy(ISO_BASE);                  // fuera de etapas (arriba del 1er cluster)
+    } else if(isFrac){                          // por fracplan: intensidad de arena (lb/ft) por etapa
+      const sr=iso.stageRanges.find(r=>md>=r.md0 && md<=r.md1);
+      if(sr && sr.propInt!=null && fracRng) c.copy(rampColor(sr.propInt, fracRng.min, fracRng.max));
+      else c.copy(ISO_BASE);                    // fuera de etapas o sin dato de fracplan
     } else { // dogleg_lateral | dogleg_build | dogleg_total
       if(dlsInSeg(md)) c.copy(dlsColor(iso.dlsAtMD(md), segMax));
       else             c.copy(ISO_BASE);        // el otro tramo queda en gris, no compite
@@ -370,7 +397,7 @@ function buildPad(pad){
         // rangos MD de cada etapa (primer top al último bottom de sus clusters)
         const stageRanges=(w.frac?.stages||[]).map(s=>{
           const mds=(s.clusters||[]).flatMap(c=>[c.top_md,c.bottom_md]).filter(x=>x!=null);
-          return mds.length?{stage:s.stage,md0:Math.min(...mds),md1:Math.max(...mds)}:null;
+          return mds.length?{stage:s.stage,md0:Math.min(...mds),md1:Math.max(...mds),propInt:s.plan?.prop_int_lbft??null}:null;
         }).filter(Boolean);
         // dls interpolable por MD desde el survey
         const dlsAtMD=md=>{
@@ -452,6 +479,13 @@ function buildPad(pad){
       const shoeTvd=sp.tvd.toFixed(0);
       addLabel(`${specs.join(" ")} · MD ${Math.round(cas.shoe_md)} · TVD ${shoeTvd}`,
         toThree(sp.x,sp.y,sp.tvd).add(new THREE.Vector3(0, r*2, 0)), "shoe", w.id);
+      // casing telescopado: una etiqueta por XOVER (cambio de peso/grado) mostrando arriba/abajo
+      const segSpec=sg=>[fmtOD(sg.od_in??cas.od_in), sg.weight_ppf!=null?`${sg.weight_ppf} lb/ft`:null, sg.grade].filter(Boolean).join(" ");
+      (cas.segments||[]).forEach((sg,idx)=>{ if(idx===0||sg.top_md==null) return;
+        const xp=interpAtMD(st,sg.top_md,wx);
+        addLabel(`xover MD ${Math.round(sg.top_md)} · ↑ ${segSpec(cas.segments[idx-1])} · ↓ ${segSpec(sg)}`,
+          toThree(xp.x,xp.y,xp.tvd).add(new THREE.Vector3(0, r*2, 0)), "shoe", w.id);
+      });
 
       // TOC (tope de cemento): cono achatado (embudo) apuntando hacia superficie — se lee claro
       // como "acá empieza el cemento", distinto de un anillo o un tapón. Color cemento (tan).
@@ -870,6 +904,8 @@ document.getElementById("well-matrix").addEventListener("change",e=>{
   else if(t.classList.contains("mx-elemall")){ const k=t.dataset.el; wids.forEach(id=>{ ensureVis(id)[k]=t.checked; applyWellVis(id); }); }
   else if(t.matches("td.mx-well input[data-el]")){ const wid=t.closest("[data-wid]").dataset.wid, k=t.dataset.el; ensureVis(wid)[k]=t.checked; applyWellVis(wid); }
   else return;
+  // el coloreo "por fracplan" se auto-normaliza a los pozos visibles → re-normalizar al cambiar visibilidad
+  if(isoMode==="fracplan") refreshIsoColors();
   mxSyncMasters(); saveViewCfg();
 });
 // filtro de etapas de punzados (campo de texto por pozo / para todos)
@@ -933,8 +969,20 @@ document.querySelectorAll("input[name='odfmt']").forEach(r=>r.addEventListener("
 // cero de la regla de ramas horizontales (boca | landing) → reconstruye la numeración de grilla
 document.getElementById("cfg-hzero")?.addEventListener("change",e=>{ hzero=e.target.value; buildGrids(); saveViewCfg(); });
 setLabelSize(11); setGridSize(16); setLabelFont("mono"); setStagePair("greens");
+// "cursor frac" depende de "cursor slim": se habilita solo con slim activo
+function syncCursorFrac(){
+  const slim=document.getElementById("lbl-cursor").checked;
+  const frac=document.getElementById("lbl-cursor-frac");
+  frac.disabled=!slim;
+  document.getElementById("lbl-cursor-frac-row").style.opacity=slim?"":"0.45";
+  if(!slim) frac.checked=false;
+  SHOW_CURSOR_FRAC=frac.checked;
+}
 document.getElementById("lbl-cursor").addEventListener("change",e=>{ SHOW_CURSOR_TIP=e.target.checked;
-  if(!SHOW_CURSOR_TIP) document.getElementById("hover-tip").style.display="none"; });
+  if(!SHOW_CURSOR_TIP) document.getElementById("hover-tip").style.display="none";
+  syncCursorFrac(); });
+document.getElementById("lbl-cursor-frac").addEventListener("change",e=>{ SHOW_CURSOR_FRAC=e.target.checked; });
+syncCursorFrac();
 
 /* ---- Cuadros flotantes: colapsar (click en el título) + ensanchar (Pozos) + arrastrar + persistir ----
    Posiciones por defecto (mismas que el markup): sirven para "Reordenar" cuando algún cuadro quedó
@@ -1077,7 +1125,19 @@ canvas.addEventListener("mousemove",e=>{
   if(!info){ hoverTip.style.display="none"; return; }
   const stageTxt = info.stage!=null ? ` · <span class="s">E${info.stage}</span>` : "";
   const dlsTxt = info.dls!=null ? `<br><span class="d">dogleg</span> <span class="dl">${info.dls.toFixed(2)}</span> °/30m` : "";
-  hoverTip.innerHTML=`<span class="w">${info.well}</span>${stageTxt}<br>MD <b>${Math.round(info.md)}</b> m · TVD <b>${Math.round(info.tvd)}</b> m${dlsTxt}`;
+  // "cursor frac": suma los datos planificados de la etapa sobre la que se hace hover
+  let fracTxt="";
+  if(SHOW_CURSOR_FRAC && info.stage!=null){
+    const w=PAD?.pad.wells.find(x=>x.id===info.well);
+    const p=w?.frac?.stages?.find(s=>s.stage===info.stage)?.plan;
+    if(p){ const f=(v,d)=>v==null?"—":(+v).toFixed(d);
+      fracTxt=`<br><span class="fk">AS:</span> ${f(p.sand_t,1)} t · <span class="fk">Fluido:</span> ${f(p.fluid_m3,0)} m³`
+        +`<br><span class="fk">LongEt:</span> ${f(p.length_m,1)} m · <span class="fk">PropInt:</span> ${f(p.prop_int_lbft,0)} lb/ft`
+        +`<br><span class="fk">FluidInt:</span> ${f(p.fluid_int_m3m,1)} m³/m`
+        +`<br><span class="fk">WL:</span> ${p.wl?escHtml(p.wl):"—"}`;
+    } else fracTxt=`<br><span class="d">sin datos de fracplan</span>`;
+  }
+  hoverTip.innerHTML=`<span class="w">${info.well}</span>${stageTxt}<br>MD <b>${Math.round(info.md)}</b> m · TVD <b>${Math.round(info.tvd)}</b> m${dlsTxt}${fracTxt}`;
   hoverTip.style.display="block";
   hoverTip.style.left=(e.clientX-rect.left)+"px";
   hoverTip.style.top=(e.clientY-rect.top)+"px";
@@ -1309,7 +1369,7 @@ function syncBuilderFromPad(pad){
     const casings={};
     (w.casings||[]).forEach(c=>{ casings[c.phase]={od_in:c.od_in??null, shoe_md:c.shoe_md??null,
       toc_md:c.toc_md??null, weight_ppf:c.weight_ppf??null, grade:c.grade??null,
-      short_joints:c.short_joints||undefined}; });
+      segments:c.segments||undefined, short_joints:c.short_joints||undefined}; });
     const inst=w.installation ? {enabled:true, tbg_od:w.installation.tbg_od_in??null,
         tbg_weight:w.installation.tbg_weight_ppf??null, tbg_grade:w.installation.tbg_grade??null,
         tbg_md:w.installation.tbg_md_m??null,
@@ -1339,7 +1399,7 @@ function saveViewCfg(){
       lblSize:parseInt(document.getElementById("cfg-lblsize").value,10),
       gridSize:parseInt(document.getElementById("cfg-gridsize").value,10),
       font:document.getElementById("cfg-font").value, checks:{} };
-    ["lbl-stage","lbl-tpn","lbl-short","lbl-install","lbl-shoetrack","lbl-shoe","lbl-toc","lbl-cursor",
+    ["lbl-stage","lbl-tpn","lbl-short","lbl-install","lbl-shoetrack","lbl-shoe","lbl-toc","lbl-cursor","lbl-cursor-frac",
      "cfg-grid","cfg-planes","cfg-gridnums","cfg-axes","cfg-shoes","cfg-autodiam"].forEach(id=>cfg.checks[id]=document.getElementById(id).checked);
     localStorage.setItem(VIEWCFG_KEY, JSON.stringify(cfg));
   }catch(e){ /* almacenamiento no disponible: la vista simplemente no persiste */ }
@@ -1369,7 +1429,7 @@ function loadViewCfg(){
   if(typeof cfg.perfRadiusM==="number"){ perfRadiusM=cfg.perfRadiusM;
     document.getElementById("cfg-perfradius").value=cfg.perfRadiusM;
     document.getElementById("perfradius-val").textContent=perfRadiusM+" m"; }
-  applyAllToggles();
+  applyAllToggles(); syncCursorFrac();
 }
 // cualquier cambio en el panel de capas o en Configuración guarda la vista
 document.getElementById("panels").addEventListener("change",saveViewCfg);
@@ -1522,15 +1582,24 @@ function parseSurveyXLS(buf){
   return {vsec_azimuth_deg:vsec_az, stations};
 }
 
+/* Set de filas OCULTAS del Excel (1-indexadas). Los fracplans traen clusters/etapas "borradas"
+   como filas ocultas (p.ej. una etapa extra al heel arriba del 1er plug): NO se deben ingerir.
+   Requiere leer con cellStyles:true para que SheetJS complete ws['!rows'][].hidden. */
+function hiddenRowsOf(ws){
+  const set=new Set(), meta=ws["!rows"]||[];
+  for(let i=0;i<meta.length;i++){ if(meta[i] && meta[i].hidden) set.add(i+1); }
+  return set;
+}
 function parseFracplanXLS(buf){
   if(!window.XLSX) throw new Error("SheetJS no cargó (sin internet?)");
-  const wb=XLSX.read(new Uint8Array(buf),{type:"array"}); const ws=wb.Sheets["Punzados"];
+  const wb=XLSX.read(new Uint8Array(buf),{type:"array",cellStyles:true}); const ws=wb.Sheets["Punzados"];
   if(!ws) throw new Error('falta la hoja "Punzados"');
-  const rows=sheetMatrix(ws);
+  const rows=sheetMatrix(ws), hidden=hiddenRowsOf(ws);
   const c=(r,col)=>{ const row=rows[r-1]; return row?(row[col-1]??null):null; };
   const hdr={lp_md:c(5,2),collar_md:c(6,2),horizontal_ext_m:c(7,2),total_stages:c(9,2)};
   const stages={}, order=[]; let cur=null;
   for(let r=13;r<=rows.length;r++){
+    if(hidden.has(r)) continue;                    // fila oculta = dato borrado, no se ingiere
     const name=c(r,1); if(!(typeof name==="string" && name.startsWith("Cluster"))) continue;
     const nm=name.match(/(\d+)/); const n=nm?parseInt(nm[1],10):null;
     const stg=c(r,5), plug=c(r,12);
@@ -1541,9 +1610,61 @@ function parseFracplanXLS(buf){
       shots:c(r,8), charge:c(r,9), phasing:c(r,10)});
     if(plug!=null) stages[cur].plug_md=plug;
   }
-  return { total_stages: hdr.total_stages?parseInt(hdr.total_stages,10):order.length,
+  // hoja "Resumen": adjunta a cada etapa su plan (arena/fluido/intensidades/longitud/cañón), por grupo
+  const planOf=parseFracplanResumen(wb);
+  if(planOf) order.forEach(s=>{ const p=planOf(s); if(p) stages[s].plan=p; });
+  return { total_stages: hdr.total_stages!=null?parseInt(hdr.total_stages,10):order.length,
     lp_md:hdr.lp_md, collar_md:hdr.collar_md, horizontal_ext_m:hdr.horizontal_ext_m,
     planned_vs_actual:"planned", stages:order.map(s=>stages[s]) };
+}
+/* Reformatea el detalle de cañón del Resumen ("Cañón 3 1/8 · 2 tiros · Carga: EHO 45")
+   al formato pedido: 'Gun 3 1/8" · 2 spf · EHO 45' ("1/2 tiros" → "1-2 spf"). */
+function parseGunDesc(s){
+  const parts=String(s).split("·").map(x=>x.trim());
+  const gun=(parts[0]||"").replace(/^ca\S*\s+/i,"").trim();     // quita "Cañón "
+  const tm=(parts[1]||"").match(/([\d/]+)/); const spf=tm?tm[1].replace(/\//g,"-"):"";
+  const carga=(parts[2]||"").replace(/^carga:\s*/i,"").trim();
+  if(!gun) return String(s).trim();
+  return `Gun ${gun}"${spf?` · ${spf} spf`:""}${carga?` · ${carga}`:""}`;
+}
+/* Hoja "Resumen": los valores vienen POR GRUPO de etapas (y son por-etapa). Devuelve una función
+   stage→{sand_t, fluid_m3, prop_int_lbft, fluid_int_m3m, length_m, wl} o null si no está la hoja. */
+function parseFracplanResumen(wb){
+  const ws=wb.Sheets["Resumen"]; if(!ws) return null;
+  const rows=sheetMatrix(ws);
+  const at=(r,col)=>{ const row=rows[r-1]; return row?(row[col-1]??null):null; };
+  const num=v=>(typeof v==="number"&&isFinite(v))?v:null;
+  const isRange=v=>typeof v==="string" && /^\s*Etapas\s+\d+\s*-\s*\d+/i.test(v);
+  const rangeOf=v=>{ const m=String(v).match(/(\d+)\s*-\s*(\d+)/); return m?[+m[1],+m[2]]:null; };
+  // fila de encabezado con las columnas de grupo ("Etapas 1-5", ...)
+  let groups=null;
+  for(let r=1;r<=rows.length && !groups;r++){
+    const cols=[], len=rows[r-1]?rows[r-1].length:0;
+    for(let col=1;col<=len;col++){ const v=at(r,col); if(isRange(v)){ const rg=rangeOf(v); if(rg) cols.push({col,lo:rg[0],hi:rg[1]}); } }
+    if(cols.length>=2) groups=cols;
+  }
+  if(!groups) return null;
+  const findRow=sub=>{ for(let r=1;r<=rows.length;r++){ const v=at(r,1); if(typeof v==="string" && v.toLowerCase().includes(sub.toLowerCase())) return r; } return null; };
+  const rPI=findRow("Prop Intensity"), rFI=findRow("Fluid Intensity"), rFL=findRow("Frac Length");
+  let rFluid=null, arenaRows=[];
+  for(let r=1;r<=rows.length;r++){ const a=at(r,1);
+    if(typeof a==="string" && a.trim().toUpperCase()==="TOTAL" && at(r,2)==="m³") rFluid=r;
+    if(typeof a==="string" && /arena/i.test(a)) arenaRows.push(r); }
+  const gunByRange={};
+  for(let r=1;r<=rows.length;r++){ const a=at(r,1), b=at(r,2);
+    if(isRange(a) && typeof b==="string" && /·/.test(b)){ const rg=rangeOf(a); if(rg) gunByRange[`${rg[0]}-${rg[1]}`]=parseGunDesc(b); } }
+  const G=groups.map(g=>{
+    let sand=null; arenaRows.forEach(r=>{ const v=num(at(r,g.col)); if(v!=null) sand=(sand||0)+v; });
+    return { lo:g.lo, hi:g.hi, sand_t:sand,
+      fluid_m3: rFluid?num(at(rFluid,g.col)):null,
+      prop_int_lbft: rPI?num(at(rPI,g.col)):null,
+      fluid_int_m3m: rFI?num(at(rFI,g.col)):null,
+      length_m: rFL?num(at(rFL,g.col)):null,
+      wl: gunByRange[`${g.lo}-${g.hi}`]||null };
+  });
+  return stage=>{ const g=G.find(x=>stage>=x.lo && stage<=x.hi); return g?{
+    sand_t:g.sand_t, fluid_m3:g.fluid_m3, prop_int_lbft:g.prop_int_lbft,
+    fluid_int_m3m:g.fluid_int_m3m, length_m:g.length_m, wl:g.wl}:null; };
 }
 
 /* pdf.js: reconstruye líneas agrupando ítems de texto por su coordenada y (arriba→abajo) */
@@ -1642,6 +1763,77 @@ function parseRunTally(text, maxLen=10.0, edgeM=150){
   stEls.sort((a,b)=>a.top_md-b.top_md);                // somero → profundo
   return {shorts, shoetrack: stEls.length?{elements:stEls}:null};
 }
+/* Alternativa al tally PDF: un XLSX simple de UNA solapa con los mismos campos, para TODAS las fases.
+   Dos tablas: (1) por fase → od_in/shoe_md/weight_ppf/grade/toc_md; (2) piezas cortas + shoetrack.
+   Columnas por HEADER (robusto al reordenamiento). Devuelve { fase: {casing} }. Ver docs/archivos-input.md. */
+const TALLY_PHASE_ALIAS={guia:"guia","guía":"guia",int1:"intermedia1",intermedia1:"intermedia1","intermedia 1":"intermedia1",
+  int2:"intermedia2",intermedia2:"intermedia2","intermedia 2":"intermedia2",prod:"produccion",produccion:"produccion",
+  "producción":"produccion",aislacion:"produccion","aislación":"produccion","aisl":"produccion"};
+function normPhaseName(v){ if(v==null) return null; const k=String(v).trim().toLowerCase();
+  return TALLY_PHASE_ALIAS[k] || TALLY_PHASE_ALIAS[k.replace(/[\s.]/g,"")] || null; }
+function parseTallyXLS(buf){
+  if(!window.XLSX) throw new Error("SheetJS no cargó (sin internet?)");
+  const wb=XLSX.read(new Uint8Array(buf),{type:"array"}); const ws=wb.Sheets[wb.SheetNames[0]];
+  const rows=sheetMatrix(ws);
+  const norm=s=>String(s??"").trim().toLowerCase();
+  const numOf=x=>{ if(x==null||x==="") return null; if(typeof x==="number") return x;
+    const m=String(x).replace(/,/g,"").match(/-?[\d.]+/); return m?parseFloat(m[0]):null; };
+  // fila de encabezado = cada key aparece en una celda DISTINTA (evita matchear texto de notas)
+  const findHeader=(...keys)=>{ for(let r=0;r<rows.length;r++){ const cells=(rows[r]||[]).map(norm), used=new Set();
+    let ok=true; for(const k of keys){ let f=-1;
+      for(let ci=0;ci<cells.length;ci++){ if(!used.has(ci)&&cells[ci].includes(k)){ f=ci; break; } }
+      if(f<0){ ok=false; break; } used.add(f); }
+    if(ok) return r; } return -1; };
+  const colOf=(hr,...keys)=>{ const cells=(rows[hr]||[]).map(norm);
+    for(let ci=0;ci<cells.length;ci++) if(keys.some(k=>cells[ci].includes(k))) return ci; return -1; };
+  const out={};
+  const ensure=ph=>out[ph]||(out[ph]={od_in:null,shoe_md:null,weight_ppf:null,grade:null,toc_md:null,short_joints:[],shoetrack:null});
+  const phr=findHeader("fase","od");          // (1) tabla de fases
+  const pcr=findHeader("tipo","tope");        // (2) tabla de piezas
+  const phEnd = (pcr>phr) ? pcr : rows.length;   // la tabla de fases termina donde empieza la de piezas
+  if(phr>=0){
+    // una fase puede tener VARIAS filas (telescopado): cada fila = un tramo con desde/hasta MD.
+    const cF=colOf(phr,"fase"), cOD=colOf(phr,"od"), cDesde=colOf(phr,"desde"),
+      cHasta=colOf(phr,"hasta","zapato","shoe"), cW=colOf(phr,"peso","lb/ft","lb/pie","lb"),
+      cG=colOf(phr,"grado","grade","acero"), cT=colOf(phr,"toc");
+    const gr=v=>(v!=null&&String(v).trim())?String(v).trim():null;
+    const segsByPhase={};
+    for(let r=phr+1;r<phEnd;r++){ const row=rows[r]||[]; const ph=normPhaseName(row[cF]); if(!ph) continue;
+      const c=ensure(ph); const toc=cT>=0?numOf(row[cT]):null; if(toc!=null && c.toc_md==null) c.toc_md=toc;
+      (segsByPhase[ph]||(segsByPhase[ph]=[])).push({ top_md:cDesde>=0?numOf(row[cDesde]):null,
+        bottom_md:cHasta>=0?numOf(row[cHasta]):null, od_in:cOD>=0?numOf(row[cOD]):null,
+        weight_ppf:cW>=0?numOf(row[cW]):null, grade:cG>=0?gr(row[cG]):null });
+    }
+    Object.entries(segsByPhase).forEach(([ph,segs])=>{ const c=ensure(ph);
+      segs.sort((a,b)=>(a.bottom_md??0)-(b.bottom_md??0));
+      let prev=0; segs.forEach(s=>{ if(s.top_md==null) s.top_md=prev; prev=s.bottom_md??prev;
+        s.top_md=round3(s.top_md); s.bottom_md=round3(s.bottom_md); });
+      const deep=segs[segs.length-1];                       // tramo del zapato (más profundo)
+      c.shoe_md = deep.bottom_md;
+      c.od_in = deep.od_in ?? segs.find(s=>s.od_in!=null)?.od_in ?? null;
+      c.weight_ppf = deep.weight_ppf ?? null;
+      c.grade = deep.grade ?? null;
+      const valid=segs.filter(s=>s.bottom_md!=null);
+      if(valid.length>1) c.segments=valid;                  // solo si hay telescopado real
+    });
+  }
+  // (2) tabla de piezas (caños cortos + shoetrack)
+  if(pcr>=0){
+    const cF=colOf(pcr,"fase"), cTp=colOf(pcr,"tipo"), cD=colOf(pcr,"desc","detalle"),
+      cTop=colOf(pcr,"tope","top"), cBot=colOf(pcr,"fondo","bottom"), cL=colOf(pcr,"long"), cX=colOf(pcr,"xover","x-over");
+    for(let r=pcr+1;r<rows.length;r++){ const row=rows[r]||[]; const tp=norm(row[cTp]); if(!tp) continue;
+      const ph=normPhaseName(row[cF])||"produccion", c=ensure(ph);
+      const top=cTop>=0?numOf(row[cTop]):null, bot=cBot>=0?numOf(row[cBot]):null;
+      let len=cL>=0?numOf(row[cL]):null; if(len==null && top!=null && bot!=null) len=round3(bot-top);
+      const desc=(cD>=0&&row[cD]!=null)?String(row[cD]).trim():"";
+      if(tp.startsWith("shoe")){ (c.shoetrack||(c.shoetrack={elements:[]})).elements
+        .push({desc:desc||"elemento", length_m:len, top_md:round3(top), bottom_md:round3(bot)}); }
+      else { const xo=/^(s|y|x|1|t)/.test(norm(cX>=0?row[cX]:""));
+        c.short_joints.push({desc:desc||"caño corto", xover:xo, length_m:len, top_md:round3(top), bottom_md:round3(bot)}); }
+    }
+  }
+  return out;
+}
 
 /* ---- Estado + UI del constructor ---- */
 const PHASES=[["guia","Guía"],["intermedia1","Intermedia 1"],["intermedia2","Intermedia 2"],["produccion","Aislación"]];
@@ -1694,6 +1886,15 @@ function shortsList(c){
   return `<div class="cc-list"><div class="cc-title">↳ ${sjs.length} caño(s) corto(s) detectados</div>
     <table class="tbl cc-tbl"><tr><th>#</th><th>Tipo</th><th>MD desde</th><th>Longitud</th><th>Cañería / acero · detalle</th></tr>${rows}</table></div>`;
 }
+/* tramos (telescopado) de una fase: desde/hasta MD + OD/peso/grado. Solo lectura (viene del tally xlsx). */
+function segmentsList(c){
+  const sg=c.segments||[]; if(sg.length<2) return "";
+  const rows=sg.map(s=>`<tr><td class="num">${s.top_md!=null?Math.round(s.top_md):"?"}–${s.bottom_md!=null?Math.round(s.bottom_md):"?"} m</td>
+      <td>${s.od_in!=null?fmtOD(s.od_in):"?"}</td><td class="num">${s.weight_ppf!=null?s.weight_ppf+" lb/ft":"—"}</td>
+      <td>${escHtml(s.grade||"—")}</td></tr>`).join("");
+  return `<div class="cc-list"><div class="cc-title">↳ ${sg.length} tramo(s) (telescopado)</div>
+    <table class="tbl cc-tbl"><tr><th>Desde–Hasta MD</th><th>OD</th><th>Peso</th><th>Acero</th></tr>${rows}</table></div>`;
+}
 function phaseBlock(i,ph,label,c){ c=c||{};
   return `<div class="phase-row"><span class="tag">${label}</span>
     <span class="btn filebtn">Tally .pdf<input type="file" accept=".pdf" data-w="${i}" data-kind="tally" data-phase="${ph}"></span>
@@ -1704,7 +1905,7 @@ function phaseBlock(i,ph,label,c){ c=c||{};
       <label>Acero<select data-w="${i}" data-ph="${ph}" data-c="gr">${grOptions(c.grade)}</select></label>
       <label>Zapato MD<input type="number" data-w="${i}" data-ph="${ph}" data-c="md" value="${c.shoe_md??""}"></label>
       <label>TOC MD<input type="number" data-w="${i}" data-ph="${ph}" data-c="toc" value="${c.toc_md??""}"></label>
-    </div>${ph==="produccion"?shortsList(c):""}</div>`;
+    </div>${segmentsList(c)}${ph==="produccion"?shortsList(c):""}</div>`;
 }
 function instBlock(i,w){
   const ins=w.install||{};
@@ -1818,12 +2019,15 @@ function renderWellCards(){
           placeholder="Nombre del pozo" title="Click para editar el nombre">
       </h5>
       <div class="wc-body">
-      <div class="file-row"><span class="tag">Survey</span>
+      <div class="file-row"><span class="tag">Survey</span>${dlBtn("survey",i,!!w.survey)}
         <span class="btn filebtn">Cargar .xlsx<input type="file" accept=".xlsx,.xls" data-w="${i}" data-kind="survey"></span>
         <span class="st" data-st="survey-${i}">${survSt}</span></div>
-      <div class="file-row"><span class="tag">Fracplan</span>
+      <div class="file-row"><span class="tag">Fracplan</span>${dlBtn("frac",i,!!(w.frac&&(w.frac.stages||[]).length))}
         <span class="btn filebtn">Cargar .xlsx<input type="file" accept=".xlsx,.xls" data-w="${i}" data-kind="frac"></span>
         <span class="st" data-st="frac-${i}">${fracSt}</span></div>
+      <div class="file-row"><span class="tag">Tally cañerías</span>${dlBtn("tally",i, Object.values(w.casings||{}).some(c=>c&&(c.od_in!=null||c.shoe_md!=null||c.segments)))}
+        <span class="btn filebtn">Cargar .xlsx<input type="file" accept=".xlsx,.xls" data-w="${i}" data-kind="tallyxls"></span>
+        <span class="st" data-st="tallyxls-${i}">— (opcional; todas las fases en un .xlsx)</span></div>
       ${PHASES.map(([ph,label])=>phaseBlock(i,ph,label,w.casings[ph])+(ph==="produccion"?instBlock(i,w)+shoetrackBlock(i,w)+fracBlock(i,w):"")).join("")}
       </div>`;
     cont.appendChild(card);
@@ -1950,8 +2154,119 @@ document.getElementById("b-wells").addEventListener("change",async e=>{
       }
       renderWellCards();                       // refleja el autollenado en los picklists (editable)
       stset(key, fmtCasingStatus(cas)); }
+    else if(kind==="tallyxls"){ const all=parseTallyXLS(buf); let n=0;
+      Object.entries(all).forEach(([ph,c])=>{
+        const cas=ING.wells[i].casings[ph]||(ING.wells[i].casings[ph]={});
+        const od=nearestOD(c.od_in); if(od!=null) cas.od_in=od;
+        const wt=nearestWT(cas.od_in, c.weight_ppf); if(wt!=null) cas.weight_ppf=wt;
+        if(c.grade) cas.grade=c.grade;
+        if(c.shoe_md!=null) cas.shoe_md=c.shoe_md;
+        if(c.toc_md!=null) cas.toc_md=c.toc_md;
+        cas.segments = c.segments?.length ? c.segments : undefined;
+        cas.short_joints = c.short_joints?.length ? c.short_joints : undefined;
+        if(c.shoetrack?.elements?.length){
+          ING.wells[i].shoetrack={enabled:true,
+            elements:c.shoetrack.elements.map(el=>({desc:el.desc, top_md:el.top_md, length_m:el.length_m}))}; }
+        n++;
+      });
+      renderWellCards();
+      stset(key, n?`${n} fase(s) cargada(s)`:"sin fases reconocidas", n?"":"err"); }
   }catch(err){ stset(key, "error: "+err.message, "err"); }
   t.value="";
+});
+
+/* ====== Exportar survey / fracplan / tally a .xlsx (mismo formato que las plantillas → editable y
+   recargable). Botón ⤓ por fila, activo solo si hay datos. Los layouts espejan docs/plantillas/. ====== */
+function dlBtn(kind, i, enabled){
+  return `<button class="dl-btn" data-dl="${kind}" data-w="${i}" ${enabled?"":"disabled"}
+    title="${enabled?"Descargar editable (.xlsx)":"Cargá datos para descargar"}">⤓</button>`;
+}
+function dlXlsx(sheets, filename){
+  if(!window.XLSX) throw new Error("SheetJS no cargó");
+  const wb=XLSX.utils.book_new();
+  for(const s of sheets) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(s.aoa), s.name);
+  const blob=new Blob([XLSX.write(wb,{type:"array",bookType:"xlsx"})],
+    {type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+  const url=URL.createObjectURL(blob), a=document.createElement("a");
+  a.href=url; a.download=filename; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),4000);
+}
+function surveyAOA(w){
+  const st=w.survey?.stations||[], rows=[];
+  const R=(r,arr)=>{ while(rows.length<=r) rows.push([]); rows[r]=arr; };
+  R(0,["SURVEY — "+(w.id||"")]);
+  R(4,["Vertical Section Azimuth (deg):",null, w.survey?.vsec_azimuth_deg??null]);
+  R(9,["N°","MD","INCL","AZIM","TVD","VSEC","NS","EW","DLS"]);
+  st.forEach((s,k)=>R(10+k,[k+1,s.md,s.incl,s.azim,s.tvd,s.vsec,s.ns,s.ew,s.dls]));
+  return rows;
+}
+function tallyAOA(w){
+  const rows=[["TALLY DE CAÑERÍAS — "+(w.id||"")],[],[],
+    ["Fase","OD (pulg)","Desde MD (m)","Hasta MD (m)","Peso (lb/ft)","Grado","TOC MD (m)"]];
+  PHASES.forEach(([ph])=>{ const c=w.casings?.[ph]; if(!c) return;
+    if(!(c.od_in!=null||c.shoe_md!=null||c.segments?.length)) return;
+    if(c.segments?.length) c.segments.forEach((sg,idx)=>
+      rows.push([ph, sg.od_in??c.od_in??null, sg.top_md??null, sg.bottom_md??null, sg.weight_ppf??null, sg.grade??null, idx===0?(c.toc_md??null):null]));
+    else rows.push([ph, c.od_in??null, 0, c.shoe_md??null, c.weight_ppf??null, c.grade??null, c.toc_md??null]);
+  });
+  rows.push([],["Piezas cortas y shoetrack (opcional; tipo = 'corto' o 'shoetrack')"],
+    ["Fase","Tipo","Descripción","Tope MD (m)","Fondo MD (m)","Longitud (m)","XOVER"]);
+  PHASES.forEach(([ph])=>{ (w.casings?.[ph]?.short_joints||[]).forEach(sj=>
+    rows.push([ph,"corto",sj.desc||"",sj.top_md??null,sj.bottom_md??null,sj.length_m??null,sj.xover?"si":"no"])); });
+  (w.shoetrack?.elements||[]).forEach(el=>{ const bot=el.bottom_md ?? (el.top_md!=null&&el.length_m!=null?round3(el.top_md+el.length_m):null);
+    rows.push(["produccion","shoetrack",el.desc||"",el.top_md??null,bot,el.length_m??null,"no"]); });
+  return rows;
+}
+function fracplanSheets(w){
+  const f=w.frac||{}, stages=(f.stages||[]).slice().sort((a,b)=>a.stage-b.stage), pz=[];
+  const P=(r,arr)=>{ while(pz.length<=r) pz.push([]); pz[r]=arr; };
+  P(0,["Pozo:",w.id||""]); P(4,["MD 90° (LP)",f.lp_md??null]); P(5,["Camisa (m)",f.collar_md??null]);
+  P(6,["Ext. Horizontal",f.horizontal_ext_m??null]); P(8,["Total etapas",f.total_stages??stages.length]);
+  P(11,["# Cluster","Tope MD (m)","Fondo MD (m)","Incl (°)","N° etapa","Sep (m)","Altura (m)","N° tiros","Carga","Phasing","Temp (°C)","Plug MD (m)","Long ET (m)"]);
+  let r=12;
+  stages.forEach(s=>{ const cls=s.clusters||[]; cls.forEach((cl,ci)=>P(r++,[
+    "Cluster "+(cl.n??""), cl.top_md??null, cl.bottom_md??null, cl.incl??null, ci===0?s.stage:null,
+    null, null, cl.shots??null, cl.charge??null, cl.phasing??null, null,
+    (ci===cls.length-1&&s.plug_md!=null)?s.plug_md:null, s.plan?.length_m??null])); });
+  const sheets=[{name:"Punzados",aoa:pz}];
+  const wp=stages.filter(s=>s.plan);
+  if(wp.length){
+    let groups=[];
+    for(const s of wp){ const p=s.plan, key=JSON.stringify([p.sand_t,p.fluid_m3,p.prop_int_lbft,p.fluid_int_m3m,p.length_m,p.wl]);
+      const last=groups[groups.length-1];
+      if(last && last.key===key && s.stage===last.hi+1){ last.hi=s.stage; last.n++; }
+      else groups.push({lo:s.stage,hi:s.stage,n:1,key,plan:p}); }
+    if(groups.length<2 && groups[0].hi>groups[0].lo){ const g=groups[0], mid=(g.lo+g.hi)>>1;
+      groups=[{lo:g.lo,hi:mid,n:mid-g.lo+1,plan:g.plan},{lo:mid+1,hi:g.hi,n:g.hi-mid,plan:g.plan}]; }
+    const wlDesc=wl=>{ if(!wl) return ""; const m=String(wl).match(/Gun\s+(.+?)"?\s*·\s*([\d-]+)\s*spf\s*·\s*(.+)$/i);
+      return m?`Cañón ${m[1].trim()} · ${m[2].replace(/-/g,"/")} tiros · Carga: ${m[3].trim()}`:wl; };
+    const col=fn=>groups.map(fn);
+    sheets.push({name:"Resumen",aoa:[
+      ["Yacimiento:","",w.id||""],[],
+      ["","TOTAL",...groups.map(g=>`Etapas ${g.lo}-${g.hi}`),"TOTAL POZO"],
+      ["Total etapas","",...col(g=>g.n), wp.length],
+      ["PROPANTE"],
+      ["Arena Natural 30/140","tn",...col(g=>g.plan.sand_t??null)],
+      ["Prop Intensity","lb/ft",...col(g=>g.plan.prop_int_lbft??null)],
+      ["FLUIDOS"],
+      ["TOTAL","m³",...col(g=>g.plan.fluid_m3??null)],
+      ["Fluid Intensity","m³/m",...col(g=>g.plan.fluid_int_m3m??null)],
+      ["Frac Length","m",...col(g=>g.plan.length_m??null)],
+      [],
+      ["Descripción punzados por grupo:"],
+      ...groups.map(g=>[`Etapas ${g.lo}-${g.hi}`, wlDesc(g.plan.wl)])]});
+  }
+  return sheets;
+}
+document.getElementById("b-wells").addEventListener("click",e=>{
+  const b=e.target.closest(".dl-btn"); if(!b || b.disabled) return;
+  const i=+b.dataset.w, w=ING.wells[i]; if(!w) return;
+  const id=(w.id||`pozo${i+1}`).replace(/[^\w.\-]+/g,"_");
+  try{
+    if(b.dataset.dl==="survey")     dlXlsx([{name:"Survey",aoa:surveyAOA(w)}], `${id}_survey.xlsx`);
+    else if(b.dataset.dl==="frac")  dlXlsx(fracplanSheets(w), `${id}_fracplan.xlsx`);
+    else if(b.dataset.dl==="tally") dlXlsx([{name:"Tally",aoa:tallyAOA(w)}], `${id}_tally.xlsx`);
+  }catch(err){ toast("⚠ Export: "+err.message); }
 });
 
 // sin survey: pozo vertical perfecto (TVD=MD, ns=ew=0) hasta el punto más profundo conocido
@@ -1980,6 +2295,7 @@ function assemblePad(){
       if(!c || !(c.od_in!=null||c.shoe_md!=null||c.weight_ppf!=null||c.grade||c.toc_md!=null)) return;
       const cas={phase:ph, od_in:c.od_in??null, shoe_md:c.shoe_md??null, toc_md:c.toc_md??null,
         weight_ppf:c.weight_ppf??null, grade:c.grade??null};
+      if(c.segments?.length) cas.segments=c.segments;
       if(c.short_joints?.length) cas.short_joints=c.short_joints;
       casings.push(cas);
     });

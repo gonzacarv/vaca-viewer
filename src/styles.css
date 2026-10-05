@@ -147,6 +147,7 @@
   #hover-tip .d { color:var(--ink-dim); }
   #hover-tip .s { color:var(--stage); font-weight:600; }
   #hover-tip .dl { color:var(--short); }
+  #hover-tip .fk { color:var(--ink-dim); }
   #hud-measure.on { color:#04141f; background:var(--accent); border-color:var(--accent); }
   #measure-tip { position:absolute; pointer-events:none; z-index:6; display:none; transform:translate(-50%,-140%);
     font-family:var(--lbl-font,var(--mono)); font-size:11px; line-height:1.5; color:var(--ink); text-align:center;
@@ -219,6 +220,10 @@
   .file-row .toc { margin-left:auto; flex-direction:row !important; align-items:center; gap:6px;
     text-transform:none !important; letter-spacing:0 !important; }
   .file-row .toc input { width:88px; }
+  .dl-btn { background:transparent; border:1px solid var(--line); color:var(--ink-dim); border-radius:5px;
+    cursor:pointer; font-size:13px; line-height:1; padding:2px 7px; }
+  .dl-btn:hover:not(:disabled) { color:#fff; border-color:var(--accent); }
+  .dl-btn:disabled { opacity:.3; cursor:default; }
   .filebtn { position:relative; overflow:hidden; display:inline-block; }
   .filebtn.opt::after { content:" (opc.)"; color:var(--ink-dim); font-size:11px; }
   .filebtn input[type=file] { position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; }
