@@ -22,7 +22,9 @@ Thumbs.db
 
 # Node (por si algún día se agrega tooling)
 node_modules/
-dist/
+# dist/: solo se versiona el archivo único offline para descargar y usar (el resto queda local)
+dist/*
+!dist/vaca-viewer.html
 samples/
 vendor/
 
