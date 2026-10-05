@@ -34,7 +34,9 @@ docs/plantillas/     .xlsx modelo (survey/fracplan/tally) + gen_plantillas.py. d
 ### build.py / build_dist.py (bundles)
 Envuelven cada módulo en un IIFE con `exports` y exponen cada símbolo como **getter**
 (`Object.defineProperty`), replicando las live-bindings ES (clave para que export3d lea el PAD/flags
-actuales). Inlinan el CSS. `dist/` y `vendor/` están en `.gitignore`.
+actuales). Inlinan el CSS. `vendor/` y `dist/*` están en `.gitignore`, **salvo `dist/vaca-viewer.html`**,
+que SÍ se versiona: es lo que el usuario baja de GitHub para usar la app (en otra PC). En cada versión:
+`python3 build_dist.py` y commitearlo junto con el código. `dist/Pads/` tiene datos reales: nunca subirlo.
 - **build.py**: un `import * as THREE` + libs por CDN + `type=module` → requiere HTTP e internet.
 - **build_dist.py** (release/distribución): three como **UMD global** (sin `import`, sin `type=module`),
   worker de pdf.js vía Blob desde el fuente inlineado; libs cacheadas en `vendor/` (descarga de cdnjs

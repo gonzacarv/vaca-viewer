@@ -102,7 +102,13 @@ Está pensada para el flujo real de campo —survey de geonavegación, tally de 
 
 ## Cómo se usa
 
-**1. Abrí la app.** Para usarla alcanza con **un solo archivo**: `dist/vaca-viewer.html`. Se abre con **doble-click**, sin servidor ni internet (three, SheetJS, pdf.js y jsPDF van embebidos). Se genera con:
+**1. Abrí la app.** Para usarla alcanza con **un solo archivo**: [`dist/vaca-viewer.html`](dist/vaca-viewer.html). Se abre con **doble-click**, sin servidor ni internet (three, SheetJS, pdf.js y jsPDF van embebidos).
+
+> ⤓ **Descargar la última versión:** entrá a [`dist/vaca-viewer.html`](dist/vaca-viewer.html) acá en
+> GitHub y tocá el botón **"Download raw file"** (ícono ⤓, arriba a la derecha del archivo). Guardalo
+> donde quieras y abrilo con doble-click (Chrome o Edge).
+
+Para regenerarlo después de cambiar el código:
 
 ```bash
 python3 build_dist.py
@@ -137,6 +143,7 @@ vaca-viewer/
 ├── src/             → módulos ES: viewer, export3d, export2d, export-ui, util, main + styles.css
 ├── build.py         → dist/index.html (single-file, libs por CDN)
 ├── build_dist.py    → dist/vaca-viewer.html (single-file 100% offline; libs en vendor/)
+├── dist/vaca-viewer.html → la app lista para descargar y usar (versionada en cada release)
 ├── build_pad.py     → parsers de survey/tally/fracplan en Python
 └── docs/
     ├── data-schema.md      → formato JSON del pad
