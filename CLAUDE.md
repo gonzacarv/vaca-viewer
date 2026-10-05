@@ -1,7 +1,7 @@
 # CLAUDE.md — Vaca Viewer
 
 Visor web de pozos y pads no convencionales (plug-and-perf). 100% navegador, **offline**, los datos
-**nunca salen del equipo**. Autor: Gonzalo Carvallo (@gonzacarv). Versión actual: **v0.5**.
+**nunca salen del equipo**. Autor: Gonzalo Carvallo (@gonzacarv). Versión actual: **v0.6**.
 
 ## Arquitectura
 
@@ -75,6 +75,20 @@ ya está embebida en styles.css. Isotipo y favicon = **SVG inline**.
 - **Planos envolventes**: la "espalda" (grilla de profundidad) se ubica siempre detrás de los heels según
   la orientación dominante del lateral (`lateralAxisInfo`); el plano lateral sigue a la cámara.
 
+## Instalación — v0.6
+
+- `installation.elements` = lista tipada (spec en `docs/data-schema.md`). Rango (`top_md`/`bottom_md`):
+  `TBG`(od/peso/grado) · `VB`(varillas: `diam` 3/4|7/8|1|1.5|vastago, `cc`) · `TPNC`(tapón de cemento,
+  `volume_l`) · `FLUIDO`(`name`,`color`,`density_gcm3`,`volume_l`). Puntuales (`md`): `TPN` · `PKR` ·
+  `ANCLA` · `BBA` · `BHA`(`mdf`) · `CARTEL`(`text`).
+- Modelo puro en viewer.js entre `/* ==== INSTALACIÓN (v0.6)` y `/* ==== FIN instalación` (sin DOM/THREE:
+  el harness lo evalúa tal cual): `normInstallation` (convierte pads v0.5 `tbg_*` → elemento TBG; se aplica
+  en `buildPad`), `casingID` (ID=√(OD²−w/2.67)), `capacityAt`/`volBetween`/`mdForVolume` (cañería más
+  interna que cubre el MD, por tramo telescopado), `instVolume`, `fmtVol`.
+- Constructor: una fila por elemento (`instRow`, `data-if` = campo del pad). TPNC/FLUIDO: desde/hasta →
+  volumen; volumen → hasta (`syncInstVolume`). `assemblePad` recalcula `volume_l` con las cañerías finales.
+  Los bloques Instalación/Shoetrack/Fracplan recuerdan si están abiertos (`w._open`).
+
 ## Corte 2D (export2d.js) — REGLAS DE DISEÑO (no romper)
 
 El usuario rechazó explícitamente seguir el survey real. Ver [[corte-2d-estilo-canonico]] en memoria.
@@ -83,7 +97,7 @@ El usuario rechazó explícitamente seguir el survey real. Ver [[corte-2d-estilo
   sigue la trayectoria punto a punto. Sin líneas de "juntas" en el arco.
 - Cañerías: paredes negras gruesas + interior blanco (telescopio). Cemento: patrón punteado del
   anular TOC→zapato. Zapatos: triángulos macizos hacia afuera, **tamaño fijo** (no proporcional al Ø).
-  Tapones: bloque negro fino. Packers: 2 bloques por fuera del TBG. Punzados: "dientes" esquemáticos
+  Tapones (de fractura): bloque negro fino. PKR de instalación: 2 recuadros con X por fuera del TBG. Punzados: "dientes" esquemáticos
   (NO 1:1 con los tiros). TBG con cartel propio (MD/TVD).
 - Etiquetas: en el lateral SOLO los tapones (y N° de etapa sobre el caño) van rotados −90° por encima;
   TODO lo demás (TOC, TBG, PKR, zapatos, caños cortos, shoetrack) va en cajas horizontales — tronco/
@@ -101,6 +115,21 @@ El usuario rechazó explícitamente seguir el survey real. Ver [[corte-2d-estilo
   desc/detalle + `5,87m - @2490m MD` (longitud 2 decimales con COMA, sin "L" ni "desde"). Shoetrack:
   UNA sola caja "Shoetrack" que lista sus componentes línea por línea con ese mismo formato
   (compacta, arrastrable entera).
+- Instalación (v0.6): fluidos llenan el ID de la cañería (solapes = rayado diagonal alternando colores;
+  B&N → grises); TPNC = patrón `cemplug` (gris + pintas) con tope/base marcados; TBG blanco → paredes por
+  encima de fluidos; VB = línea fina (`VB_W`, diferencias casi imperceptibles por Ø) + rombos si CC; BBA =
+  tramo corto del Ø del TBG, relleno de color con anillos transversales (NO rayado: parecía cemento);
+  PKR = recuadros con X por fuera del TBG; ANCLA = recuadros con cuña; TPN de instalación = rectángulo
+  con X que cruza todo el ID (~6:1); BHA =
+  símbolo rígido en el marco local del MD (fresa con 3 dientes; con MDF + anillo + cuerpo de motor),
+  punta hacia donde avanza el MD; CARTEL = caja con líder con flecha (`marker-start` #arw). Orden de
+  dibujo: casings → dogleg → TBG blanco → bandas de etapa → fluidos → TPNC → paredes TBG → VB → BBA →
+  N° de etapa → TPN/PKR/ANCLA → BHA → zapatos… Checkboxes: `fluids`, `cemplug`, `rods`, `bha`, `notes`.
+- Color por elemento (`el.color`, validado con `instColor`): sin elegir, el corte usa `INST_DEFCOLOR` y la
+  Vista 3D sus propios defaults (visibles en fondo oscuro). Trazos/contornos toman el color; en B&N todo
+  vuelve a tinta/grises. TPNC con color → su propio patrón (`cemPattern`); carteles → flecha del color.
+- Cajas: si la columna del tronco no entra, se reparte intercalada en hasta 4 columnas; las del lateral
+  buscan el hueco libre más cercano (x y luego hacia arriba) evitando cajas y el pozo (`obstacles`).
 - Regla de extensión (MD, opcional `els.extruler`): línea horizontal DEBAJO del esquema, pegada al
   pozo (justo bajo los dientes), del tope del cluster más somero a TD, con el mismo mapeo `P(md).x`
   del lateral (ticks alineados con tapones y demás elementos). No aplica a pozos verticales.

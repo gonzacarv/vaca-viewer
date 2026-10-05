@@ -6,7 +6,7 @@
 
 *Navegá el subsuelo de tu pad a escala real, prendé y apagá lo que querés ver, y exportá esquemas listos para informes y correos.*
 
-[![Estado](https://img.shields.io/badge/estado-v0.5_en_desarrollo-4ea1d3)]()
+[![Estado](https://img.shields.io/badge/estado-v0.6_en_desarrollo-4ea1d3)]()
 [![Web](https://img.shields.io/badge/100%25-web-3fb950)]()
 [![Offline](https://img.shields.io/badge/sin_servidor-offline-6cc04a)]()
 [![Datos privados](https://img.shields.io/badge/datos-nunca_salen_del_equipo-e5484d)]()
@@ -31,11 +31,34 @@ Está pensada para el flujo real de campo —survey de geonavegación, tally de 
 | | | |
 |:-:|:--|:--|
 | 🧭 | **Vista 3D** | El pad completo a escala real 1:1. Orbitás, hacés zoom y desplazás como en un CAD; prendés/apagás capas por pozo y por elemento (trayectoria, cañerías, punzados, tapones, etapas, dogleg). Medís distancias entre puntos. |
-| 🖼️ | **Exportar** | Imágenes de fondo blanco para documentos. **Vista 3D** (isométrica o la vista actual) y **corte de pozo 2D** (esquema oil&gas de manual: cañerías, cemento, zapatos, tapones, packers, punzados por etapa). Todo a **PNG / JPG / PDF**, en color o blanco y negro. |
-| ✏️ | **Datos** | Importás survey (`.xlsx`), tally (`.pdf`) y fracplan (`.xlsx`), o cargás/editás a mano. Cada pozo lleva su nombre editable y se colapsa para trabajar cómodo; el tally de aislación lista los caños cortos detectados. La tabla del pad se exporta a `.xlsx` o imagen, y el pad se guarda sobre el mismo `pad.vvwp` abierto (Guardar / Guardar como / Exportar copia). |
+| 🖼️ | **Exportar** | Imágenes de fondo blanco para documentos. **Vista 3D** (isométrica o la vista actual) y **corte de pozo 2D** (esquema oil&gas de manual: cañerías, cemento, zapatos, tapones, punzados por etapa y toda la instalación —TBG, packers, anclas, varillas, bomba, fluidos, tapones de cemento, BHA y carteles—). Todo a **PNG / JPG / PDF**, en color o blanco y negro. |
+| ✏️ | **Datos** | Importás survey (`.xlsx`), tally (`.pdf` o `.xlsx`) y fracplan (`.xlsx`), o cargás/editás a mano. Cada pozo lleva su nombre editable y se colapsa para trabajar cómodo; el tally de aislación lista los caños cortos detectados. La **instalación** se arma elemento por elemento, con cálculo de volúmenes. La tabla del pad se exporta a `.xlsx` o imagen, y el pad se guarda sobre el mismo `pad.vvwp` abierto (Guardar / Guardar como / Exportar copia). |
 | ⚙️ | **Configuración** | Exageración vertical, diámetros, radios de punzado, formato de etiquetas y demás preferencias de vista. |
 
 ---
+
+## Novedades (v0.6)
+
+**Instalación por elementos** (sección *Datos* → pozo → *Instalación*): en vez de una única sarta de TBG desde boca de pozo, ahora la instalación es una lista de elementos que se agregan con botones:
+
+| Botón | Qué carga | Cómo se dibuja en el corte 2D |
+|:--|:--|:--|
+| **TBG** | desde / hasta MD + OD, libraje y acero (picklists API) | sarta de tubing **solo en ese rango** — se pueden cargar varias |
+| **TPN** | MD | rectángulo con X que cruza la cañería |
+| **PKR** | MD | recuadros con X a ambos lados del TBG |
+| **ANCLA** | MD | recuadros con cuña a ambos lados del TBG |
+| **TPN cemento** | desde / hasta MD (o desde + volumen) | interior gris con pintas, tope y base marcados, cartel con el **volumen en litros** |
+| **FLUIDO** | nombre, densidad (g/cm³, opcional), desde / hasta (o desde + volumen) | llena la cañería con su color; donde se **solapan** varios, rayado alternando los colores |
+| **BBA** | MD | bomba: tramo corto del Ø del TBG con anillos transversales |
+| **VB** | desde / hasta MD, Ø (3/4", 7/8", 1", 1,5", vástago), **CC** | varillas de bombeo: línea fina (apenas más gruesa a mayor Ø); con CC, centralizadores |
+| **BHA** | MD, **MDF** | fresa; con MDF, fresa + motor de fondo. Apunta hacia donde avanza el MD (acostado en la rama) |
+| **Cartel** | MD + texto | cartel libre con flecha al MD |
+
+- **Volúmenes**: TPN cemento y fluidos usan el ID de la cañería en la que están (OD + libraje, respeta el telescopado). Desde + hasta → calcula el volumen; desde + volumen → ajusta el hasta.
+- **Color por elemento**: cada fila tiene su selector de color (corte 2D y Vista 3D). Sin tocarlo, cada vista usa su color por defecto; en blanco y negro todo vuelve a tinta y grises.
+- **Exportar → corte 2D**: checkboxes nuevos en *Elementos* (TPN de cemento, fluidos, varillas y bomba, BHA, carteles). Las **cajas de etiquetas** se reparten en varias columnas si no entran en una, y las del lateral buscan lugar libre sin pisarse ni tapar el pozo.
+- **Vista 3D y tabla del pad**: todos los elementos de la instalación aparecen en la escena (capa *Instalación*) y en la tabla resumen, con sus volúmenes.
+- **Compatibilidad**: los pads v0.5 (TBG único desde superficie) se abren igual y se convierten solos al formato nuevo.
 
 ## Novedades (v0.5)
 
@@ -79,18 +102,17 @@ Está pensada para el flujo real de campo —survey de geonavegación, tally de 
 
 ## Cómo se usa
 
-**1. Abrí la app.** Serví la carpeta por HTTP y entrá con el navegador:
+**1. Abrí la app.** Para usarla alcanza con **un solo archivo**: `dist/vaca-viewer.html`. Se abre con **doble-click**, sin servidor ni internet (three, SheetJS, pdf.js y jsPDF van embebidos). Se genera con:
 
 ```bash
-python3 -m http.server 8080     # abrí http://localhost:8080
+python3 build_dist.py
 ```
 
-> **Archivo único portable (recomendado para distribuir):** `python3 build_dist.py` genera
-> `dist/vaca-viewer.html` — **100% offline y self-contained** (three, SheetJS, pdf.js y jsPDF
-> embebidos). Se abre con **doble-click**, sin servidor ni internet. (`python3 build.py` genera
-> `dist/index.html`, más liviano pero con las libs por CDN → requiere servidor + internet.)
+> `dist/index.html` (de `python3 build.py`) **no** es el archivo para distribuir: es más liviano pero
+> trae las librerías por internet (CDN). Para desarrollar sobre los fuentes, serví la carpeta por HTTP
+> (`python3 -m http.server 8080` y abrí `http://localhost:8080`).
 
-**2. Cargá un pad.** En la sección **Datos**, arrastrá un `pad.vvwp` existente, o construilo cargando los archivos crudos por pozo (el survey y el fracplan son opcionales; sin survey se asume pozo vertical).
+**2. Cargá un pad.** En la sección **Datos**, arrastrá un `pad.vvwp` existente, o construilo cargando los archivos crudos por pozo (el survey y el fracplan son opcionales; sin survey se asume pozo vertical). Las plantillas de cada archivo están en [`docs/plantillas/`](docs/plantillas/). La instalación (TBG, packers, fluidos, varillas, BHA…) se agrega a mano en el bloque *Instalación* de cada pozo.
 
 **3. Explorá en 3D.** Con el pad cargado saltás a **Vista 3D**. Usá el panel de **Capas** (arriba a la derecha) para mostrar solo lo que te interesa, la veleta de la esquina para las vistas cardinales, y `F` para encuadrar.
 
@@ -124,7 +146,7 @@ vaca-viewer/
 
 El formato de intercambio es un **JSON propio y versionado** (`schema_version`); profundidades en metros, diámetros en pulgadas, coordenadas locales al pad. Especificación completa en [`docs/data-schema.md`](docs/data-schema.md).
 
-> 🔒 Los datos reales de pozos van en `data/` (ignorada por git). El repositorio solo contiene código y ejemplos anonimizados.
+> 🔒 Los datos reales de pozos van en `data/` o `samples/` (ignoradas por git). El repositorio solo contiene código, plantillas y ejemplos anonimizados.
 
 ---
 

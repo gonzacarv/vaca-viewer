@@ -184,6 +184,16 @@
     text-transform:none !important; letter-spacing:0 !important; }
   .inst-el { display:flex; gap:8px; align-items:center; }
   .inst-el input { width:96px; }
+  /* instalación v0.6: filas tipadas (pueden envolver) + barra de botones "+ elemento" */
+  .inst-list { display:flex; flex-direction:column; gap:6px; }
+  .inst-wrap[data-blk="inst"] .inst-el { flex-wrap:wrap; }
+  .inst-wrap[data-blk="inst"] .inst-el select, .inst-wrap[data-blk="inst"] .inst-el input { padding:4px 6px; font-size:12px; }
+  .inst-tag { width:92px; flex:none; font-size:10.5px; font-weight:600; color:#3ad6e0; text-transform:uppercase; letter-spacing:.05em; }
+  .inst-chk { flex-direction:row !important; align-items:center; gap:4px !important; font-size:11px !important; cursor:pointer; }
+  .inst-chk input { width:auto !important; }
+  .inst-cap { font-size:10px; color:var(--ink-dim); font-family:var(--mono); }
+  .well-card input.inst-color { width:34px !important; height:26px; padding:1px 2px !important; cursor:pointer; }
+  .inst-add { display:flex; flex-wrap:wrap; gap:6px; }
   table.tbl tr.inst td { color:#3ad6e0; }
   .well-card { border:1px solid var(--line); border-radius:8px; padding:14px 16px; margin-top:12px; background:var(--panel-2); }
   .well-card h5 { margin:0 0 12px; font-size:12.5px; letter-spacing:.05em; color:var(--ink); font-weight:600; }

@@ -119,7 +119,8 @@ function read2DOpts(){
     els:{ casings:el("casings"), cement:el("cement"), shoes:el("shoes"), plugs:el("plugs"),
       tbg:el("tbg"), instel:el("instel"), stages:el("stages"), perf:el("perf"),
       shorts:el("shorts"), shoetrack:el("shoetrack"), ruler:el("ruler"), extruler:el("extruler"),
-      labels:el("labels") } };
+      labels:el("labels"), fluids:el("fluids"), cemplug:el("cemplug"), rods:el("rods"),
+      bha:el("bha"), notes:el("notes") } };
 }
 function render2D(){
   const w=currentWell(); const box=$("ex2d-box"); if(!box) return;
