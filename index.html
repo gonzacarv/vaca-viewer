@@ -29,7 +29,7 @@
       </span>
       <div class="brandtext">
         <div class="brandname"><span class="bn-a">vaca</span> <span class="bn-b">viewer</span></div>
-        <div class="sub">subsuelo · v0.4</div>
+        <div class="sub">subsuelo · v0.5</div>
       </div>
     </div>
     <nav>
@@ -72,8 +72,9 @@
             <span class="grip">⠿</span><span class="panel-title">Vista de pozo</span>
           </div>
           <div class="panel-body">
-            <label class="row"><input type="radio" name="isomode" value="normal" checked>Normal (gris)</label>
-            <label class="row"><input type="radio" name="isomode" value="stages"><span class="sw" id="iso-stage-sw" style="background:linear-gradient(90deg,#2fa84a,#8fe063)"></span>Por etapas</label>
+            <label class="row"><input type="radio" name="isomode" value="normal" checked>Cañería</label>
+            <label class="row"><input type="radio" name="isomode" value="fracplan"><span class="sw" style="background:linear-gradient(90deg,#00e33a,#ffe500,#ff1e1e)"></span>Fracplan</label>
+            <label class="row"><input type="radio" name="isomode" value="stages"><span class="sw" id="iso-stage-sw" style="background:linear-gradient(90deg,#2fa84a,#8fe063)"></span>Etapas</label>
             <label class="row"><input type="radio" name="isomode" value="dogleg_lateral"><span class="sw" style="background:linear-gradient(90deg,#00e33a,#ffe500,#ff1e1e)"></span>Dogleg · lateral</label>
             <label class="row"><input type="radio" name="isomode" value="dogleg_build"><span class="sw" style="background:linear-gradient(90deg,#00e33a,#ffe500,#ff1e1e)"></span>Dogleg · curva</label>
             <label class="row"><input type="radio" name="isomode" value="dogleg_total"><span class="sw" style="background:linear-gradient(90deg,#00e33a,#ffe500,#ff1e1e)"></span>Dogleg · total</label>
@@ -86,14 +87,15 @@
             <span class="grip">⠿</span><span class="panel-title">Etiquetas</span>
           </div>
           <div class="panel-body">
+            <label class="row"><input type="checkbox" id="lbl-cursor" checked><span class="sw" style="background:var(--accent)"></span>Cursor slim</label>
+            <label class="row" id="lbl-cursor-frac-row" style="padding-left:18px"><input type="checkbox" id="lbl-cursor-frac"><span class="sw" style="background:linear-gradient(90deg,#00e33a,#ffe500,#ff1e1e)"></span>Cursor frac</label>
             <label class="row"><input type="checkbox" id="lbl-stage" checked><span class="sw" style="background:var(--stage)"></span>Etapas</label>
             <label class="row"><input type="checkbox" id="lbl-tpn"><span class="sw" style="background:var(--plug)"></span>Tapones</label>
             <label class="row"><input type="checkbox" id="lbl-short"><span class="sw" style="background:var(--short)"></span>Caños cortos</label>
-            <label class="row"><input type="checkbox" id="lbl-install"><span class="sw" style="background:#00c2d1"></span>Instalación (detalle)</label>
-            <label class="row"><input type="checkbox" id="lbl-shoetrack"><span class="sw" style="background:#c9a3ff"></span>Shoetrack (detalle)</label>
-            <label class="row"><input type="checkbox" id="lbl-shoe"><span class="sw" style="background:var(--casing)"></span>Zapatos (datos)</label>
-            <label class="row"><input type="checkbox" id="lbl-toc"><span class="sw" style="background:#cbb78a"></span>TOC (cemento)</label>
-            <label class="row"><input type="checkbox" id="lbl-cursor" checked><span class="sw" style="background:var(--accent)"></span>Cursor MD/TVD (hover)</label>
+            <label class="row"><input type="checkbox" id="lbl-install"><span class="sw" style="background:#00c2d1"></span>Instalación</label>
+            <label class="row"><input type="checkbox" id="lbl-shoetrack"><span class="sw" style="background:#c9a3ff"></span>Shoetrack</label>
+            <label class="row"><input type="checkbox" id="lbl-shoe"><span class="sw" style="background:var(--casing)"></span>Zapatos</label>
+            <label class="row"><input type="checkbox" id="lbl-toc"><span class="sw" style="background:#cbb78a"></span>TOC</label>
           </div>
         </div>
 
@@ -104,7 +106,7 @@
           </div>
           <div class="panel-body">
             <label class="row"><input type="checkbox" id="cfg-grid" checked>Grilla de superficie</label>
-            <label class="row"><input type="checkbox" id="cfg-planes">Planos envolventes (piso + fondo + lateral)</label>
+            <label class="row"><input type="checkbox" id="cfg-planes">Planos envolventes</label>
             <label class="row"><input type="checkbox" id="cfg-gridnums">Numeración de grilla (m)</label>
             <label class="row"><input type="checkbox" id="cfg-axes" checked>Ejes N/E/TVD</label>
             <label class="row"><input type="checkbox" id="cfg-shoes" checked>Marcas de zapato</label>

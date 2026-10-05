@@ -74,9 +74,16 @@ los archivos de origen adjuntos para trazabilidad).
   "casings": [
     {
       "phase": "produccion",       // "guia"|"intermedia1"|"intermedia2"|"produccion"
-      "od_in": 5.0,
-      "shoe_md": 6643.1,           // profundidad del zapato (set depth)
+      "od_in": 5.0,                // OD "resumen" = el del tramo del zapato (más profundo)
+      "shoe_md": 6643.1,           // profundidad del zapato (set depth) = Hasta MD más profundo
       "toc_md": null,              // tope de cemento (MD), si se conoce
+      "weight_ppf": 21.4,          // libraje "resumen" (tramo del zapato)
+      "grade": "P110",             // acero "resumen" (tramo del zapato)
+      "segments": [               // OPCIONAL: casing telescopado (mismo OD, distinto peso/grado por tramo).
+        // Solo si hay >1 tramo. La app marca cada XOVER en 3D. shoe/od/peso/grado "resumen" = tramo más profundo.
+        { "top_md": 0,    "bottom_md": 3200,   "od_in": 5.0, "weight_ppf": 18.4, "grade": "N80" },
+        { "top_md": 3200, "bottom_md": 6643.1, "od_in": 5.0, "weight_ppf": 21.4, "grade": "P110" }
+      ],
       "short_joints": [           // caños cortos (<10 m) del TRAMO MEDIO. Solo en la aislación.
         // casing corto o XOVER; se ignoran los primeros y últimos 150 m (cabezal y shoetrack).
         // La app los dibuja como banda amarilla, capa "Caños cortos". `xover:true` si es un crossover.
@@ -110,7 +117,18 @@ los archivos de origen adjuntos para trazabilidad).
         "clusters": [
           { "n": 450, "top_md": 3477, "bottom_md": 3477.3, "incl": 90, "shots": 1, "charge": "3 1/8\"_EHO 45", "phasing": 0 }
           // ...
-        ]
+        ],
+        // "plan" (OPCIONAL): datos planificados de la etapa, tomados de la hoja "Resumen" del
+        // fracplan (valores por GRUPO de etapas, replicados a cada etapa del grupo). Habilita la
+        // vista de pozo "Por fracplan" (coloreo verde→rojo por prop_int_lbft) y el "cursor frac".
+        "plan": {
+          "sand_t": 314.6,          // arena total planificada (toneladas)
+          "fluid_m3": 1848.5,       // fluido total (m³)
+          "prop_int_lbft": 2010.4,  // Prop Intensity (lb/ft) — métrica del coloreo "Por fracplan"
+          "fluid_int_m3m": 33.7,    // Fluid Intensity (m³/m)
+          "length_m": 105.15,       // Frac Length / longitud de etapa (m)
+          "wl": "Gun 3 1/8\" · 2 spf · EHO 45"  // detalle de cañón (reformateado del Resumen)
+        }
       }
       // ...
     ],

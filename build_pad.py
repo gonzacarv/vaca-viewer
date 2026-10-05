@@ -114,12 +114,76 @@ def parse_survey(path):
         })
     return {"vsec_azimuth_deg":vsec_az, "stations":stations}
 
+def _parse_gun_desc(s):
+    """'Cañón 3 1/8 · 2 tiros · Carga: EHO 45' -> 'Gun 3 1/8\" · 2 spf · EHO 45' ('1/2 tiros' -> '1-2 spf')."""
+    parts=[p.strip() for p in str(s).split("·")]
+    gun=re.sub(r'^ca\S*\s+', '', parts[0], flags=re.I).strip() if parts else ""
+    m=re.search(r'([\d/]+)', parts[1]) if len(parts)>1 else None
+    spf=m.group(1).replace("/","-") if m else ""
+    carga=re.sub(r'^carga:\s*', '', parts[2], flags=re.I).strip() if len(parts)>2 else ""
+    if not gun: return str(s).strip()
+    return f'Gun {gun}"' + (f' · {spf} spf' if spf else "") + (f' · {carga}' if carga else "")
+
+def parse_fracplan_resumen(wb):
+    """Hoja 'Resumen': valores por GRUPO de etapas (por-etapa). Devuelve stage->plan o None."""
+    if "Resumen" not in wb.sheetnames: return None
+    ws=wb["Resumen"]; c=lambda r,col: ws.cell(r,col).value
+    is_range=lambda v: isinstance(v,str) and re.match(r'\s*Etapas\s+\d+\s*-\s*\d+', v, re.I)
+    range_of=lambda v: (lambda m: [int(m.group(1)),int(m.group(2))] if m else None)(re.search(r'(\d+)\s*-\s*(\d+)', str(v)))
+    num=lambda v: v if isinstance(v,(int,float)) else None
+    groups=None
+    for r in range(1, ws.max_row+1):
+        cols=[]
+        for col in range(1, ws.max_column+1):
+            v=c(r,col)
+            if is_range(v):
+                rg=range_of(v)
+                if rg: cols.append({"col":col,"lo":rg[0],"hi":rg[1]})
+        if len(cols)>=2: groups=cols; break
+    if not groups: return None
+    def find_row(sub):
+        for r in range(1, ws.max_row+1):
+            v=c(r,1)
+            if isinstance(v,str) and sub.lower() in v.lower(): return r
+        return None
+    rPI=find_row("Prop Intensity"); rFI=find_row("Fluid Intensity"); rFL=find_row("Frac Length")
+    rFluid=None; arena_rows=[]
+    for r in range(1, ws.max_row+1):
+        a=c(r,1)
+        if isinstance(a,str) and a.strip().upper()=="TOTAL" and c(r,2)=="m³": rFluid=r
+        if isinstance(a,str) and re.search(r'arena', a, re.I): arena_rows.append(r)
+    gun_by_range={}
+    for r in range(1, ws.max_row+1):
+        a=c(r,1); b=c(r,2)
+        if is_range(a) and isinstance(b,str) and "·" in b:
+            rg=range_of(a)
+            if rg: gun_by_range[f"{rg[0]}-{rg[1]}"]=_parse_gun_desc(b)
+    G=[]
+    for g in groups:
+        sand=None
+        for r in arena_rows:
+            v=num(c(r,g["col"]))
+            if v is not None: sand=(sand or 0)+v
+        G.append({"lo":g["lo"],"hi":g["hi"],"sand_t":sand,
+            "fluid_m3": num(c(rFluid,g["col"])) if rFluid else None,
+            "prop_int_lbft": num(c(rPI,g["col"])) if rPI else None,
+            "fluid_int_m3m": num(c(rFI,g["col"])) if rFI else None,
+            "length_m": num(c(rFL,g["col"])) if rFL else None,
+            "wl": gun_by_range.get(f'{g["lo"]}-{g["hi"]}')})
+    def plan_of(stage):
+        for g in G:
+            if g["lo"]<=stage<=g["hi"]:
+                return {k:g[k] for k in ("sand_t","fluid_m3","prop_int_lbft","fluid_int_m3m","length_m","wl")}
+        return None
+    return plan_of
+
 def parse_fracplan(path):
     wb=openpyxl.load_workbook(path, data_only=True); ws=wb["Punzados"]
     c=lambda r,col: ws.cell(r,col).value
     hdr={"lp_md":c(5,2),"collar_md":c(6,2),"horizontal_ext_m":c(7,2),"total_stages":c(9,2)}
     stages={}; order=[]; cur=None
     for r in range(13, ws.max_row+1):
+        if ws.row_dimensions[r].hidden: continue      # fila oculta = dato borrado, no se ingiere
         name=c(r,1)
         if not (isinstance(name,str) and name.startswith("Cluster")): continue
         n=int(re.search(r'(\d+)', name).group(1))
@@ -131,6 +195,11 @@ def parse_fracplan(path):
         stages[cur]["clusters"].append({"n":n,"top_md":c(r,2),"bottom_md":c(r,3),
             "incl":c(r,4),"shots":c(r,8),"charge":c(r,9),"phasing":c(r,10)})
         if plug is not None: stages[cur]["plug_md"]=plug
+    plan_of=parse_fracplan_resumen(wb)
+    if plan_of:
+        for s in order:
+            p=plan_of(s)
+            if p: stages[s]["plan"]=p
     return {"total_stages":int(hdr["total_stages"]) if hdr["total_stages"] else len(order),
             "lp_md":hdr["lp_md"],"collar_md":hdr["collar_md"],
             "horizontal_ext_m":hdr["horizontal_ext_m"],"planned_vs_actual":"planned",
@@ -208,6 +277,95 @@ def parse_tally(path, phase=None):
     # caños cortos + shoetrack: solo interesan en la aislación (5"); en las otras fases se omiten
     shorts, shoetrack = parse_run_tally(text) if phase=="produccion" else ([], None)
     return od, shoe, weight, grade, shorts, shoetrack
+
+TALLY_PHASE_ALIAS={"guia":"guia","guía":"guia","int1":"intermedia1","intermedia1":"intermedia1","intermedia 1":"intermedia1",
+ "int2":"intermedia2","intermedia2":"intermedia2","intermedia 2":"intermedia2","prod":"produccion","produccion":"produccion",
+ "producción":"produccion","aislacion":"produccion","aislación":"produccion","aisl":"produccion"}
+def _norm_phase(v):
+    if v is None: return None
+    k=str(v).strip().lower()
+    return TALLY_PHASE_ALIAS.get(k) or TALLY_PHASE_ALIAS.get(re.sub(r'[\s.]', '', k))
+
+def parse_tally_xls(path):
+    """Tally de cañerías como XLSX simple de UNA solapa (alternativa a los PDFs). Devuelve
+       {fase: {od_in, shoe_md, weight_ppf, grade, toc_md, short_joints, shoetrack}}.
+       Detecta columnas por header. Ver docs/archivos-input.md."""
+    wb=openpyxl.load_workbook(path, data_only=True); ws=wb[wb.sheetnames[0]]
+    rows=[[ws.cell(r,c).value for c in range(1, ws.max_column+1)] for r in range(1, ws.max_row+1)]
+    norm=lambda s: str(s).strip().lower() if s is not None else ""
+    def numof(x):
+        if x is None or x=="": return None
+        if isinstance(x,(int,float)): return float(x)
+        m=re.search(r'-?[\d.]+', str(x).replace(",","")); return float(m.group()) if m else None
+    def find_header(*keys):
+        # fila de encabezado = cada key en una celda DISTINTA (evita matchear texto de notas)
+        for r,row in enumerate(rows):
+            cells=[norm(v) for v in row]; used=set(); ok=True
+            for k in keys:
+                f=next((ci for ci,c in enumerate(cells) if ci not in used and k in c), -1)
+                if f<0: ok=False; break
+                used.add(f)
+            if ok: return r
+        return -1
+    def col_of(hr,*keys):
+        cells=[norm(v) for v in rows[hr]]
+        for ci,c in enumerate(cells):
+            if any(k in c for k in keys): return ci
+        return -1
+    out={}
+    def ensure(ph): return out.setdefault(ph, {"od_in":None,"shoe_md":None,"weight_ppf":None,"grade":None,"toc_md":None,"short_joints":[],"shoetrack":None})
+    phr=find_header("fase","od")            # (1) tabla de fases
+    pcr=find_header("tipo","tope")          # (2) tabla de piezas
+    ph_end=pcr if pcr>phr else len(rows)    # la tabla de fases termina donde empieza la de piezas
+    if phr>=0:
+        # una fase puede tener VARIAS filas (telescopado): cada fila = un tramo con desde/hasta MD.
+        cF=col_of(phr,"fase"); cOD=col_of(phr,"od"); cDesde=col_of(phr,"desde")
+        cHasta=col_of(phr,"hasta","zapato","shoe")
+        cW=col_of(phr,"peso","lb/ft","lb/pie","lb"); cG=col_of(phr,"grado","grade","acero"); cT=col_of(phr,"toc")
+        grade_of=lambda v: str(v).strip() if (v is not None and str(v).strip()) else None
+        segs_by_phase={}
+        for r in range(phr+1, ph_end):
+            row=rows[r]; ph=_norm_phase(row[cF] if cF>=0 else None)
+            if not ph: continue
+            c=ensure(ph); toc=numof(row[cT]) if cT>=0 else None
+            if toc is not None and c["toc_md"] is None: c["toc_md"]=toc
+            segs_by_phase.setdefault(ph,[]).append({"top_md":numof(row[cDesde]) if cDesde>=0 else None,
+                "bottom_md":numof(row[cHasta]) if cHasta>=0 else None, "od_in":numof(row[cOD]) if cOD>=0 else None,
+                "weight_ppf":numof(row[cW]) if cW>=0 else None, "grade":grade_of(row[cG]) if cG>=0 else None})
+        for ph,segs in segs_by_phase.items():
+            c=ensure(ph); segs.sort(key=lambda s: s["bottom_md"] or 0)
+            prev=0.0
+            for s in segs:
+                if s["top_md"] is None: s["top_md"]=prev
+                prev=s["bottom_md"] if s["bottom_md"] is not None else prev
+                s["top_md"]=round(s["top_md"],3) if s["top_md"] is not None else None
+                s["bottom_md"]=round(s["bottom_md"],3) if s["bottom_md"] is not None else None
+            deep=segs[-1]                                   # tramo del zapato (más profundo)
+            c["shoe_md"]=deep["bottom_md"]
+            c["od_in"]=deep["od_in"] if deep["od_in"] is not None else next((s["od_in"] for s in segs if s["od_in"] is not None), None)
+            c["weight_ppf"]=deep["weight_ppf"]; c["grade"]=deep["grade"]
+            valid=[s for s in segs if s["bottom_md"] is not None]
+            if len(valid)>1: c["segments"]=valid           # solo si hay telescopado real
+    if pcr>=0:
+        cF=col_of(pcr,"fase"); cTp=col_of(pcr,"tipo"); cD=col_of(pcr,"desc","detalle")
+        cTop=col_of(pcr,"tope","top"); cBot=col_of(pcr,"fondo","bottom"); cL=col_of(pcr,"long"); cX=col_of(pcr,"xover","x-over")
+        for r in range(pcr+1, len(rows)):
+            row=rows[r]; tp=norm(row[cTp] if cTp>=0 else None)
+            if not tp: continue
+            ph=_norm_phase(row[cF] if cF>=0 else None) or "produccion"; c=ensure(ph)
+            top=numof(row[cTop]) if cTop>=0 else None; bot=numof(row[cBot]) if cBot>=0 else None
+            ln=numof(row[cL]) if cL>=0 else None
+            if ln is None and top is not None and bot is not None: ln=round(bot-top,3)
+            desc=str(row[cD]).strip() if (cD>=0 and row[cD] is not None) else ""
+            if tp.startswith("shoe"):
+                if c["shoetrack"] is None: c["shoetrack"]={"elements":[]}
+                c["shoetrack"]["elements"].append({"desc":desc or "elemento","length_m":ln,
+                    "top_md":round(top,3) if top is not None else None,"bottom_md":round(bot,3) if bot is not None else None})
+            else:
+                xo=bool(re.match(r'^(s|y|x|1|t)', norm(row[cX]) if cX>=0 else ""))
+                c["short_joints"].append({"desc":desc or "caño corto","xover":xo,"length_m":ln,
+                    "top_md":round(top,3) if top is not None else None,"bottom_md":round(bot,3) if bot is not None else None})
+    return out
 
 # ============================================================================
 # CONFIGURACIÓN DEL PAD — ajustar estos diccionarios y el bloque pad={} abajo.
