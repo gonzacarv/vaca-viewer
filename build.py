@@ -20,7 +20,7 @@ SRC  = os.path.join(ROOT, "src")
 DIST = os.path.join(ROOT, "dist")
 
 # Orden de evaluación (dependencias primero). main.js va último (arranca la app).
-MODULE_ORDER = ["util.js", "viewer.js", "export3d.js", "export2d.js", "export-ui.js", "main.js"]
+MODULE_ORDER = ["util.js", "viewer.js", "export3d.js", "export2d.js", "export-ui.js", "corva.js", "corva-ui.js", "main.js"]
 
 def transform(src):
     """Devuelve (cuerpo_transformado, nombres_exportados, usa_three)."""

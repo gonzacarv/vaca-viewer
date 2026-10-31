@@ -1,7 +1,8 @@
 # CLAUDE.md — Vaca Viewer
 
 Visor web de pozos y pads no convencionales (plug-and-perf). 100% navegador, **offline**, los datos
-**nunca salen del equipo**. Autor: Gonzalo Carvallo (@gonzacarv). Versión actual: **v0.6**.
+**nunca salen del equipo**. Única excepción: la solapa Datos → Corva, que habla directo con Corva y solo
+lee. Autor: Gonzalo Carvallo (@gonzacarv). Versión actual: **v1.1**.
 
 ## Arquitectura
 
@@ -21,6 +22,8 @@ src/
                      cámara, compositado de etiquetas HTML sobre el canvas) → PNG/JPG/PDF.
   export2d.js        corte transversal de pozo (esquema oil&gas en SVG) → PNG/JPG/PDF.
   export-ui.js       cablea la sección Exportar (tabs, preview, sliders, zoom, drag de cajas).
+  corva.js           cliente de Corva (solo lectura) + conversión al schema del pad. Sin DOM ni THREE.
+  corva-ui.js        solapas de Datos (Manual/Corva) y credenciales en Configuración. Ver docs/corva.md.
   util.js            helpers puros: saveDataURL, rasterizeSVG, canvasToFile, canvasToPDF, color.
   main.js            bootstrap: importa viewer + initExport().
   styles.css         estilos (incluye @font-face Space Grotesk embebida como data-URI, línea 1-2).
@@ -56,26 +59,47 @@ ya está embebida en styles.css. Isotipo y favicon = **SVG inline**.
   `produccion`(5", aislación). Spec completa en `docs/data-schema.md`.
 - **`stage.plan`** (opcional, de la hoja *Resumen* del fracplan): `sand_t, fluid_m3, prop_int_lbft,
   fluid_int_m3m, length_m, wl`. Habilita la Vista de pozo "Fracplan" y el "cursor frac".
-- **`casing.segments`** (opcional): casing telescopado — tramos `{top_md,bottom_md,od_in,weight_ppf,
-  grade}`. shoe/od/peso/grado "resumen" = tramo más profundo; cada xover se etiqueta en 3D.
+- **`casing.segments`** (opcional): tramos de la columna `{top_md,bottom_md,od_in,weight_ppf,grade}`, por
+  libraje, grado o diámetro (5"/5½"). shoe/od/peso/grado "resumen" = tramo más profundo. Salen del tally, de
+  Corva o de las filas "+ tramo" del constructor. En 3D cambia el radio del tubo y cada XO se etiqueta; en
+  el corte, `halfAt` da el semiancho por tramo y `casingSegAt` (viewer.js) el tramo en un MD.
+- **`stage.actual`** (opcional, de Corva): lo bombeado. Habilita la Vista de pozo "Frac real".
 - Los samples reales van en `samples/` (gitignored). No commitear data operativa.
 
 ## Vista de pozo (isoMode) e ingesta — v0.5
 
 - **isoMode** (panel "Vista de pozo"): `normal`(Cañería) · `fracplan`(intensidad de arena `prop_int_lbft`,
-  rampa verde→rojo auto-normalizada a pozos visibles) · `stages`(par de colores configurable, `STAGE_PAIRS`)
+  rampa verde→rojo auto-normalizada a pozos visibles) · `fracreal`(igual, con `stage.actual`; se oculta si el
+  pad no lo trae) · `stages`(par de colores configurable, `STAGE_PAIRS`)
   · `dogleg_lateral|build|total`. El coloreo se aplica al tubo de `produccion` en `applyIsoColors`.
-- **Cursor**: "cursor slim" (MD/TVD/dogleg) + "cursor frac" dependiente (agrega AS/Fluido/LongEt/PropInt/
-  FluidInt/WL de la etapa en hover).
+- **Cursor**: "cursor slim" (MD/TVD/dogleg) + "cursor frac" dependiente: dos sub-carteles de color pastel
+  debajo del encabezado, **Plan** (AS/Fluido/LongEt/PropInt/FluidInt/WL) y **Real** (lo bombeado).
+- **Punzados 3D** (`refreshPerfColors`, `perfBranches`, `perfAlpha`): en `fracplan`/`fracreal` toman la intensidad de la
+  etapa, con la misma rampa y escala que el tubo (gris si falta el dato); en las demás vistas, turquesa alternado por
+  etapa. Cada cluster son 6 raíces con 2 bifurcaciones (42 tramos), y la punta llega justo a la extensión (80–250 m, 120 por
+  defecto). La opacidad cae con la distancia radial, de 1 en la salida a `PERF_TIP_ALPHA` en la punta: va en el atributo
+  de color RGBA de cada vértice, y el color en el material (un objeto y un material por etapa). export3d los trata aparte.
+- **Rampa de arena** (`fracIntensityRange`): cada modo con su escala, del mínimo al máximo **sin el 5% extremo de
+  cada lado**: con min/max puro, las etapas cortadas o mal cargadas aplastan al resto. El panel muestra los lb/ft.
 - **Ingesta** (parsers en `viewer.js` + gemelos en `build_pad.py`, MISMA lógica): survey `.xlsx`,
   fracplan `.xlsx` (`Punzados` posición fija + `Resumen` por grupo de etapas), tally `.pdf` (Run Tally de
   OpenWells/Landmark) **o** `.xlsx` (una solapa, todas las fases, con telescopado desde/hasta MD).
-  **Las filas OCULTAS del Excel se ignoran** (dato borrado, ej. "etapa 29"). Ver `docs/archivos-input.md`
+  En el Run Tally, Set Depth = MD del FONDO de la pieza. **Las filas OCULTAS del Excel se ignoran** (dato
+  borrado, ej. "etapa 29"). Ver `docs/archivos-input.md`
   y [[ingestor-filas-ocultas]].
 - **Exportar ingesta**: botón ⤓ por pozo (Survey/Fracplan/Tally) → `.xlsx` con formato de plantilla y los
   datos cargados, editable y recargable (`surveyAOA`/`fracplanSheets`/`tallyAOA` + `dlXlsx`).
 - **Planos envolventes**: la "espalda" (grilla de profundidad) se ubica siempre detrás de los heels según
   la orientación dominante del lateral (`lateralAxisInfo`); el plano lateral sigue a la cámara.
+
+## Corva
+
+Spec en `docs/corva.md`. **El repo es público:** ni docs, ni comentarios, ni ejemplos llevan la operadora, el yacimiento, nombres de
+pozos, profundidades por pozo o estadísticas de la cuenta (ejemplos genéricos: `ABC-1234h`); ese detalle va en `samples/corva-relevamiento.md` (ignorado por git). No cambiar la ruta de datos sin releerlo: `data.corva.ai` no habilita CORS para
+páginas locales; la app usa `api.corva.ai/api/core/v1/data/corva/` (deprecada en el swagger), donde el
+`sort` va sin comillas (`{timestamp: -1}`): con JSON válido responde 200 e ignora el orden.
+Los `components` de `data.casing` se ubican desde el zapato hacia arriba, y la profundidad de los tapones
+es la del diseño en todas las fuentes: el doc explica por qué.
 
 ## Instalación — v0.6
 
@@ -97,6 +121,14 @@ El usuario rechazó explícitamente seguir el survey real. Ver [[corte-2d-estilo
 - **Camino CANÓNICO** parametrizado por MD: tronco vertical + **cuarto de círculo agresivo** (radio
   Rm = clamp(8% TVD landing, 120–300 m), arranca donde TVD = tvdLand−Rm) + lateral horizontal. NO se
   sigue la trayectoria punto a punto. Sin líneas de "juntas" en el arco.
+- **Holguras:** los semianchos se calculan de adentro hacia afuera (`halves`): el mínimo de cada fase deja
+  `WALL_CLEAR` sobre el máximo de la interna, en cualquier tramo y con cualquier Ø del slider. Si no entra, crece la externa.
+- **Ajuste esquemático** (`els.schem`, checkbox "Separar instalación"): la instalación importa más que la regla.
+  Cada elemento pide su lugar en px (`evs`: extensión hacia arriba/abajo + `SCHEM_GAP`; rangos cortos, `SCHEM_MIN_LEN`:
+  una cola de 2 TBG siempre se ve). Lo que falta se agrega **estirando el camino** (`stretch`/`extraAt`), el lienzo crece
+  y nada se comprime. Lo que cae en el arco corre el inicio de la curva (`arcStart`) y queda en el tronco; los zapatos NO
+  piden lugar, siguen en la curva salvo que algo más profundo la corra. El orden entre elementos nunca cambia. La regla
+  usa el mismo mapeo (`rulerY`), así que los números siguen siendo ciertos, con ticks más separados. Sin instalación no hay ajuste.
 - Cañerías: paredes negras gruesas + interior blanco (telescopio). Cemento: patrón punteado del
   anular TOC→zapato. Zapatos: triángulos macizos hacia afuera, **tamaño fijo** (no proporcional al Ø).
   Tapones (de fractura): bloque negro fino. PKR de instalación: 2 recuadros con X por fuera del TBG. Punzados: "dientes" esquemáticos
@@ -119,17 +151,25 @@ El usuario rechazó explícitamente seguir el survey real. Ver [[corte-2d-estilo
   (compacta, arrastrable entera).
 - Instalación (v0.6): fluidos llenan el ID de la cañería (solapes = rayado diagonal alternando colores;
   B&N → grises); TPNC = patrón `cemplug` (gris + pintas) con tope/base marcados; TBG blanco → paredes por
-  encima de fluidos; VB = línea fina (`VB_W`, diferencias casi imperceptibles por Ø) + rombos si CC; BBA =
-  tramo corto del Ø del TBG, relleno de color con anillos transversales (NO rayado: parecía cemento);
+  encima de fluidos, más fino si es de menor OD que el mayor del pozo (`TBG_OD_GAIN`), con hombro en el cambio;
+  VB = línea fina (`VB_W`, diferencias casi imperceptibles por Ø) + rombos si CC; BBA = tramo corto (`BBA_PX`) del
+  Ø del TBG, siempre desde su MD hacia abajo, relleno de color con anillos transversales (NO rayado: parecía cemento);
   PKR = recuadros con X por fuera del TBG; ANCLA = recuadros con cuña; TPN de instalación = rectángulo
   con X que cruza todo el ID (~6:1); BHA =
   símbolo rígido en el marco local del MD (fresa con 3 dientes; con MDF + anillo + cuerpo de motor),
-  punta hacia donde avanza el MD; CARTEL = caja con líder con flecha (`marker-start` #arw). Orden de
+  punta hacia donde avanza el MD; CARTEL = caja con líder con flecha (`marker-start` #arw), multilínea, con
+  fondo elegible (`el.bg`), dibujada por encima de todas las demás (`rb.notes`); en el mismo MD (±1 m) que un
+  elemento puntual reemplaza su etiqueta automática. Orden de
   dibujo: casings → dogleg → TBG blanco → bandas de etapa → fluidos → TPNC → paredes TBG → VB → BBA →
   N° de etapa → TPN/PKR/ANCLA → BHA → zapatos… Checkboxes: `fluids`, `cemplug`, `rods`, `bha`, `notes`.
 - Color por elemento (`el.color`, validado con `instColor`): sin elegir, el corte usa `INST_DEFCOLOR` y la
   Vista 3D sus propios defaults (visibles en fondo oscuro). Trazos/contornos toman el color; en B&N todo
   vuelve a tinta/grises. TPNC con color → su propio patrón (`cemPattern`); carteles → flecha del color.
+- Tramos: cambio de OD exagerado (`SEG_OD_GAIN`, sin llegar a la fase externa) con hombro; si solo cambia
+  libraje o grado, marca hacia afuera. Cartel horizontal `XO 5" 18# → 5½" 23#` (checkbox `xovers`).
+- Líderes: salen de la pared del lado de la caja **sobre la normal del camino**, nunca con un corrimiento horizontal
+  (en el arco quedarían adentro del caño). Arrastrar una caja muestra un círculo con X (HTML, fuera del SVG): soltarla
+  ahí la elimina (`hiddenLabels`, clave = sus líneas) hasta que cambia el pad ("Generar y ver pad" o cualquier carga).
 - Cajas: si la columna del tronco no entra, se reparte intercalada en hasta 4 columnas; las del lateral
   buscan el hueco libre más cercano (x y luego hacia arriba) evitando cajas y el pozo (`obstacles`).
 - Regla de extensión (MD, opcional `els.extruler`): línea horizontal DEBAJO del esquema, pegada al
@@ -147,7 +187,7 @@ Grotesk, minúsculas). Sistema completo en `docs/brand-kit.md` y en un proyecto 
 
 - **No hay navegador headless** en este entorno. Verificar con: `node --check` de cada módulo y del
   bundle; y un harness node que stubbea `./viewer.js` (con `interpAtMD`, `escHtml`, `fmtOD`,
-  `plugCountInverted`, `parseStages`) para ejecutar `buildWellSVG` contra un pad y chequear que el SVG
+  `plugCountInverted`, `parseStages`, `casingSegAt`) para ejecutar `buildWellSVG` contra un pad y chequear que el SVG
   sea XML bien formado, sin `NaN/undefined`, y que cajas/etiquetas no se salgan del lienzo.
 - Tras cambios: `python3 build.py` y confirmar que el bundle pasa `node --check`. Para release offline:
   `python3 build_dist.py` (chequea que no queden dependencias de red).

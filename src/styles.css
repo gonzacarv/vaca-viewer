@@ -148,6 +148,19 @@
   #hover-tip .s { color:var(--stage); font-weight:600; }
   #hover-tip .dl { color:var(--short); }
   #hover-tip .fk { color:var(--ink-dim); }
+  #hover-tip .ft-card { margin-top:5px; padding:3px 7px 4px; border-radius:4px; color:#1c2530; }
+  #hover-tip .ft-card .ft-t { font-weight:700; }
+  #hover-tip .ft-card .fk { color:#55616e; }
+  #hover-tip .ft-plan { background:#d6e6f5; }
+  #hover-tip .ft-real { background:#fbe3c8; }
+  #hover-tip .ft-plug { margin-top:4px; }
+  .iso-legend { display:flex; align-items:center; gap:6px; margin-top:6px; padding-top:6px; border-top:1px dashed var(--line);
+    font-family:var(--mono); font-size:10.5px; color:var(--ink-dim); }
+  .iso-legend .sw { flex:1; min-width:24px; height:7px; border-radius:2px; background:linear-gradient(90deg,#00e33a,#ffe500,#ff1e1e); }
+  .ex-trash { position:fixed; z-index:50; width:58px; height:58px; transform:translateX(-50%); pointer-events:none;
+    display:flex; align-items:center; justify-content:center; border-radius:50%; border:2px dashed #d64545;
+    background:rgba(13,17,23,.88); color:#ff8a8a; font-size:24px; transition:transform .12s, background .12s; }
+  .ex-trash.over { transform:translateX(-50%) scale(1.2); background:#d64545; color:#fff; border-style:solid; }
   #hud-measure.on { color:#04141f; background:var(--accent); border-color:var(--accent); }
   #measure-tip { position:absolute; pointer-events:none; z-index:6; display:none; transform:translate(-50%,-140%);
     font-family:var(--lbl-font,var(--mono)); font-size:11px; line-height:1.5; color:var(--ink); text-align:center;
@@ -159,7 +172,7 @@
   .build-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:10px 18px; max-width:1200px; }
   .build-grid label, .well-card label { display:flex; flex-direction:column; gap:4px; font-size:10.5px;
     color:var(--ink-dim); text-transform:uppercase; letter-spacing:.06em; }
-  .build-grid input, .build-grid select, .well-card input, .well-card select {
+  .build-grid input, .build-grid select, .well-card input, .well-card select, .well-card textarea {
     background:var(--panel-2); color:var(--ink); border:1px solid var(--line); border-radius:5px;
     padding:6px 8px; font-size:12.5px; font-family:var(--sans); }
   .phase-row { display:flex; align-items:center; gap:8px; padding:7px 0; flex-wrap:wrap; border-top:1px dashed var(--line); }
@@ -212,6 +225,10 @@
   /* listado de caños cortos detectados (debajo de los detalles de la aislación) */
   .cc-list { flex-basis:100%; margin:4px 0 2px 114px; }
   .cc-list .cc-title { font-family:var(--mono); font-size:10.5px; color:var(--short); margin-bottom:4px; }
+  .cc-edit { display:flex; flex-direction:column; gap:4px; align-items:flex-start; }
+  .cc-edit .inst-el { flex-wrap:wrap; }
+  .cc-edit .inst-el input[type=number] { width:86px; }
+  .cc-edit .cc-title { color:var(--ink-dim); margin-bottom:0; }
   .cc-tbl { width:auto; }
   .cc-tbl th, .cc-tbl td { padding:3px 9px; font-size:11px; }
   /* card colapsable (tabla del pad) con acciones en el encabezado */
@@ -239,11 +256,22 @@
   .filebtn input[type=file] { position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; }
   /* ---- Sección Exportar (v0.3) ---- */
   .ex-tabs { display:flex; gap:6px; margin:0 0 16px; border-bottom:1px solid var(--line); }
-  .ex-tab { background:none; border:0; border-bottom:2px solid transparent; color:var(--ink-dim);
+  .ex-tab, .sub-tab { background:none; border:0; border-bottom:2px solid transparent; color:var(--ink-dim);
     padding:9px 14px; font-size:12.5px; cursor:pointer; font-family:var(--sans); margin-bottom:-1px; }
-  .ex-tab:hover { color:var(--ink); }
-  .ex-tab.active { color:var(--ink); border-bottom-color:var(--accent); }
-  .ex-pane { display:none; } .ex-pane.active { display:block; }
+  .ex-tab:hover, .sub-tab:hover { color:var(--ink); }
+  .ex-tab.active, .sub-tab.active { color:var(--ink); border-bottom-color:var(--accent); }
+  .ex-pane, .sub-pane { display:none; } .ex-pane.active, .sub-pane.active { display:block; }
+  /* ---- Corva: credenciales (Configuración) y solapa de Datos ---- */
+  .cv-form { display:flex; flex-direction:column; gap:10px; max-width:420px; align-items:stretch; }
+  .cv-field { display:flex; flex-direction:column; gap:4px; font-size:10.5px; color:var(--ink-dim); text-transform:uppercase; letter-spacing:.06em; }
+  .cv-field .ex-inp, .cv-field .ex-sel { width:100%; text-transform:none; letter-spacing:0; box-sizing:border-box; }
+  .cv-row { display:flex; align-items:flex-end; gap:8px 0; flex-wrap:wrap; margin-bottom:10px; }
+  .cv-row .cv-field { flex:1 1 280px; max-width:440px; margin-right:12px; }
+  .cv-row .btn { margin-bottom:0; }
+  .cv-log { margin-top:8px; }
+  .cv-log .cv-warn { color:var(--plug,#e3a94c); }
+  .cv-ok { color:#6cc04a; } .cv-err { color:#ff7b72; }
+  .btn:disabled { opacity:.5; cursor:default; }
   .ex-layout { display:grid; grid-template-columns:320px 1fr; gap:18px; align-items:start; max-width:1200px; }
   .ex-controls { display:flex; flex-direction:column; gap:0; }
   .ex-controls .card { margin-bottom:12px; padding:14px 16px; }

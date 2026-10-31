@@ -29,7 +29,7 @@
       </span>
       <div class="brandtext">
         <div class="brandname"><span class="bn-a">vaca</span> <span class="bn-b">viewer</span></div>
-        <div class="sub">subsuelo · v0.6</div>
+        <div class="sub">subsuelo · v1.1</div>
       </div>
     </div>
     <nav>
@@ -74,10 +74,12 @@
           <div class="panel-body">
             <label class="row"><input type="radio" name="isomode" value="normal" checked>Cañería</label>
             <label class="row"><input type="radio" name="isomode" value="fracplan"><span class="sw" style="background:linear-gradient(90deg,#00e33a,#ffe500,#ff1e1e)"></span>Fracplan</label>
+            <label class="row" id="iso-fracreal" style="display:none" title="Intensidad de arena bombeada, de Corva"><input type="radio" name="isomode" value="fracreal"><span class="sw" style="background:linear-gradient(90deg,#00e33a,#ffe500,#ff1e1e)"></span>Frac real</label>
             <label class="row"><input type="radio" name="isomode" value="stages"><span class="sw" id="iso-stage-sw" style="background:linear-gradient(90deg,#2fa84a,#8fe063)"></span>Etapas</label>
             <label class="row"><input type="radio" name="isomode" value="dogleg_lateral"><span class="sw" style="background:linear-gradient(90deg,#00e33a,#ffe500,#ff1e1e)"></span>Dogleg · lateral</label>
             <label class="row"><input type="radio" name="isomode" value="dogleg_build"><span class="sw" style="background:linear-gradient(90deg,#00e33a,#ffe500,#ff1e1e)"></span>Dogleg · curva</label>
             <label class="row"><input type="radio" name="isomode" value="dogleg_total"><span class="sw" style="background:linear-gradient(90deg,#00e33a,#ffe500,#ff1e1e)"></span>Dogleg · total</label>
+            <div class="iso-legend" id="iso-legend" style="display:none" title="Intensidad de arena de cada punta de la rampa, sin el 5% extremo de cada lado"><span id="iso-leg-min"></span><span class="sw"></span><span id="iso-leg-max"></span></div>
           </div>
         </div>
 
@@ -246,10 +248,12 @@
                 <input type="text" id="ex2d-perfstages" class="ex-inp" style="width:100%; margin:2px 0 6px"
                   placeholder="etapas a punzar (ej: 1,3,10-15) — vacío = todas">
                 <label class="row"><input type="checkbox" data-ex2d-el="shorts"> Caños cortos</label>
+                <label class="row"><input type="checkbox" data-ex2d-el="xovers" checked> Cambios de tramo (XO)</label>
                 <label class="row"><input type="checkbox" data-ex2d-el="shoetrack"> Shoetrack</label>
                 <label class="row"><input type="checkbox" data-ex2d-el="ruler" checked> Regla de profundidad</label>
                 <label class="row"><input type="checkbox" data-ex2d-el="extruler"> Regla de extensión (MD)</label>
                 <label class="row"><input type="checkbox" data-ex2d-el="labels" checked> Etiquetas de texto</label>
+                <label class="row" title="Estira el esquema donde hay elementos de instalación muy juntos o muy cortos y saca de la curva los que caen en ella. Los cuadros siempre muestran el dato real."><input type="checkbox" data-ex2d-el="schem" checked> Separar instalación (no a escala)</label>
               </div>
               <div class="card"><h4>Exportar</h4>
                 <div class="ex-actions">
@@ -269,6 +273,13 @@
     <section class="view" id="vdata">
       <div class="pad">
         <h2>Datos</h2>
+        <div class="ex-tabs">
+          <button class="sub-tab active" data-dtab="dt-manual">Manual</button>
+          <button class="sub-tab" data-dtab="dt-corva">Corva</button>
+        </div>
+
+        <!-- ============ Solapa: Manual ============ -->
+        <div class="sub-pane active" id="dt-manual">
         <div class="card">
           <h4>Cargar pad existente</h4>
           <div class="drop" id="drop">Arrastrá tu <b>pad.vvwp</b> aquí, o
@@ -319,6 +330,30 @@
           <button class="btn" id="forget">Olvidar pad guardado</button>
           <span class="stub">Para imágenes (PNG/JPG/PDF, corte de pozo o vista 3D) usá la sección <b>Exportar</b>.</span>
         </div>
+        </div>
+
+        <!-- ============ Solapa: Corva ============ -->
+        <div class="sub-pane" id="dt-corva">
+          <div class="card">
+            <h4>Traer pad desde Corva</h4>
+            <div id="cv-noauth">
+              <div class="stub" style="margin-bottom:10px">Para ver los PADs de tu cuenta, primero cargá tus credenciales de Corva.</div>
+              <button class="btn primary" id="cv-goconfig">Ir a Configuración</button>
+            </div>
+            <div id="cv-picker" style="display:none">
+              <div class="cv-row">
+                <label class="cv-field">Pad <select id="cv-pad" class="ex-sel"></select></label>
+                <label class="cv-field">Mostrar <select id="cv-frac" class="ex-sel" title="Colorea las etapas del pad en la Vista de pozo"><option value="fracplan">Frac plan</option><option value="fracreal">Frac real</option></select></label>
+                <button class="btn primary" id="cv-load">Cargar pad</button>
+                <button class="btn" id="cv-refresh">Actualizar lista</button>
+              </div>
+              <div class="stub" id="cv-status"></div>
+              <div class="stub cv-log" id="cv-log"></div>
+              <div class="stub" style="margin-top:10px">Trae survey, cañerías, fractura planificada y real, y los convierte a metros. El pad queda
+                guardado en este equipo y se puede editar y guardar desde la solapa <b>Manual</b>. TOC e instalación no se traen: se cargan a mano.</div>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -340,11 +375,11 @@
             <span class="meta" id="dexag-val">40×</span></label>
           <div class="stub" style="margin-top:8px">Los diámetros reales (5"–13⅜") son invisibles sobre 6600 m de pozo. Este factor los agranda de forma proporcional entre sí. No afecta la escala de profundidad.</div>
         </div>
-        <div class="card"><h4>Radio de punzados</h4>
-          <label class="row" style="max-width:420px">Propagación (m)
-            <input type="range" id="cfg-perfradius" min="1" max="200" step="1" value="20" style="flex:1; accent-color:var(--accent)">
-            <span class="meta" id="perfradius-val">20 m</span></label>
-          <div class="stub" style="margin-top:8px">Radio real (en metros) hasta donde llega la "rama" de punzados — sirve para ver la propagación real. No afecta la profundidad.</div>
+        <div class="card"><h4>Extensión de las fracturas</h4>
+          <label class="row" style="max-width:420px">Extensión (m)
+            <input type="range" id="cfg-perfradius" min="80" max="250" step="5" value="120" style="flex:1; accent-color:var(--accent)">
+            <span class="meta" id="perfradius-val">120 m</span></label>
+          <div class="stub" style="margin-top:8px">Radio real (en metros) hasta donde llegan las ramas de cada punzado en la Vista 3D. No afecta la profundidad.</div>
         </div>
         <div class="card"><h4>Numeración de tapones</h4>
           <label class="row" style="max-width:420px"><input type="checkbox" id="cfg-pluginv"> Invertir conteo (N°1 = más somero)</label>
@@ -383,6 +418,30 @@
           <div class="lbl" style="font-family:var(--mono); font-size:10px; color:var(--ink-dim); text-transform:uppercase; letter-spacing:.08em; margin-bottom:6px">Formato del OD en etiquetas</div>
           <label class="row" style="max-width:420px"><input type="radio" name="odfmt" value="decimal" checked> Decimal &nbsp;<span class="stub">7.625"</span></label>
           <label class="row" style="max-width:420px"><input type="radio" name="odfmt" value="imperial"> Imperial (fraccional) &nbsp;<span class="stub">7 5/8"</span></label>
+        </div>
+        <div class="card"><h4>Conexión a Corva</h4>
+          <div id="cv-login">
+            <form id="cv-form" class="cv-form">
+              <label class="cv-field">Mail <input id="cv-email" class="ex-inp" type="email" autocomplete="username"></label>
+              <label class="cv-field">Contraseña <input id="cv-pass" class="ex-inp" type="password" autocomplete="current-password"></label>
+              <label class="cv-field">Verificación en dos pasos
+                <select id="cv-mfa" class="ex-sel">
+                  <option value="">No uso</option><option value="email">Mail</option>
+                  <option value="sms">SMS</option><option value="authenticator">App autenticadora</option>
+                </select></label>
+              <label class="cv-field" id="cv-code-row" style="display:none">Código <input id="cv-code" class="ex-inp" type="text" autocomplete="one-time-code"></label>
+              <label class="row"><input type="checkbox" id="cv-remember" checked> Recordar la sesión en este navegador</label>
+              <div><button class="btn primary" id="cv-connect" type="submit">Conectar y validar</button></div>
+            </form>
+            <div class="stub" style="margin-top:4px">Tu mail y contraseña van solo a Corva y la contraseña no se guarda. Si recordás la sesión, queda
+              un token en este navegador: no la recuerdes en una PC compartida.</div>
+          </div>
+          <div id="cv-account" style="display:none">
+            <div class="stub" style="margin-bottom:10px">Cuenta: <b id="cv-who"></b><br>Token vigente hasta: <span id="cv-exp"></span> (se renueva solo)<br>Sesión: <span id="cv-keep"></span></div>
+            <button class="btn" id="cv-validate">Validar conexión</button>
+            <button class="btn" id="cv-disconnect">Desconectar</button>
+          </div>
+          <div class="stub" id="cv-auth-status"></div>
         </div>
         <div class="card"><h4>Atajos</h4>
           <div class="stub"><kbd>1</kbd>–<kbd>4</kbd> secciones · <kbd>rueda</kbd> zoom · <kbd>arrastrar</kbd> orbitar ·

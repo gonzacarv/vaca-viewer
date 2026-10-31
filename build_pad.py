@@ -50,8 +50,8 @@ GOTCHAS IMPORTANTES (ya resueltos acá, NO re-romper)
 4. CAÑOS CORTOS (pup joints) de la aislación: se leen de "2.2 Run Tally". Regla del campo:
    caño NORMAL >10 m, caño corto <10 m. Su fila NO trae "N° Tally" (columna vacía), por eso el
    parser ubica los 3 decimales consecutivos (Longitud, Cum.Length, Set Depth) sin asumir cuántos
-   enteros van antes. Set Depth = MD del TOPE del caño (≈ TD − Cum.Length) ⇒ bottom = Set Depth +
-   Longitud. Si tu tally usa otra convención de Set Depth, ajustá parse_short_joints.
+   enteros van antes. Set Depth = MD del FONDO de la pieza (la 1ra fila, el zapato, da el total
+   corrido) ⇒ top = Set Depth − Longitud.
 """
 import openpyxl, pdfplumber, re, json, warnings
 from collections import Counter
@@ -212,7 +212,8 @@ def parse_run_tally(text, max_len=10.0, edge_m=150):
       - shoetrack: piezas cortas de los últimos `edge_m` m (zapato, collar flotador, camisas, cortos).
     Cada fila trae 3 decimales consecutivos = Longitud, Cum.Length, Set Depth. La fila corta NO trae
     'N° Tally', por eso ubicamos los 3 decimales sin asumir cuántos enteros van antes. Set Depth = MD
-    del TOPE (≈ TD − Cum.Length) ⇒ bottom = Set Depth + Longitud.
+    del FONDO de la pieza (la 1ra fila, el zapato, da el total corrido) ⇒ top = Set Depth − Longitud.
+    También arma los tramos del casing: ver run_tally_segments.
     """
     m=re.search(r'2\.2\s+Run\s+Tally(.*?)(?:\n\s*2\.3|\n\s*3\.|\Z)', text, re.S|re.I)
     block=m.group(1) if m else text
@@ -230,12 +231,12 @@ def parse_run_tally(text, max_len=10.0, edge_m=150):
         # se descartan los decimales sueltos del principio de la "descripción"
         desc=re.sub(rf'^(?:{dec}\s+)+', '', line[mm.end():].strip())
         rows.append({"length":length, "setd":setd, "desc":desc})
-    if not rows: return [], None
-    max_md=max(r["setd"]+r["length"] for r in rows)      # fondo de la sarta (≈ zapato)
+    if not rows: return [], None, None
+    max_md=max(r["setd"] for r in rows)                  # fondo de la sarta (≈ zapato)
     shorts=[]; st_els=[]
     for r in rows:
         if r["length"]>=max_len: continue                # caño normal
-        top=round(r["setd"],3); bottom=round(r["setd"]+r["length"],3)
+        top=round(r["setd"]-r["length"],3); bottom=round(r["setd"],3)
         if top<edge_m: continue                          # primeros 150 m (cabezal/colgador): se ignora
         if bottom>max_md-edge_m:                          # últimos 150 m: shoetrack
             st_els.append({"desc":r["desc"] or "elemento", "length_m":round(r["length"],3),
@@ -246,7 +247,30 @@ def parse_run_tally(text, max_len=10.0, edge_m=150):
                        "length_m":round(r["length"],3), "top_md":top, "bottom_md":bottom})
     shorts.sort(key=lambda x:x["top_md"])
     st_els.sort(key=lambda x:x["top_md"])
-    return shorts, ({"elements":st_els} if st_els else None)
+    return shorts, ({"elements":st_els} if st_els else None), run_tally_segments(rows, max_len, max_md)
+
+def casing_spec_from_desc(d):
+    """OD/libraje/grado que trae la descripción de una fila: "5, 18, P-110 ICY W-463" o 5.5" 23# P-110"""
+    m=re.search(r'(\d+ 1/2|\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)\s*,\s*([A-Z])-?(\d{2,3})', d) \
+      or re.search(r"""(\d+ 1/2|\d+(?:\.\d+)?)\s*(?:"|´´|'')\s*(\d+(?:\.\d+)?)\s*#\s*([A-Z])-?(\d{2,3})""", d)
+    if not m: return None
+    od=int(m.group(1).split()[0])+0.5 if "/" in m.group(1) else float(m.group(1))
+    return {"od_in":od, "weight_ppf":float(m.group(2)), "grade":m.group(3)+m.group(4)}
+
+def run_tally_segments(rows, max_len, max_md):
+    """Tramos = caños normales (las piezas cortas no definen tramo) con distinta especificación, de boca
+    a zapato; el XO queda en el tramo de arriba. None si es una sola especificación o la fila no la trae."""
+    segs=[]
+    for r in sorted((x for x in rows if x["length"]>=max_len), key=lambda x:x["setd"]):
+        sp=casing_spec_from_desc(r["desc"])
+        if not sp: continue
+        if segs and all(segs[-1][k]==sp[k] for k in sp): continue
+        segs.append({"top_md":round(r["setd"]-r["length"],3), "bottom_md":None, **sp})
+    if len(segs)<2: return None
+    for i,s in enumerate(segs):
+        s["bottom_md"]=segs[i+1]["top_md"] if i+1<len(segs) else round(max_md,3)
+    segs[0]["top_md"]=0
+    return segs
 
 def parse_tally(path, phase=None):
     with pdfplumber.open(path) as pdf:
@@ -275,8 +299,10 @@ def parse_tally(path, phase=None):
     mt=re.search(r'Total\s+length\s+run\s+([\d,]+\.\d+)', text, re.I)
     shoe=float(mt.group(1).replace(",","")) if mt else None
     # caños cortos + shoetrack: solo interesan en la aislación (5"); en las otras fases se omiten
-    shorts, shoetrack = parse_run_tally(text) if phase=="produccion" else ([], None)
-    return od, shoe, weight, grade, shorts, shoetrack
+    shorts, shoetrack, segments = parse_run_tally(text) if phase=="produccion" else ([], None, None)
+    if segments:                       # con tramos, el resumen es el tramo del zapato
+        od, weight, grade = segments[-1]["od_in"], segments[-1]["weight_ppf"], segments[-1]["grade"]
+    return od, shoe, weight, grade, shorts, shoetrack, segments
 
 TALLY_PHASE_ALIAS={"guia":"guia","guía":"guia","int1":"intermedia1","intermedia1":"intermedia1","intermedia 1":"intermedia1",
  "int2":"intermedia2","intermedia2":"intermedia2","intermedia 2":"intermedia2","prod":"produccion","produccion":"produccion",
@@ -394,8 +420,9 @@ for i,wid in enumerate(WELL_ORDER):
     casings=[]
     for phase in ["guia","intermedia1","intermedia2","produccion"]:
         if phase in TALLYS.get(wid,{}):
-            od,shoe,weight,grade,shorts,shoetrack=parse_tally(TALLYS[wid][phase], phase)
+            od,shoe,weight,grade,shorts,shoetrack,segments=parse_tally(TALLYS[wid][phase], phase)
             cas={"phase":phase,"od_in":od,"shoe_md":shoe,"toc_md":None,"weight_ppf":weight,"grade":grade}
+            if segments: cas["segments"]=segments
             if shorts: cas["short_joints"]=shorts
             if shoetrack: cas["shoetrack"]=shoetrack
             casings.append(cas)

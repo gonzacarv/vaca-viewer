@@ -17,11 +17,23 @@ import { rasterizeSVG, canvasToFile, canvasToPDF } from "./util.js";
 /* ---- semiancho (px) por fase, anidados. No son OD reales: priorizan legibilidad ---- */
 const HALF = { guia:34, intermedia1:26, intermedia2:19, produccion:13 };
 const TBG_HALF = 6;
+/* el esquema no es a escala: un cambio de OD por tramo se exagera para que se lea (5½" sobre 5" = +30%) */
+const SEG_OD_GAIN = 3;
+/* un TBG más fino que el mayor del pozo también se exagera (2⅜" sobre 2⅞" = −35%), con piso */
+const TBG_OD_GAIN = 2, TBG_MIN_RATIO = 0.55;
+/* holgura mínima (px) entre los ejes de las paredes de dos cañerías anidadas: la pared + aire visible */
+const WALL_CLEAR = 7.2;
+/* AJUSTE ESQUEMÁTICO: lo que queda muy junto o muy corto se separa estirando el camino (el lienzo crece),
+   y lo que cae en el arco baja la curva para quedar en el tronco. La regla sigue al mismo mapeo. */
+const BBA_PX = 18;                     // largo de la bomba, siempre desde su MD hacia abajo
+const SCHEM_GAP = 14, SCHEM_GAP_BARE = 6, SCHEM_ARC_CLEAR = 18;
+const SCHEM_MIN_LEN = { TBG:34, VB:10, TPNC:16, FLUIDO:12 };
 /* varillas de bombeo: trazo fino, apenas (casi imperceptiblemente) más grueso cuanto mayor el Ø */
 const VB_W = { "3/4":1.7, "7/8":1.8, "1":1.9, "1.5":2.05, vastago:2.2 };
 const PHASE_ORDER = ["guia","intermedia1","intermedia2","produccion"];
 
 const INK="#111", DIM="#6a7178", WALL_W=3.2;
+const POINT_TYPES=["TPN","PKR","ANCLA","BBA","BHA"];
 const STAGE_PAL = ["#1f77b4","#e07a00","#2ca02c","#c02a2a","#8a5cc0","#8c564b","#c85aa8","#0f8fa6","#9a9a1e","#5a5a5a"];
 
 /* rampa dogleg (misma que la Vista 3D): 0→verde puro, medio→amarillo, máx→rojo.
@@ -69,8 +81,8 @@ function findKick(st, landingMD, tvdLand, Rm){
 export function buildWellSVG(w, opts={}){
   const o = { cx:1, cy:1, diam:1, elw:6, shoe:1, font:10.5, margin:0, perfStages:"", from:null, to:null, theme:"color",
     els:{ casings:true, cement:true, shoes:true, plugs:true, tbg:true, instel:true, stages:true,
-          perf:true, shorts:false, shoetrack:false, ruler:true, extruler:false, labels:true,
-          fluids:true, cemplug:true, rods:true, bha:true, notes:true }, ...opts };
+          perf:true, shorts:false, xovers:true, shoetrack:false, ruler:true, extruler:false, labels:true,
+          fluids:true, cemplug:true, rods:true, bha:true, notes:true, schem:true }, ...opts };
   const bw = o.theme==="bw";
   const dg = o.theme==="dogleg";
   const FS = Math.max(6, o.font||10.5);                  // tamaño de letra base (px)
@@ -89,10 +101,28 @@ export function buildWellSVG(w, opts={}){
   const fromMD = Math.max(0, Math.min(o.from==null?0:o.from, TD-1));
   const toMD   = Math.max(fromMD+1, Math.min(o.to==null?TD:o.to, TD));
 
-  const HW = ph => (HALF[ph]||13) * o.diam;
-  const maxHalf = HALF.guia * o.diam;
+  const casings=(w.casings||[]).slice().sort((a,b)=>PHASE_ORDER.indexOf(a.phase)-PHASE_ORDER.indexOf(b.phase));
   const tbgHalf = TBG_HALF * o.diam;
+  // relación de un tramo respecto de la cañería, y su rango en todos los tramos
+  const odRatio = (c,od) => (!od || !c.od_in || od===c.od_in) ? 1 : Math.max(0.5, 1+(od/c.od_in-1)*SEG_OD_GAIN);
+  const ratioRange = c => { const rs=[1, ...(c?.segments||[]).map(s=>odRatio(c,s.od_in))]; return [Math.min(...rs), Math.max(...rs)]; };
+  // semianchos anidados, de adentro hacia afuera: el MÍNIMO de cada cañería deja WALL_CLEAR sobre el MÁXIMO
+  // de la que lleva adentro, en cualquier tramo y con cualquier Ø del slider. Si no entra, crece la externa.
+  const halves={};
+  let maxHalf=tbgHalf;
+  for(const ph of PHASE_ORDER.slice().reverse()){
+    const [rMin,rMax]=ratioRange(casings.find(c=>c.phase===ph));
+    halves[ph]=Math.max((HALF[ph]||13)*o.diam, (maxHalf+WALL_CLEAR)/rMin);
+    maxHalf=halves[ph]*rMax;
+  }
+  const HW = ph => halves[ph]??halves.produccion;
   const prodHalf = HW("produccion");
+  const minHalfOf = c => HW(c.phase)*ratioRange(c)[0];
+  const maxHalfOf = c => HW(c.phase)*ratioRange(c)[1];
+  // semiancho de una cañería en un MD, según su tramo
+  const halfAt = (c,md) => HW(c.phase)*odRatio(c, V.casingSegAt(c,md)?.od_in);
+  const covering = md => casings.filter(c=>c.shoe_md!=null && c.shoe_md>=md-1e-6);
+  const innerHalf = md => { const c=covering(md).at(-1); return (c?halfAt(c,md):prodHalf)-WALL_W/2; };
 
   const tvdAt = md => sampleMD(st, md).tvd;
   // DLS interpolado por MD desde el survey (misma idea que dlsAtMD de la Vista 3D)
@@ -115,20 +145,88 @@ export function buildWellSVG(w, opts={}){
   const yScale = trunkVisible ? (660/vertSpan)*o.cy : 1;
   const xScale = latVisMD>0 ? (720/Math.max(latVisMD,1))*o.cx : 1;
 
+  // ---------- instalación: elementos (copia), con los que comparten MD apenas corridos para que no se pisen ----------
+  const inst = V.normInstallation(w)?.elements || [];
+  const instOf = t => inst.filter(e=>e.type===t);
+  inst.forEach(el=>{ if(el.md!=null) el.md_real=el.md; });
+  { const pts=inst.filter(el=>POINT_TYPES.includes(el.type)&&el.md!=null).sort((a,b)=>a.md-b.md);
+    for(let i=1;i<pts.length;i++) if(pts[i].md-pts[i-1].md<0.05) pts[i].md=pts[i-1].md+0.05;
+    // la bomba cuelga hacia abajo: un TBG que termina justo en su MD termina después de ella
+    instOf("BBA").forEach(b=>{ if(b.md==null) return;
+      instOf("TBG").forEach(t=>{ if(t.bottom_md!=null && Math.abs(t.bottom_md-b.md)<0.05) t.bottom_md=b.md+0.05; }); }); }
+  const tbgOn = o.els.tbg ? instOf("TBG").filter(el=>el.top_md!=null&&el.bottom_md!=null) : [];
+  const tbgOdMax = Math.max(0, ...tbgOn.map(el=>el.od_in||0));
+  const tbgHalfOf = el => (!el?.od_in||!tbgOdMax) ? tbgHalf : tbgHalf*Math.max(TBG_MIN_RATIO, 1+(el.od_in/tbgOdMax-1)*TBG_OD_GAIN);
+  const tbgAt = md => tbgOn.filter(el=>md>=Math.min(el.top_md,el.bottom_md)&&md<=Math.max(el.top_md,el.bottom_md)).at(-1);
+  const tbgHalfAt = md => tbgHalfOf(tbgAt(md));
+  const sideHalfH = md => Math.max(9, o.elw*1.6, Math.max(4, innerHalf(md)-tbgHalfAt(md)-0.6)*1.5)/2;
+  const plugHalfH = md => Math.max(8, o.elw*1.4, innerHalf(md)*0.35)/2;
+  const bhaHalf = md => Math.max(4, innerHalf(md)*0.84);
+
+  // ---------- ajuste esquemático: cuánto hay que estirar el camino para que cada cosa se lea ----------
+  const trunkRealPx = (a,b) => Math.abs(tvdAt(b)-tvdAt(a))*yScale;
+  let arcStart=kickMD;                                   // MD donde arranca el arco dibujado
+  const stretch=[];                                      // [md, px agregados hasta ese md]
+  if(o.els.schem!==false && inst.length){
+    const evs=[], add=(md,up=0,down=0)=>{ if(md!=null && md>=fromMD && md<=toMD) evs.push({md,up,down}); };
+    const ranges=[];
+    const addRange=el=>{ const a=Math.min(el.top_md,el.bottom_md), b=Math.max(el.top_md,el.bottom_md);
+      add(a); add(b); if(a>=fromMD&&b<=toMD) ranges.push({a,b,min:SCHEM_MIN_LEN[el.type]||0}); };
+    inst.forEach(el=>{ const t=el.type;
+      if(["TPN","PKR","ANCLA"].includes(t)&&o.els.instel&&el.md!=null){ const h=t==="TPN"?plugHalfH(el.md):sideHalfH(el.md); add(el.md,h,h); }
+      else if(t==="BBA"&&o.els.rods&&el.md!=null) add(el.md,0,BBA_PX);
+      else if(t==="BHA"&&o.els.bha&&el.md!=null) add(el.md,bhaHalf(el.md)*(el.mdf?5.7:2.5),0);
+      else if(el.top_md!=null&&el.bottom_md!=null){
+        if((t==="TBG"&&o.els.tbg)||(t==="VB"&&o.els.rods)||(t==="TPNC"&&o.els.cemplug)) addRange(el);
+        // un fluido largo no pide nada: solo se ajusta si queda tan corto que no se lee
+        else if(t==="FLUIDO"&&o.els.fluids&&el.bottom_md<=kickMD&&trunkRealPx(el.top_md,el.bottom_md)<SCHEM_MIN_LEN.FLUIDO) addRange(el);
+      }
+    });
+    // lo que cae dentro del arco baja la curva y queda en el tronco
+    if(!isVerticalWell && evs.length){
+      const inArc=evs.filter(e=>e.md>kickMD&&e.md<landingMD).map(e=>e.md);
+      if(inArc.length) arcStart=Math.min(Math.max(...inArc)+2, landingMD-0.25);
+      add(arcStart,SCHEM_ARC_CLEAR,0);
+    }
+    evs.sort((a,b)=>a.md-b.md);
+    const ev=[];                                         // los del mismo MD son un solo evento
+    for(const e of evs){ const l=ev.at(-1);
+      if(l&&e.md-l.md<0.01){ l.up=Math.max(l.up,e.up); l.down=Math.max(l.down,e.down); } else ev.push({...e}); }
+    const isTrunk=md=>isVerticalWell||md<=arcStart;
+    const realPx=(a,b)=>isTrunk(b)?trunkRealPx(a,b):(a>=landingMD?(b-a)*xScale:Infinity);
+    const gaps=ev.map((e,i)=>{ if(!i) return 0; const p=ev[i-1], g=p.down+e.up;
+      return Math.max(realPx(p.md,e.md), g+(g>0?SCHEM_GAP:SCHEM_GAP_BARE)); });
+    const idxOf=md=>ev.findIndex(e=>Math.abs(e.md-md)<0.011);
+    ranges.forEach(r=>{ const i0=idxOf(r.a), i1=idxOf(r.b); if(i0<0||i1<=i0) return;
+      const len=gaps.slice(i0+1,i1+1).reduce((x,y)=>x+y,0);
+      if(isFinite(len)&&len<r.min) gaps[i1]+=r.min-len; });
+    let acc=0;
+    ev.forEach((e,i)=>{ if(i){ const real=realPx(ev[i-1].md,e.md); if(isFinite(real)) acc+=Math.max(0,gaps[i]-real); } stretch.push([e.md,acc]); });
+  }
+  // px agregados al camino hasta un MD
+  const extraAt = md => {
+    if(!stretch.length||md<=stretch[0][0]) return 0;
+    for(let i=1;i<stretch.length;i++) if(md<=stretch[i][0]){ const [a,ea]=stretch[i-1], [b,eb]=stretch[i];
+      return ea+(eb-ea)*(md-a)/((b-a)||1); }
+    return stretch.at(-1)[1];
+  };
+
   // --- camino canónico (coords "crudas", luego se trasladan) ---
   // tronco: x=0, y=tvd*yScale. arco: cuarto de círculo de radio R (px) = build TVD * yScale.
   // lateral: y=cte, x avanza por MD.
-  const Ykick = tvdKick*yScale, Yland = tvdLand*yScale;
-  const R = isVerticalWell ? 0 : Math.max(Yland - Ykick, 24);
+  // Con ajuste esquemático, el tronco llega hasta arcStart (TVD real + lo estirado) y el arco sigue desde ahí.
+  const R = isVerticalWell ? 0 : Math.max((tvdLand-tvdKick)*yScale, 24);
+  const Ykick = tvdAt(arcStart)*yScale+extraAt(arcStart), Yland = Ykick+R;
   const Xland = R;
+  const extraLand = extraAt(landingMD);
   const pos = md => {
-    if(md<=kickMD || isVerticalWell){
-      return { x:0, y:tvdAt(md)*yScale, tx:0, ty:1, nx:-1, ny:0 };
+    if(md<=arcStart || isVerticalWell){
+      return { x:0, y:tvdAt(md)*yScale+extraAt(md), tx:0, ty:1, nx:-1, ny:0 };
     }
     if(md>=landingMD){
-      return { x:Xland+(md-landingMD)*xScale, y:Yland, tx:1, ty:0, nx:0, ny:1 };
+      return { x:Xland+(md-landingMD)*xScale+extraAt(md)-extraLand, y:Yland, tx:1, ty:0, nx:0, ny:1 };
     }
-    const t=(md-kickMD)/Math.max(landingMD-kickMD,1);
+    const t=(md-arcStart)/Math.max(landingMD-arcStart,1e-3);
     const phi=Math.PI - (Math.PI/2)*t;                    // 180° → 90°
     const cx=R, cy=Ykick;                                 // centro del arco
     const x=cx+R*Math.cos(phi), y=cy+R*Math.sin(phi);
@@ -157,6 +255,14 @@ export function buildWellSVG(w, opts={}){
   const laneBase = YlandF-teethLen-14;                   // base de las etiquetas rotadas (suben)
   const latBoxTop = laneBase-(hasLanes?laneSpace-20:8);  // techo de la caja del zapato lateral
   const rulerBottomTvd = tvdLand+100;                    // la regla sigue 100 m debajo del fondo
+  // la regla usa el mismo mapeo que el camino: en lo estirado, los ticks quedan más separados
+  const tvdArc = isVerticalWell ? Infinity : tvdAt(arcStart);
+  const mdAtTvd = d => { let p=st[0];
+    for(const s of st){ if((s.tvd||0)>=d) return p.md+(s.md-p.md)*(d-(p.tvd||0))/(((s.tvd||0)-(p.tvd||0))||1); p=s; }
+    return TD; };
+  const rulerY = d => d<=tvdArc ? d*yScale+extraAt(mdAtTvd(d))
+    : tvdLand>tvdArc && d<=tvdLand ? Ykick+(Yland-Ykick)*(d-tvdArc)/(tvdLand-tvdArc)
+    : (tvdLand>tvdArc ? Yland+(d-tvdLand)*yScale : Ykick+(d-tvdArc)*yScale);
 
   const S=[];                                            // fragmentos SVG
   const boxes=[];                                        // cajas de etiqueta (tronco/arco)
@@ -172,36 +278,58 @@ export function buildWellSVG(w, opts={}){
     cemPattern("cemplug", V.INST_DEFCOLOR.TPNC)+`</defs>`);
 
   // banda (polígono cerrado) entre offsets ±w a lo largo del camino [a..b]
-  const bandPts=(a,b,n=90)=>{ const arr=[]; for(let i=0;i<=n;i++) arr.push(P(a+(b-a)*i/n)); return arr; };
+  // el arco siempre bien muestreado: con muestras parejas por MD, una curva cerrada queda poligonal
+  const ARC_N=48;
+  const bandPts=(a,b,n=90)=>{ const ms=[]; for(let i=0;i<=n;i++) ms.push(a+(b-a)*i/n);
+    const p=Math.max(a,arcStart), q=Math.min(b,landingMD);
+    if(!isVerticalWell && q>p){ const k=Math.max(2,Math.round(ARC_N*(q-p)/Math.max(landingMD-arcStart,1e-3)));
+      for(let i=0;i<=k;i++) ms.push(p+(q-p)*i/k); ms.sort((x,y)=>x-y); }
+    return ms.map(P); };
   const sideLine=(pts,sgn,w)=>pts.map(p=>({x:p.x+p.nx*sgn*w, y:p.y+p.ny*sgn*w}));
   const polyPath=pts=>"M "+pts.map(p=>`${f1(p.x)},${f1(p.y)}`).join(" L ");
   const bandPath=(pts,w)=>polyPath(sideLine(pts,1,w))+" L "+sideLine(pts,-1,w).reverse().map(p=>`${f1(p.x)},${f1(p.y)}`).join(" L ")+" Z";
   const ringPath=(pts,wIn,wOut,sgn)=>polyPath(sideLine(pts,sgn,wIn))+" L "+sideLine(pts,sgn,wOut).reverse().map(p=>`${f1(p.x)},${f1(p.y)}`).join(" L ")+" Z";
 
   // ---------- cañerías (de externa a interna): cemento → interior blanco → paredes → zapato ----------
-  const casings=(w.casings||[]).slice().sort((a,b)=>PHASE_ORDER.indexOf(a.phase)-PHASE_ORDER.indexOf(b.phase));
   casings.forEach(c=>{
     if(c.shoe_md==null) return;
-    const half=HW(c.phase);
+    const half=minHalfOf(c);
     const a=fromMD, b=Math.min(c.shoe_md,toMD); if(b<=a) return;
     const pts=bandPts(a,b);
     // cemento del anular (TOC→zapato) — punteado
     if(o.els.cement && c.toc_md!=null && c.toc_md<b){
       const idx=PHASE_ORDER.indexOf(c.phase);
-      const outer=idx>0 ? HW(PHASE_ORDER[idx-1]) : half+12*o.diam;
+      const ext=idx>0 && casings.find(x=>x.phase===PHASE_ORDER[idx-1]);
+      const outer=idx>0 ? (ext?minHalfOf(ext):HW(PHASE_ORDER[idx-1]))-WALL_W/2 : maxHalfOf(c)+12*o.diam;
       const ca=Math.max(c.toc_md,a), cpts=bandPts(ca,b,70);
       for(const sgn of [1,-1]) S.push(`<path d="${ringPath(cpts,half,outer,sgn)}" fill="url(#cem)" stroke="#9a9a9a" stroke-width="0.6"/>`);
       // cielo de cemento (línea en el TOC) + etiqueta
       const ft=P(ca);
       for(const sgn of [1,-1]) S.push(`<line x1="${f1(ft.x+ft.nx*sgn*half)}" y1="${f1(ft.y+ft.ny*sgn*half)}" x2="${f1(ft.x+ft.nx*sgn*outer)}" y2="${f1(ft.y+ft.ny*sgn*outer)}" stroke="#777" stroke-width="1.6"/>`);
-      if(o.els.labels) queueLabel(ft, [`TOC ${V.fmtOD(c.od_in)}`, `${Math.round(c.toc_md)} m`], "#666", maxHalf, ca);
+      if(o.els.labels) queueLabel(ft, [`TOC ${V.fmtOD(c.od_in)}`, `${Math.round(c.toc_md)} m`], "#666", outer, ca);
     }
     if(!o.els.casings) return;
-    // interior blanco (tapa el cemento/las paredes de la fase externa)
-    S.push(`<path d="${bandPath(pts,half)}" fill="#ffffff"/>`);
-    // paredes gruesas
-    for(const sgn of [1,-1]) S.push(`<path d="${polyPath(sideLine(pts,sgn,half))}" fill="none" stroke="${INK}" stroke-width="${WALL_W}"/>`);
+    // un trozo por tramo (sin tramos, uno solo): interior blanco que tapa el cemento y las paredes de la
+    // fase externa + paredes gruesas
+    const cuts=(c.segments||[]).map(s=>s.top_md).filter(m=>m!=null&&m>a&&m<b).sort((x,y)=>x-y);
+    const marks=[a,...cuts,b];
+    for(let i=1;i<marks.length;i++){ const p=marks[i-1], q=marks[i], hw=halfAt(c,(p+q)/2);
+      const sp=bandPts(p,q,Math.max(8,Math.round(90*(q-p)/(b-a))));
+      S.push(`<path d="${bandPath(sp,hw)}" fill="#ffffff"/>`);
+      for(const sgn of [1,-1]) S.push(`<path d="${polyPath(sideLine(sp,sgn,hw))}" fill="none" stroke="${INK}" stroke-width="${WALL_W}"/>`);
+    }
+    // cambio de tramo: hombro si cambia el OD, marca hacia afuera si solo cambia libraje o grado
+    cuts.forEach(m=>{ const up=V.casingSegAt(c,m-0.01), down=V.casingSegAt(c,m+0.01), f=P(m);
+      const h0=halfAt(c,m-0.01), h1=halfAt(c,m+0.01), inner=Math.min(h0,h1), outer=Math.max(Math.max(h0,h1),inner+5);
+      for(const sgn of [1,-1]) S.push(`<line x1="${f1(f.x+f.nx*sgn*inner)}" y1="${f1(f.y+f.ny*sgn*inner)}" x2="${f1(f.x+f.nx*sgn*outer)}" y2="${f1(f.y+f.ny*sgn*outer)}" stroke="${INK}" stroke-width="${WALL_W}"/>`);
+      if(o.els.labels && o.els.xovers && up && down){
+        const spec=sg=>[V.fmtOD(sg.od_in??c.od_in), sg.weight_ppf!=null?`${sg.weight_ppf}#`:null, sg.grade!==(up.grade)||sg.grade!==(down.grade)?sg.grade:null].filter(Boolean).join(" ");
+        queueLabel(f, [`XO ${spec(up)} → ${spec(down)}`, `${Math.round(m)} m · TVD ${Math.round(tvdAt(m))} m`], INK, outer, m);
+      }
+    });
   });
+  const prodCas = casings.find(c=>c.phase==="produccion");
+  const prodHalfAt = md => prodCas?halfAt(prodCas,md):prodHalf;
 
   // ---------- coloreo por dogleg: interior del pozo pintado con la rampa verde→rojo ----------
   // Normalizado al DLS máximo del rango visible (auto-normalización, como el isoMode de la Vista 3D).
@@ -210,11 +338,11 @@ export function buildWellSVG(w, opts={}){
     for(const s of st) if(s.md>=fromMD&&s.md<=toMD) dlsMax=Math.max(dlsMax, s.dls||0);
     dlsMax=Math.max(dlsMax, dlsAt(fromMD), dlsAt(toMD));
     if(dlsMax>0){
-      const n=240, w2=prodHalf-WALL_W/2;
+      const n=240;
       for(let i=0;i<n;i++){
         const a=fromMD+(toMD-fromMD)*i/n, b=fromMD+(toMD-fromMD)*(i+1)/n;
         const col=dlsColor(dlsAt((a+b)/2)/dlsMax);
-        S.push(`<path d="${bandPath(bandPts(a,b,3),w2)}" fill="${col}" stroke="${col}" stroke-width="0.5"/>`);
+        S.push(`<path d="${bandPath(bandPts(a,b,3),prodHalfAt((a+b)/2)-WALL_W/2)}" fill="${col}" stroke="${col}" stroke-width="0.5"/>`);
       }
       // leyenda de escala (barra 0→máx) bajo el título
       S.push(`<defs><linearGradient id="dlsg" x1="0" y1="0" x2="1" y2="0">`+
@@ -229,26 +357,25 @@ export function buildWellSVG(w, opts={}){
   }
 
   // ---------- INSTALACIÓN: helpers ----------
-  const inst = V.normInstallation(w)?.elements || [];
-  const instOf = t => inst.filter(e=>e.type===t);
   const clipR = el => [Math.max(Math.min(el.top_md,el.bottom_md),fromMD), Math.min(Math.max(el.top_md,el.bottom_md),toMD)];
   const inRange = el => { if(el.top_md==null||el.bottom_md==null) return false; const [a,b]=clipR(el); return b>a; };
   const inPt = el => el.md!=null && el.md>=fromMD && el.md<=toMD;
   const rngTxt = el => `${Math.round(el.top_md)}–${Math.round(el.bottom_md)} m`;
   // cañería más interna / más externa que cubre md (casings va de externa a interna)
-  const covering = md => casings.filter(c=>c.shoe_md!=null && c.shoe_md>=md-1e-6);
-  const innerHalf = md => { const c=covering(md).at(-1); return (c?HW(c.phase):prodHalf)-WALL_W/2; };
-  const outerHalf = md => { const c=covering(md)[0]; return c?HW(c.phase):prodHalf; };
+  const outerHalf = md => { const c=covering(md)[0]; return c?halfAt(c,md):prodHalf; };
   const nSeg = (a,b,max=120) => Math.max(3, Math.min(max, Math.round((b-a)/Math.max(toMD-fromMD,1)*240)));
-  // relleno del interior de la cañería entre a y b, cortado en cada zapato (cambia el ID)
+  // relleno del interior de la cañería entre a y b, cortado en cada zapato y tramo (cambia el ID)
   const fillInterior = (a,b,fill,extra="") => {
-    const cuts=[...new Set([a,b,...casings.map(c=>c.shoe_md).filter(m=>m!=null&&m>a&&m<b)])].sort((x,y)=>x-y);
+    const cuts=[...new Set([a,b,...casings.flatMap(c=>[c.shoe_md,...(c.segments||[]).map(s=>s.top_md)]).filter(m=>m!=null&&m>a&&m<b)])].sort((x,y)=>x-y);
     let g="";
     for(let i=1;i<cuts.length;i++){ const p=cuts[i-1], q=cuts[i];
       g+=`<path d="${bandPath(bandPts(p,q,nSeg(p,q)), innerHalf((p+q)/2))}" fill="${fill}"${extra}/>`; }
     return g;
   };
-  const pxPerMD = md => { const a=P0(md-0.5), b=P0(md+0.5); return Math.hypot(b.x-a.x, b.y-a.y)||1; };
+  // un cartel en el mismo MD (±1 m) que un elemento puntual reemplaza su etiqueta automática
+  const notes = o.els.notes&&o.els.labels ? instOf("CARTEL").filter(el=>el.md!=null&&el.text) : [];
+  const hasNote = el => notes.some(n=>Math.abs(n.md-(el.md_real??el.md))<=1);
+  const mdTxt = el => `${Math.round(el.md_real??el.md)} m`;
   // color elegido por elemento (o el default del corte). En B&N: trazos en tinta, rellenos en gris.
   const baseOf = el => V.instColor(el) || V.INST_DEFCOLOR[el.type] || INK;
   const inkOf  = el => bw ? INK : baseOf(el);
@@ -259,8 +386,8 @@ export function buildWellSVG(w, opts={}){
     return `url(#${id})`; };
 
   // ---------- TBG (por rango desde/hasta): interior blanco ahora, paredes después de los fluidos ----------
-  const tbgs = o.els.tbg ? instOf("TBG").filter(inRange) : [];
-  tbgs.forEach(el=>{ const [a,b]=clipR(el); S.push(`<path d="${bandPath(bandPts(a,b,nSeg(a,b,90)),tbgHalf)}" fill="#ffffff"/>`); });
+  const tbgs = tbgOn.filter(inRange);
+  tbgs.forEach(el=>{ const [a,b]=clipR(el); S.push(`<path d="${bandPath(bandPts(a,b,nSeg(a,b,90)),tbgHalfOf(el))}" fill="#ffffff"/>`); });
 
   // rango MD visible de una etapa (tope del primer cluster → fondo del último), o null
   const stageRange = stg => {
@@ -280,7 +407,7 @@ export function buildWellSVG(w, opts={}){
       const col=STAGE_PAL[(stg.stage||0)%STAGE_PAL.length];
       if(!bw && !dg){
         const pts=bandPts(r.md0,r.md1,24);
-        S.push(`<path d="${bandPath(pts,prodHalf-WALL_W/2)}" fill="${col}" fill-opacity="0.85"/>`);
+        S.push(`<path d="${bandPath(pts,prodHalfAt((r.md0+r.md1)/2)-WALL_W/2)}" fill="${col}" fill-opacity="0.85"/>`);
       }
       if(o.els.labels){       // el N° se dibuja más abajo, por encima de la instalación (fluidos, TBG…)
         const f=P((r.md0+r.md1)/2);
@@ -336,15 +463,19 @@ export function buildWellSVG(w, opts={}){
 
   // ---------- TBG: paredes (por encima de fluidos/cemento) + cartel de specs al pie ----------
   tbgs.forEach(el=>{
-    const [a,b]=clipR(el), pts=bandPts(a,b,nSeg(a,b,90));
-    for(const sgn of [1,-1]) S.push(`<path d="${polyPath(sideLine(pts,sgn,tbgHalf))}" fill="none" stroke="${inkOf(el)}" stroke-width="1.6"/>`);
+    const [a,b]=clipR(el), pts=bandPts(a,b,nSeg(a,b,90)), hw=tbgHalfOf(el);
+    for(const sgn of [1,-1]) S.push(`<path d="${polyPath(sideLine(pts,sgn,hw))}" fill="none" stroke="${inkOf(el)}" stroke-width="1.6"/>`);
+    // hombro contra el TBG que sigue, si cambia el diámetro (2⅞" → cola de 2⅜")
+    const nx=tbgs.find(x=>x!==el&&Math.abs(Math.min(x.top_md,x.bottom_md)-el.bottom_md)<=1), hn=nx?tbgHalfOf(nx):hw;
+    if(nx&&hn!==hw){ const f=P(el.bottom_md);
+      for(const sgn of [1,-1]) S.push(`<line x1="${f1(f.x+f.nx*sgn*hw)}" y1="${f1(f.y+f.ny*sgn*hw)}" x2="${f1(f.x+f.nx*sgn*hn)}" y2="${f1(f.y+f.ny*sgn*hn)}" stroke="${inkOf(el)}" stroke-width="1.6"/>`); }
     if(o.els.labels && el.bottom_md<=toMD){
       const specs=[el.od_in!=null?`TBG ${V.fmtOD(el.od_in)}`:"TBG"];
       if(el.weight_ppf!=null) specs.push(`${el.weight_ppf}#/ft`);
       if(el.grade) specs.push(el.grade);
       const where = el.top_md>0.5 ? rngTxt(el) : `${Math.round(el.bottom_md)} m`;
       queueLabel(P(el.bottom_md), [specs.join(" "), `${where} · TVD ${Math.round(tvdAt(el.bottom_md))} m`],
-        bw?INK:(V.instColor(el)||"#0b6b76"), tbgHalf+6, el.bottom_md);
+        bw?INK:(V.instColor(el)||"#0b6b76"), hw+6, el.bottom_md);
     }
   });
 
@@ -362,17 +493,12 @@ export function buildWellSVG(w, opts={}){
         el.top_md>0.5?rngTxt(el):`${Math.round(el.bottom_md)} m`], INK, 3, el.bottom_md);
   });
 
-  // ---------- bomba (BBA): tramo corto del Ø del TBG, relleno de color con anillos transversales ----------
+  // ---------- bomba (BBA): tramo corto del Ø del TBG, siempre desde su MD hacia abajo, con anillos transversales ----------
   // (pieza mecánica: se distingue del cemento —pintas— y de los fluidos —rayado diagonal—)
   if(o.els.rods) instOf("BBA").filter(inPt).forEach(el=>{
-    const Lmd=Math.max(24, tbgHalf*4.5)/pxPerMD(el.md);
-    const a=Math.max(fromMD, el.md-Lmd/2), b=Math.min(toMD, el.md+Lmd/2), hw=tbgHalf+0.8;
-    const fill=bw?"#e2e2e2":fillOf(el), ink=bw?INK:shade(baseOf(el),0.45);
-    S.push(`<path d="${bandPath(bandPts(a,b,12), hw)}" fill="${fill}" stroke="${ink}" stroke-width="1.3"/>`);
-    const pa=P(a), pb=P(b), n=Math.max(3, Math.round(Math.hypot(pb.x-pa.x, pb.y-pa.y)/4.2));
-    for(let k=1;k<n;k++){ const f=P(a+(b-a)*k/n);
-      S.push(`<line x1="${f1(f.x+f.nx*hw)}" y1="${f1(f.y+f.ny*hw)}" x2="${f1(f.x-f.nx*hw)}" y2="${f1(f.y-f.ny*hw)}" stroke="${ink}" stroke-width="0.9"/>`); }
-    if(o.els.labels) queueLabel(P(el.md), ["BBA (bomba)", `${Math.round(el.md)} m`], INK, tbgHalf+2, el.md);
+    const f=P(el.md), hw=tbgHalfAt(el.md)+0.8;
+    S.push(drawPump(f, BBA_PX, hw, bw?"#e2e2e2":fillOf(el), bw?INK:shade(baseOf(el),0.45)));
+    if(o.els.labels&&!hasNote(el)) queueLabel({...f, x:f.x+f.tx*BBA_PX/2, y:f.y+f.ty*BBA_PX/2}, ["BBA", mdTxt(el)], INK, hw+1, el.md);
   });
 
   // ---------- punzados: "dientes" esquemáticos hacia la formación (no 1:1 con los tiros reales) ----------
@@ -382,7 +508,7 @@ export function buildWellSVG(w, opts={}){
       if(stageFilter && !stageFilter.has(stg.stage)) return;
       const r=stageRange(stg); if(!r) return;
       const col=bw?INK:STAGE_PAL[(stg.stage||0)%STAGE_PAL.length];
-      S.push(drawTeeth(P, r.md0, r.md1, prodHalf, col, teethLen));
+      S.push(drawTeeth(P, r.md0, r.md1, prodHalfAt((r.md0+r.md1)/2), col, teethLen));
     });
   }
 
@@ -393,10 +519,11 @@ export function buildWellSVG(w, opts={}){
     w.frac.stages.forEach(stg=>{
       if(stg.plug_md==null||stg.plug_md<fromMD||stg.plug_md>toMD) return;
       const f=P(stg.plug_md);
-      S.push(blockAcross(f, prodHalf, o.elw, INK));
+      const hp=prodHalfAt(stg.plug_md);
+      S.push(blockAcross(f, hp, o.elw, INK));
       if(o.els.labels){ const n=V.plugCountInverted?(withPlug.length-num.get(stg.stage)+1):num.get(stg.stage);
         if(stg.plug_md>=landingMD) lanes.push({ f, text:`TPN N° ${n} · ${Math.round(stg.plug_md)} m`, color:INK });
-        else queueLabel(f, [`TPN N° ${n}`, `${Math.round(stg.plug_md)} m`], INK, prodHalf, stg.plug_md);
+        else queueLabel(f, [`TPN N° ${n}`, `${Math.round(stg.plug_md)} m`], INK, hp, stg.plug_md);
       }
     });
   }
@@ -407,21 +534,24 @@ export function buildWellSVG(w, opts={}){
   // Cartel SIEMPRE horizontal (caja): en el lateral solo los tapones de frac van rotados.
   if(o.els.instel) inst.filter(el=>["TPN","PKR","ANCLA"].includes(el.type) && inPt(el)).forEach(el=>{
     const f=P(el.md);
+    const hw=tbgHalfAt(el.md);
     S.push(el.type==="TPN" ? drawPlugX(f, innerHalf(el.md), o.elw, inkOf(el))
-         : drawSideBoxes(f, tbgHalf, innerHalf(el.md), o.elw, inkOf(el), el.type==="PKR"?"x":"wedge"));
-    if(o.els.labels) queueLabel(f, [el.type==="ANCLA"?"Ancla":el.type, `${Math.round(el.md)} m`], INK, tbgHalf+8, el.md);
+         : drawSideBoxes(f, hw, innerHalf(el.md), o.elw, inkOf(el), el.type==="PKR"?"x":"wedge"));
+    if(o.els.labels&&!hasNote(el)) queueLabel(f, [el.type==="ANCLA"?"Ancla":el.type, mdTxt(el)], INK, hw+8, el.md);
   });
 
   // ---------- BHA: fresa (± motor de fondo), punta en el MD apuntando hacia donde avanza el pozo ----------
   if(o.els.bha) instOf("BHA").filter(inPt).forEach(el=>{
     const f=P(el.md), H=Math.max(4, innerHalf(el.md)*0.84);
     S.push(drawBHA(f, H, !!el.mdf, inkOf(el)));
-    if(o.els.labels) queueLabel(f, [el.mdf?"BHA c/ MDF":"BHA (fresa)", `${Math.round(el.md)} m`], INK, H, el.md);
+    if(o.els.labels&&!hasNote(el)) queueLabel(f, [el.mdf?"BHA c/ MDF":"BHA (fresa)", mdTxt(el)], INK, H, el.md);
   });
 
   // ---------- carteles libres: texto en caja con flecha apuntando al MD ----------
-  if(o.els.notes && o.els.labels) instOf("CARTEL").filter(el=>inPt(el) && el.text).forEach(el=>{
-    queueLabel(P(el.md), String(el.text).split(/\n/), inkOf(el), outerHalf(el.md)+1, el.md, {arrow:inkOf(el)});
+  notes.filter(inPt).forEach(el=>{
+    const bg=V.instColor({color:el.bg});
+    queueLabel(P(el.md), String(el.text).split(/\n/), inkOf(el), outerHalf(el.md)+1, el.md,
+      {arrow:inkOf(el), note:true, bg:bg&&bw?(bg.toLowerCase()==="#ffffff"?null:grayOf(bg)):bg});
   });
 
   // ---------- zapatos: triángulos macizos hacia afuera ----------
@@ -451,9 +581,10 @@ export function buildWellSVG(w, opts={}){
     casings.forEach(c=>{
       if(o.els.shorts)(c.short_joints||[]).forEach(sj=>{ if(sj.top_md==null||sj.top_md<fromMD||sj.top_md>toMD) return;
         const f=P(sj.top_md);
-        S.push(blockAcross(f, prodHalf, 4, bw?"#666":"#d9b800"));
+        const hs=prodHalfAt(sj.top_md);
+        S.push(blockAcross(f, hs, 4, bw?"#666":"#d9b800"));
         if(o.els.labels) queueLabel(f, [sj.desc||(sj.xover?"XOVER":"Caño corto"), lenPos(sj)],
-          bw?INK:"#8a6d00", prodHalf, sj.top_md); });
+          bw?INK:"#8a6d00", hs, sj.top_md); });
       if(o.els.shoetrack){
         const els=(c.shoetrack?.elements||[]).filter(el=>el.top_md!=null&&el.top_md>=fromMD&&el.top_md<=toMD);
         if(els.length){
@@ -474,13 +605,15 @@ export function buildWellSVG(w, opts={}){
     const step=niceStep(vertSpan/30);
     const rx=leftMargin-30;
     const y0v=tvdFrom, y1v=rulerBottomTvd;               // sigue 100 m debajo del fondo
-    S.push(`<line x1="${rx}" y1="${f1(y0v*yScale+dy)}" x2="${rx}" y2="${f1(y1v*yScale+dy)}" stroke="${DIM}" stroke-width="1"/>`);
+    S.push(`<line x1="${rx}" y1="${f1(rulerY(y0v)+dy)}" x2="${rx}" y2="${f1(rulerY(y1v)+dy)}" stroke="${DIM}" stroke-width="1"/>`);
+    let lastY=-Infinity;                                 // sin encimar números si el tramo quedó comprimido
     for(let d=Math.ceil(y0v/step)*step; d<=y1v+0.5; d+=step){
-      const y=d*yScale+dy;
-      S.push(`<line x1="${rx-5}" y1="${f1(y)}" x2="${rx}" y2="${f1(y)}" stroke="${DIM}" stroke-width="1"/>`
-        +`<text x="${rx-8}" y="${f1(y+3)}" font-family="ui-monospace,monospace" font-size="${f1(FS*0.9)}" fill="${DIM}" text-anchor="end">${Math.round(d)}</text>`);
+      const y=rulerY(d)+dy;
+      S.push(`<line x1="${rx-5}" y1="${f1(y)}" x2="${rx}" y2="${f1(y)}" stroke="${DIM}" stroke-width="1"/>`);
+      if(y-lastY<FS){ continue; } lastY=y;
+      S.push(`<text x="${rx-8}" y="${f1(y+3)}" font-family="ui-monospace,monospace" font-size="${f1(FS*0.9)}" fill="${DIM}" text-anchor="end">${Math.round(d)}</text>`);
     }
-    S.push(`<text x="${rx-8}" y="${f1(y0v*yScale+dy-12)}" font-family="ui-monospace,monospace" font-size="${f1(FS*0.95)}" fill="${DIM}" text-anchor="end">TVD (m)</text>`);
+    S.push(`<text x="${rx-8}" y="${f1(rulerY(y0v)+dy-12)}" font-family="ui-monospace,monospace" font-size="${f1(FS*0.95)}" fill="${DIM}" text-anchor="end">TVD (m)</text>`);
   }
 
   // ---------- regla de extensión (MD) DEBAJO del esquema ----------
@@ -529,6 +662,7 @@ export function buildWellSVG(w, opts={}){
       maxX+dx+maxHalf+teethLen+6);
     S.push(rb.svg); boxRight=rb.right; boxBottom=rb.bottom; labelTop=rb.top;
     S.push(rl.svg); labelTop=Math.min(labelTop, rl.top);
+    S.push(rb.notes);                                    // los carteles van siempre por encima del resto
   }
 
   // ---------- anti-desborde superior ----------
@@ -551,7 +685,7 @@ export function buildWellSVG(w, opts={}){
 
   // ---------- dimensiones del lienzo: crecen para contener TODO (cajas incluidas, sin recortes) ----------
   const width  = Math.round(Math.max(maxX+dx+maxHalf+teethLen+24, boxRight+18, extRight+12, 460)+2*M);
-  const height = Math.round(Math.max(maxY+dy+maxHalf+teethLen+26, rulerBottomTvd*yScale+dy+28, boxBottom+18, extBottom+12)+shift+2*M);
+  const height = Math.round(Math.max(maxY+dy+maxHalf+teethLen+26, rulerY(rulerBottomTvd)+dy+28, boxBottom+18, extBottom+12)+shift+2*M);
 
   const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`+
     `<rect width="${width}" height="${height}" fill="#ffffff"/>`+S.join("")+`</svg>`;
@@ -561,7 +695,9 @@ export function buildWellSVG(w, opts={}){
      La clasificación es por MD (no por tangente): un zapato en pleno arco sigue siendo "tronco".
      En pozo vertical NUNCA hay lateral (el fondo del pozo va a la columna, no a caja flotante). */
   function queueLabel(f, lines, color, half=maxHalf, md=null, extra={}){
-    boxes.push({ f, lines, color, half, ...extra,
+    const key=lines.join("|");                           // identifica la caja si el usuario la elimina
+    if(o.hiddenLabels?.has(key)) return;
+    boxes.push({ f, lines, color, half, key, ...extra,
       lateral: !isVerticalWell && (md!=null ? md>=landingMD : Math.abs(f.tx)>Math.abs(f.ty)) });
   }
 }
@@ -572,7 +708,7 @@ export function buildWellSVG(w, opts={}){
    lugar libre más cercano por encima de su ancla (desplazándose en x y luego hacia arriba), sin pisar
    otras cajas ni el pozo (`obstacles`). Los líderes se dibujan antes que las cajas (quedan debajo). */
 function renderBoxes(list, colX, trunkLimitY, latBoxTop, FS=10.5, laneZone=null, obstacles=[], minX=6, laneTop=Infinity, xSoft=Infinity){
-  if(!list.length) return { svg:"", right:0, bottom:0, top:Infinity };
+  if(!list.length) return { svg:"", notes:"", right:0, bottom:0, top:Infinity };
   const fs=FS, lh=FS*1.33, padX=FS*0.95, padY=FS*0.57, TOP=38, GAP=10;
   const swW=L=>L.swatch?fs*1.5:0;                         // muestra de color (fluido / cemento)
   const measure=L=>({ w:Math.max(...L.lines.map(t=>t.length))*fs*0.6+2*padX+swW(L), h:L.lines.length*lh+2*padY });
@@ -619,7 +755,7 @@ function renderBoxes(list, colX, trunkLimitY, latBoxTop, FS=10.5, laneZone=null,
     const b=best||{x:x0, y:y0};
     const p={L, w, h, x:b.x, y:b.y}; occ.push(p); lat.push(p);
   }
-  let leads="", out="", vbid=0, right=0, bottom=0, top=Infinity;
+  let leads="", out="", noteLeads="", noteOut="", vbid=0, right=0, bottom=0, top=Infinity;
   const arrowCols=new Set();
   const emit=(p,ax,ay)=>{
     const {x,y,w,h,L}=p, id=vbid++;
@@ -627,19 +763,21 @@ function renderBoxes(list, colX, trunkLimitY, latBoxTop, FS=10.5, laneZone=null,
     const ac=L.arrow===true?"#333":L.arrow; if(ac) arrowCols.add(ac);
     const st=ac?`stroke="${ac}" stroke-width="1" marker-start="url(#arw-${ac.slice(1)})"`:`stroke="#aaa" stroke-width="0.8"`;
     const ex=ax<x+w/2?x:x+w;                             // el líder llega al lado más cercano de la caja
-    leads+=`<line class="vlead" data-vb="${id}" x1="${f1(ax)}" y1="${f1(ay)}" x2="${f1(ex)}" y2="${f1(y+h/2)}" ${st}/>`;
-    out+=`<g class="vbox" data-vb="${id}" data-x="${f1(x)}" data-y="${f1(y)}" data-w="${f1(w)}" data-h="${f1(h)}" style="cursor:move">`
-      +box(x, y, w, h, L.lines, L.color, fs, lh, padY, L.swatch)+`</g>`;
+    const lead=`<line class="vlead" data-vb="${id}" x1="${f1(ax)}" y1="${f1(ay)}" x2="${f1(ex)}" y2="${f1(y+h/2)}" ${st}/>`;
+    const g=`<g class="vbox" data-vb="${id}" data-key="${V.escAttr(L.key||"")}" data-x="${f1(x)}" data-y="${f1(y)}" data-w="${f1(w)}" data-h="${f1(h)}" style="cursor:move">`
+      +box(x, y, w, h, L.lines, L.color, fs, lh, padY, L.swatch, L.bg)+`</g>`;
+    if(L.note){ noteLeads+=lead; noteOut+=g; } else { leads+=lead; out+=g; }
     right=Math.max(right, x+w); bottom=Math.max(bottom, y+h); top=Math.min(top, y);
   };
-  for(const p of trunk) emit(p, p.L.f.x+p.L.half, p.L.f.y);
-  for(const p of lat) emit(p, p.L.f.x, p.L.f.y-p.L.half);
+  // el líder sale de la pared del lado de la caja, sobre la NORMAL del camino: en el arco la pared no está
+  // al costado del eje sino girada con la curva
+  for(const p of [...trunk, ...lat]) emit(p, p.L.f.x-p.L.f.nx*p.L.half, p.L.f.y-p.L.f.ny*p.L.half);
   // flecha de los carteles, del color de cada uno (un <marker> por color usado)
   const defs=arrowCols.size?`<defs>${[...arrowCols].map(c=>`<marker id="arw-${c.slice(1)}" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="${c}"/></marker>`).join("")}</defs>`:"";
-  return { svg:defs+leads+out, right, bottom, top };
+  return { svg:defs+leads+out, notes:noteLeads+noteOut, right, bottom, top };
 }
-function box(x,y,w,h,lines,color,fs,lh,padY,swatch){
-  let g=`<rect x="${f1(x)}" y="${f1(y)}" width="${f1(w)}" height="${f1(h)}" fill="#ffffff" stroke="#555" stroke-width="0.9"/>`;
+function box(x,y,w,h,lines,color,fs,lh,padY,swatch,bg){
+  let g=`<rect x="${f1(x)}" y="${f1(y)}" width="${f1(w)}" height="${f1(h)}" fill="${bg||"#ffffff"}" stroke="#555" stroke-width="0.9"/>`;
   let x0=x;                                             // con muestra: cuadradito a la izquierda, texto corrido
   if(swatch){ const q=fs*0.95; x0=x+fs*1.5;
     g+=`<rect x="${f1(x+fs*0.6)}" y="${f1(y+h/2-q/2)}" width="${f1(q)}" height="${f1(q)}" fill="${swatch}" stroke="#555" stroke-width="0.6"/>`; }
@@ -730,6 +868,14 @@ function drawBHA(f, H, mdf, col){
     const b1=u0-0.19*H, b0=b1-0.5*H;                                   // anillo (sub) sobre la fresa
     g+=rect(b0,b1,0.81*H)+rect(b0-3.0*H,b0,0.42*H);                     // + cuerpo del motor
   }
+  return g;
+}
+/* bomba: símbolo rígido en el marco local del MD, desde el MD hacia el fondo (u = 0..len), con anillos */
+function drawPump(f, len, hw, fill, ink){
+  const pt=(u,v)=>`${f1(f.x+f.tx*u+f.nx*v)},${f1(f.y+f.ty*u+f.ny*v)}`;
+  let g=`<polygon points="${pt(0,-hw)} ${pt(0,hw)} ${pt(len,hw)} ${pt(len,-hw)}" fill="${fill}" stroke="${ink}" stroke-width="1.3"/>`;
+  const n=Math.max(3, Math.round(len/4.2));
+  for(let k=1;k<n;k++){ const u=len*k/n; g+=`<path d="M${pt(u,-hw)} L${pt(u,hw)}" fill="none" stroke="${ink}" stroke-width="0.9"/>`; }
   return g;
 }
 /* centralizador de varilla: rombo chico centrado en la varilla */

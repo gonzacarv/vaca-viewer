@@ -107,8 +107,8 @@ Se usa la primera hoja. Columnas por **encabezado**. Dos tablas:
 | `produccion` | 5.0 | 0 | 3200 | 18.4 | N80 | 3390 |
 | `produccion` | 5.0 | 3200 | 6643.1 | 21.4 | P110 | |
 
-- **Casing telescopado**: una fase puede usar **varias filas**, una por tramo (mismo OD, distinto
-  peso/grado). Cada fila = un tramo `[Desde MD, Hasta MD]`. El **zapato** de la fase = el `Hasta MD`
+- **Casing telescopado**: una fase puede usar **varias filas**, una por tramo (cambia peso, grado
+  o diámetro, por ejemplo 5" y 5½"). Cada fila = un tramo `[Desde MD, Hasta MD]`. El **zapato** de la fase = el `Hasta MD`
   más profundo; el OD/peso/grado "resumen" son los del tramo del zapato. Los tramos se guardan en
   `casing.segments` y se marca cada **xover** en la Vista 3D (etiqueta con el tramo de arriba/abajo).
 - `Desde MD` es opcional: si se omite, el 1er tramo arranca en 0 y cada siguiente en el `Hasta MD` del
@@ -128,5 +128,5 @@ Se usa la primera hoja. Columnas por **encabezado**. Dos tablas:
 ### 3b. PDF (compatibilidad)
 Los tallys en **PDF** corresponden a los **"Run Tally Report"** exportados como **Drillers Tally**
 desde la aplicación **OpenWells de Landmark (Halliburton)**. El parser lee la sección
-`2.1 Pipe Sections` (OD, peso, grado, "Total length run" = zapato) y `2.2 Run Tally` (caños cortos y
+`2.1 Pipe Sections` (OD, peso, grado, "Total length run" = zapato) y `2.2 Run Tally` (tramos, si la descripción trae la especificación como `5, 18, P-110`; caños cortos y
 shoetrack de la aislación, por longitud <10 m y posición). Se carga **un PDF por fase**.

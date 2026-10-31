@@ -5,5 +5,7 @@
 */
 import "./viewer.js";
 import { initExport } from "./export-ui.js";
+import { initCorva } from "./corva-ui.js";
 
 initExport();
+initCorva();

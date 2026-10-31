@@ -161,6 +161,19 @@
   #hover-tip .s { color:var(--stage); font-weight:600; }
   #hover-tip .dl { color:var(--short); }
   #hover-tip .fk { color:var(--ink-dim); }
+  #hover-tip .ft-card { margin-top:5px; padding:3px 7px 4px; border-radius:4px; color:#1c2530; }
+  #hover-tip .ft-card .ft-t { font-weight:700; }
+  #hover-tip .ft-card .fk { color:#55616e; }
+  #hover-tip .ft-plan { background:#d6e6f5; }
+  #hover-tip .ft-real { background:#fbe3c8; }
+  #hover-tip .ft-plug { margin-top:4px; }
+  .iso-legend { display:flex; align-items:center; gap:6px; margin-top:6px; padding-top:6px; border-top:1px dashed var(--line);
+    font-family:var(--mono); font-size:10.5px; color:var(--ink-dim); }
+  .iso-legend .sw { flex:1; min-width:24px; height:7px; border-radius:2px; background:linear-gradient(90deg,#00e33a,#ffe500,#ff1e1e); }
+  .ex-trash { position:fixed; z-index:50; width:58px; height:58px; transform:translateX(-50%); pointer-events:none;
+    display:flex; align-items:center; justify-content:center; border-radius:50%; border:2px dashed #d64545;
+    background:rgba(13,17,23,.88); color:#ff8a8a; font-size:24px; transition:transform .12s, background .12s; }
+  .ex-trash.over { transform:translateX(-50%) scale(1.2); background:#d64545; color:#fff; border-style:solid; }
   #hud-measure.on { color:#04141f; background:var(--accent); border-color:var(--accent); }
   #measure-tip { position:absolute; pointer-events:none; z-index:6; display:none; transform:translate(-50%,-140%);
     font-family:var(--lbl-font,var(--mono)); font-size:11px; line-height:1.5; color:var(--ink); text-align:center;
@@ -172,7 +185,7 @@
   .build-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:10px 18px; max-width:1200px; }
   .build-grid label, .well-card label { display:flex; flex-direction:column; gap:4px; font-size:10.5px;
     color:var(--ink-dim); text-transform:uppercase; letter-spacing:.06em; }
-  .build-grid input, .build-grid select, .well-card input, .well-card select {
+  .build-grid input, .build-grid select, .well-card input, .well-card select, .well-card textarea {
     background:var(--panel-2); color:var(--ink); border:1px solid var(--line); border-radius:5px;
     padding:6px 8px; font-size:12.5px; font-family:var(--sans); }
   .phase-row { display:flex; align-items:center; gap:8px; padding:7px 0; flex-wrap:wrap; border-top:1px dashed var(--line); }
@@ -225,6 +238,10 @@
   /* listado de caños cortos detectados (debajo de los detalles de la aislación) */
   .cc-list { flex-basis:100%; margin:4px 0 2px 114px; }
   .cc-list .cc-title { font-family:var(--mono); font-size:10.5px; color:var(--short); margin-bottom:4px; }
+  .cc-edit { display:flex; flex-direction:column; gap:4px; align-items:flex-start; }
+  .cc-edit .inst-el { flex-wrap:wrap; }
+  .cc-edit .inst-el input[type=number] { width:86px; }
+  .cc-edit .cc-title { color:var(--ink-dim); margin-bottom:0; }
   .cc-tbl { width:auto; }
   .cc-tbl th, .cc-tbl td { padding:3px 9px; font-size:11px; }
   /* card colapsable (tabla del pad) con acciones en el encabezado */
@@ -252,11 +269,22 @@
   .filebtn input[type=file] { position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; }
   /* ---- Sección Exportar (v0.3) ---- */
   .ex-tabs { display:flex; gap:6px; margin:0 0 16px; border-bottom:1px solid var(--line); }
-  .ex-tab { background:none; border:0; border-bottom:2px solid transparent; color:var(--ink-dim);
+  .ex-tab, .sub-tab { background:none; border:0; border-bottom:2px solid transparent; color:var(--ink-dim);
     padding:9px 14px; font-size:12.5px; cursor:pointer; font-family:var(--sans); margin-bottom:-1px; }
-  .ex-tab:hover { color:var(--ink); }
-  .ex-tab.active { color:var(--ink); border-bottom-color:var(--accent); }
-  .ex-pane { display:none; } .ex-pane.active { display:block; }
+  .ex-tab:hover, .sub-tab:hover { color:var(--ink); }
+  .ex-tab.active, .sub-tab.active { color:var(--ink); border-bottom-color:var(--accent); }
+  .ex-pane, .sub-pane { display:none; } .ex-pane.active, .sub-pane.active { display:block; }
+  /* ---- Corva: credenciales (Configuración) y solapa de Datos ---- */
+  .cv-form { display:flex; flex-direction:column; gap:10px; max-width:420px; align-items:stretch; }
+  .cv-field { display:flex; flex-direction:column; gap:4px; font-size:10.5px; color:var(--ink-dim); text-transform:uppercase; letter-spacing:.06em; }
+  .cv-field .ex-inp, .cv-field .ex-sel { width:100%; text-transform:none; letter-spacing:0; box-sizing:border-box; }
+  .cv-row { display:flex; align-items:flex-end; gap:8px 0; flex-wrap:wrap; margin-bottom:10px; }
+  .cv-row .cv-field { flex:1 1 280px; max-width:440px; margin-right:12px; }
+  .cv-row .btn { margin-bottom:0; }
+  .cv-log { margin-top:8px; }
+  .cv-log .cv-warn { color:var(--plug,#e3a94c); }
+  .cv-ok { color:#6cc04a; } .cv-err { color:#ff7b72; }
+  .btn:disabled { opacity:.5; cursor:default; }
   .ex-layout { display:grid; grid-template-columns:320px 1fr; gap:18px; align-items:start; max-width:1200px; }
   .ex-controls { display:flex; flex-direction:column; gap:0; }
   .ex-controls .card { margin-bottom:12px; padding:14px 16px; }
@@ -292,7 +320,7 @@
       </span>
       <div class="brandtext">
         <div class="brandname"><span class="bn-a">vaca</span> <span class="bn-b">viewer</span></div>
-        <div class="sub">subsuelo · v0.6</div>
+        <div class="sub">subsuelo · v1.1</div>
       </div>
     </div>
     <nav>
@@ -337,10 +365,12 @@
           <div class="panel-body">
             <label class="row"><input type="radio" name="isomode" value="normal" checked>Cañería</label>
             <label class="row"><input type="radio" name="isomode" value="fracplan"><span class="sw" style="background:linear-gradient(90deg,#00e33a,#ffe500,#ff1e1e)"></span>Fracplan</label>
+            <label class="row" id="iso-fracreal" style="display:none" title="Intensidad de arena bombeada, de Corva"><input type="radio" name="isomode" value="fracreal"><span class="sw" style="background:linear-gradient(90deg,#00e33a,#ffe500,#ff1e1e)"></span>Frac real</label>
             <label class="row"><input type="radio" name="isomode" value="stages"><span class="sw" id="iso-stage-sw" style="background:linear-gradient(90deg,#2fa84a,#8fe063)"></span>Etapas</label>
             <label class="row"><input type="radio" name="isomode" value="dogleg_lateral"><span class="sw" style="background:linear-gradient(90deg,#00e33a,#ffe500,#ff1e1e)"></span>Dogleg · lateral</label>
             <label class="row"><input type="radio" name="isomode" value="dogleg_build"><span class="sw" style="background:linear-gradient(90deg,#00e33a,#ffe500,#ff1e1e)"></span>Dogleg · curva</label>
             <label class="row"><input type="radio" name="isomode" value="dogleg_total"><span class="sw" style="background:linear-gradient(90deg,#00e33a,#ffe500,#ff1e1e)"></span>Dogleg · total</label>
+            <div class="iso-legend" id="iso-legend" style="display:none" title="Intensidad de arena de cada punta de la rampa, sin el 5% extremo de cada lado"><span id="iso-leg-min"></span><span class="sw"></span><span id="iso-leg-max"></span></div>
           </div>
         </div>
 
@@ -509,10 +539,12 @@
                 <input type="text" id="ex2d-perfstages" class="ex-inp" style="width:100%; margin:2px 0 6px"
                   placeholder="etapas a punzar (ej: 1,3,10-15) — vacío = todas">
                 <label class="row"><input type="checkbox" data-ex2d-el="shorts"> Caños cortos</label>
+                <label class="row"><input type="checkbox" data-ex2d-el="xovers" checked> Cambios de tramo (XO)</label>
                 <label class="row"><input type="checkbox" data-ex2d-el="shoetrack"> Shoetrack</label>
                 <label class="row"><input type="checkbox" data-ex2d-el="ruler" checked> Regla de profundidad</label>
                 <label class="row"><input type="checkbox" data-ex2d-el="extruler"> Regla de extensión (MD)</label>
                 <label class="row"><input type="checkbox" data-ex2d-el="labels" checked> Etiquetas de texto</label>
+                <label class="row" title="Estira el esquema donde hay elementos de instalación muy juntos o muy cortos y saca de la curva los que caen en ella. Los cuadros siempre muestran el dato real."><input type="checkbox" data-ex2d-el="schem" checked> Separar instalación (no a escala)</label>
               </div>
               <div class="card"><h4>Exportar</h4>
                 <div class="ex-actions">
@@ -532,6 +564,13 @@
     <section class="view" id="vdata">
       <div class="pad">
         <h2>Datos</h2>
+        <div class="ex-tabs">
+          <button class="sub-tab active" data-dtab="dt-manual">Manual</button>
+          <button class="sub-tab" data-dtab="dt-corva">Corva</button>
+        </div>
+
+        <!-- ============ Solapa: Manual ============ -->
+        <div class="sub-pane active" id="dt-manual">
         <div class="card">
           <h4>Cargar pad existente</h4>
           <div class="drop" id="drop">Arrastrá tu <b>pad.vvwp</b> aquí, o
@@ -582,6 +621,30 @@
           <button class="btn" id="forget">Olvidar pad guardado</button>
           <span class="stub">Para imágenes (PNG/JPG/PDF, corte de pozo o vista 3D) usá la sección <b>Exportar</b>.</span>
         </div>
+        </div>
+
+        <!-- ============ Solapa: Corva ============ -->
+        <div class="sub-pane" id="dt-corva">
+          <div class="card">
+            <h4>Traer pad desde Corva</h4>
+            <div id="cv-noauth">
+              <div class="stub" style="margin-bottom:10px">Para ver los PADs de tu cuenta, primero cargá tus credenciales de Corva.</div>
+              <button class="btn primary" id="cv-goconfig">Ir a Configuración</button>
+            </div>
+            <div id="cv-picker" style="display:none">
+              <div class="cv-row">
+                <label class="cv-field">Pad <select id="cv-pad" class="ex-sel"></select></label>
+                <label class="cv-field">Mostrar <select id="cv-frac" class="ex-sel" title="Colorea las etapas del pad en la Vista de pozo"><option value="fracplan">Frac plan</option><option value="fracreal">Frac real</option></select></label>
+                <button class="btn primary" id="cv-load">Cargar pad</button>
+                <button class="btn" id="cv-refresh">Actualizar lista</button>
+              </div>
+              <div class="stub" id="cv-status"></div>
+              <div class="stub cv-log" id="cv-log"></div>
+              <div class="stub" style="margin-top:10px">Trae survey, cañerías, fractura planificada y real, y los convierte a metros. El pad queda
+                guardado en este equipo y se puede editar y guardar desde la solapa <b>Manual</b>. TOC e instalación no se traen: se cargan a mano.</div>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -603,11 +666,11 @@
             <span class="meta" id="dexag-val">40×</span></label>
           <div class="stub" style="margin-top:8px">Los diámetros reales (5"–13⅜") son invisibles sobre 6600 m de pozo. Este factor los agranda de forma proporcional entre sí. No afecta la escala de profundidad.</div>
         </div>
-        <div class="card"><h4>Radio de punzados</h4>
-          <label class="row" style="max-width:420px">Propagación (m)
-            <input type="range" id="cfg-perfradius" min="1" max="200" step="1" value="20" style="flex:1; accent-color:var(--accent)">
-            <span class="meta" id="perfradius-val">20 m</span></label>
-          <div class="stub" style="margin-top:8px">Radio real (en metros) hasta donde llega la "rama" de punzados — sirve para ver la propagación real. No afecta la profundidad.</div>
+        <div class="card"><h4>Extensión de las fracturas</h4>
+          <label class="row" style="max-width:420px">Extensión (m)
+            <input type="range" id="cfg-perfradius" min="80" max="250" step="5" value="120" style="flex:1; accent-color:var(--accent)">
+            <span class="meta" id="perfradius-val">120 m</span></label>
+          <div class="stub" style="margin-top:8px">Radio real (en metros) hasta donde llegan las ramas de cada punzado en la Vista 3D. No afecta la profundidad.</div>
         </div>
         <div class="card"><h4>Numeración de tapones</h4>
           <label class="row" style="max-width:420px"><input type="checkbox" id="cfg-pluginv"> Invertir conteo (N°1 = más somero)</label>
@@ -646,6 +709,30 @@
           <div class="lbl" style="font-family:var(--mono); font-size:10px; color:var(--ink-dim); text-transform:uppercase; letter-spacing:.08em; margin-bottom:6px">Formato del OD en etiquetas</div>
           <label class="row" style="max-width:420px"><input type="radio" name="odfmt" value="decimal" checked> Decimal &nbsp;<span class="stub">7.625"</span></label>
           <label class="row" style="max-width:420px"><input type="radio" name="odfmt" value="imperial"> Imperial (fraccional) &nbsp;<span class="stub">7 5/8"</span></label>
+        </div>
+        <div class="card"><h4>Conexión a Corva</h4>
+          <div id="cv-login">
+            <form id="cv-form" class="cv-form">
+              <label class="cv-field">Mail <input id="cv-email" class="ex-inp" type="email" autocomplete="username"></label>
+              <label class="cv-field">Contraseña <input id="cv-pass" class="ex-inp" type="password" autocomplete="current-password"></label>
+              <label class="cv-field">Verificación en dos pasos
+                <select id="cv-mfa" class="ex-sel">
+                  <option value="">No uso</option><option value="email">Mail</option>
+                  <option value="sms">SMS</option><option value="authenticator">App autenticadora</option>
+                </select></label>
+              <label class="cv-field" id="cv-code-row" style="display:none">Código <input id="cv-code" class="ex-inp" type="text" autocomplete="one-time-code"></label>
+              <label class="row"><input type="checkbox" id="cv-remember" checked> Recordar la sesión en este navegador</label>
+              <div><button class="btn primary" id="cv-connect" type="submit">Conectar y validar</button></div>
+            </form>
+            <div class="stub" style="margin-top:4px">Tu mail y contraseña van solo a Corva y la contraseña no se guarda. Si recordás la sesión, queda
+              un token en este navegador: no la recuerdes en una PC compartida.</div>
+          </div>
+          <div id="cv-account" style="display:none">
+            <div class="stub" style="margin-bottom:10px">Cuenta: <b id="cv-who"></b><br>Token vigente hasta: <span id="cv-exp"></span> (se renueva solo)<br>Sesión: <span id="cv-keep"></span></div>
+            <button class="btn" id="cv-validate">Validar conexión</button>
+            <button class="btn" id="cv-disconnect">Desconectar</button>
+          </div>
+          <div class="stub" id="cv-auth-status"></div>
         </div>
         <div class="card"><h4>Atajos</h4>
           <div class="stub"><kbd>1</kbd>–<kbd>4</kbd> secciones · <kbd>rueda</kbd> zoom · <kbd>arrastrar</kbd> orbitar ·
@@ -1313,10 +1400,12 @@ const OD_IN={guia:13.375,intermedia1:9.625,intermedia2:7.625,produccion:5.0};
 const CASING_COLOR={guia:0xe8c96a, intermedia1:0x7fc7e0, intermedia2:0xb79fe0, produccion:0xf2ede2};
 /* Punzados: turquesa que alterna claro/oscuro entre etapas consecutivas */
 const PERF_LIGHT=0x6ff5e8, PERF_DARK=0x17c4b0;
+const PERF_NODATA=0x6b7480;            // en las vistas de frac, etapa sin el dato de intensidad
+const PERF_RADIUS_MIN=80, PERF_RADIUS_MAX=250, PERF_RADIUS_DEF=120;   // extensión de las fracturas (m)
 /* Nombres de fase para la leyenda (sin medidas, la fase es lo estable) */
 const PHASE_LABEL={guia:"Guía", intermedia1:"Intermedia 1", intermedia2:"Intermedia 2", produccion:"Aislación"};
 
-let PAD=null, wellObjects={}, vexag=1, diamExag=40, plugCountInverted=false, perfRadiusM=20;
+let PAD=null, wellObjects={}, vexag=1, diamExag=40, plugCountInverted=false, perfRadiusM=PERF_RADIUS_DEF;
 let odFormat="decimal";          // "decimal" (7.625") | "imperial" (7 5/8")
 /* OD en pulgadas → texto. Imperial redondea a octavos (los OD de casing son fracciones de 1/8"). */
 function fmtOD(od){
@@ -1395,17 +1484,22 @@ function rampColor(val, mn, mx){
   else       c.lerpColors(DLS_MID,DLS_HIGH,(t-0.5)/0.5);
   return c;
 }
-/* rango [min,max] de Prop Intensity (lb/ft) para auto-normalizar el coloreo "por fracplan".
-   Solo cuenta pozos con la AISLACIÓN visible (pozo visible + fase producción encendida): así la
-   escala se ajusta a lo que se está viendo. */
+/* rango de Prop Intensity (lb/ft) para auto-normalizar el coloreo por fracplan o por lo bombeado (cada
+   uno con su propia escala). Solo cuenta pozos con la AISLACIÓN visible (pozo visible + fase producción
+   encendida): así la escala se ajusta a lo que se está viendo. Son el mínimo y el máximo sin el 5% extremo
+   de cada lado: una etapa cortada o mal cargada no se come la rampa (en lo real, la mitad de las etapas
+   entra en menos del 10% del rango total); esas etapas quedan en el color de la punta. */
 function fracIntensityRange(){
-  let mn=Infinity, mx=-Infinity;
+  const vals=[];
   ((PAD&&PAD.pad&&PAD.pad.wells)||[]).forEach(w=>{
     const v=VIS[w.id]; if(v && (v.well===false || v.produccion===false)) return;
-    (w.frac?.stages||[]).forEach(s=>{ const p=s.plan?.prop_int_lbft;
-      if(typeof p==="number"&&isFinite(p)){ mn=Math.min(mn,p); mx=Math.max(mx,p); } });
+    (w.frac?.stages||[]).forEach(s=>{ const p=(isoMode==="fracreal"?s.actual:s.plan)?.prop_int_lbft;
+      if(typeof p==="number"&&isFinite(p)) vals.push(p); });
   });
-  return isFinite(mn)?{min:mn,max:mx}:null;
+  if(!vals.length) return null;
+  vals.sort((a,b)=>a-b);
+  const at=q=>vals[Math.round(q*(vals.length-1))], lo=at(.05), hi=at(.95);
+  return hi>lo?{min:lo,max:hi}:{min:vals[0],max:vals.at(-1)};
 }
 
 /* radio visual (m) de una cañería según su OD real y la exageración de diámetro */
@@ -1451,13 +1545,15 @@ function casingID(od, wt){
   const v=od*od-wt/2.67; return v>0?Math.sqrt(v):null;
 }
 const PHASE_DEPTH={guia:0,intermedia1:1,intermedia2:2,produccion:3};
+/* tramo de casing telescopado que cubre `md` (null si la cañería no tiene tramos o el MD queda afuera) */
+const casingSegAt=(c,md)=>(c?.segments||[]).find(s=>s.top_md!=null&&s.bottom_md!=null&&md>=s.top_md-1e-6&&md<=s.bottom_md+1e-6)||null;
 /* capacidad (L/m) de la cañería más interna que cubre `md` (la del tramo telescopado si lo hay) */
 function capacityAt(casings, md){
   let best=null;
   for(const c of casings||[]) if(c.shoe_md!=null && c.shoe_md>=md-1e-6
       && (!best || (PHASE_DEPTH[c.phase]??0)>(PHASE_DEPTH[best.phase]??0))) best=c;
   if(!best) return null;
-  const sg=(best.segments||[]).find(s=>s.top_md!=null&&s.bottom_md!=null&&md>=s.top_md-1e-6&&md<=s.bottom_md+1e-6);
+  const sg=casingSegAt(best,md);
   const id=casingID(sg?.od_in??best.od_in, sg?.weight_ppf??best.weight_ppf);
   return id ? 0.506707*id*id : null;          // π/4·(ID·0.0254 m)²·1000 L/m³
 }
@@ -1605,7 +1701,7 @@ function applyIsoColors(tube){
     if(mat.userData._emissivePatched){ mat.onBeforeCompile=()=>{}; mat.userData._emissivePatched=false; mat.needsUpdate=true; }
     mat.needsUpdate=true; return;
   }
-  const isFrac = isoMode==="fracplan";
+  const isFrac = isoMode==="fracplan" || isoMode==="fracreal";
   const fracRng = isFrac ? fracIntensityRange() : null;
   const isDogleg = isoMode==="dogleg_lateral" || isoMode==="dogleg_build" || isoMode==="dogleg_total";
   // frontera curva/lateral = MD del inicio de la primera etapa (primer cluster de la etapa más somera)
@@ -1637,10 +1733,11 @@ function applyIsoColors(tube){
       const sr=iso.stageRanges.find(r=>md>=r.md0 && md<=r.md1);
       if(sr) c.copy(sr.stage%2===0?STAGE_A:STAGE_B);
       else   c.copy(ISO_BASE);                  // fuera de etapas (arriba del 1er cluster)
-    } else if(isFrac){                          // por fracplan: intensidad de arena (lb/ft) por etapa
+    } else if(isFrac){                          // por fracplan o real: intensidad de arena (lb/ft) por etapa
       const sr=iso.stageRanges.find(r=>md>=r.md0 && md<=r.md1);
-      if(sr && sr.propInt!=null && fracRng) c.copy(rampColor(sr.propInt, fracRng.min, fracRng.max));
-      else c.copy(ISO_BASE);                    // fuera de etapas o sin dato de fracplan
+      const pi=isoMode==="fracreal"?sr?.propIntReal:sr?.propInt;
+      if(pi!=null && fracRng) c.copy(rampColor(pi, fracRng.min, fracRng.max));
+      else c.copy(ISO_BASE);                    // fuera de etapas o sin el dato
     } else { // dogleg_lateral | dogleg_build | dogleg_total
       if(dlsInSeg(md)) c.copy(dlsColor(iso.dlsAtMD(md), segMax));
       else             c.copy(ISO_BASE);        // el otro tramo queda en gris, no compite
@@ -1669,6 +1766,58 @@ function refreshIsoColors(){
   Object.values(wellObjects).forEach(g=>g.traverse(o=>{
     if(o.userData.kind==="casing" && o.userData.phase==="produccion" && o.userData.iso) applyIsoColors(o);
   }));
+  refreshPerfColors();
+  updateIsoLegend();
+}
+/* Punzados: en las vistas de frac, la intensidad de la etapa con la misma rampa y escala que el tubo.
+   En el resto, el turquesa que alterna por etapa. */
+function refreshPerfColors(){
+  const isFrac=isoMode==="fracplan"||isoMode==="fracreal", rng=isFrac?fracIntensityRange():null;
+  Object.values(wellObjects).forEach(g=>g.traverse(o=>{
+    if(o.userData.kind!=="perf") return;
+    const pi=isoMode==="fracreal"?o.userData.propReal:o.userData.propPlan;
+    if(!isFrac) o.material.color.set(o.userData.perfBase);
+    else if(pi!=null&&rng) o.material.color.copy(rampColor(pi,rng.min,rng.max));
+    else o.material.color.set(PERF_NODATA);
+  }));
+}
+/* Fractura de un cluster: rama de árbol. Cada raíz crece hacia afuera y se bifurca al ganar distancia, y la
+   punta llega justo a la extensión elegida. Cada tramo es [ángulo, radio inicial, radio final]. */
+const PERF_ROOTS=6, PERF_DEPTH=2, PERF_SPREAD=0.28, PERF_GROW=0.85;
+function perfBranches(rIn,rOut){
+  const out=[];
+  let parts=0; for(let d=0;d<=PERF_DEPTH;d++) parts+=Math.pow(PERF_GROW,d);
+  const step=(rOut-rIn)/parts;
+  const branch=(ang,r0,r1,depth,spread)=>{ out.push([ang,r0,r1]);
+    if(depth<=0) return;
+    const nr=r1+(r1-r0)*PERF_GROW;
+    branch(ang-spread, r1, nr, depth-1, spread*0.7);
+    branch(ang+spread, r1, nr, depth-1, spread*0.7);
+  };
+  for(let k=0;k<PERF_ROOTS;k++) branch((k/PERF_ROOTS)*Math.PI*2, rIn, rIn+step, PERF_DEPTH, PERF_SPREAD);
+  return out;
+}
+/* La intensidad cae con la distancia al pozo: opacidad plena en la salida, PERF_TIP_ALPHA en la extensión
+   máxima (la punta se sigue viendo). */
+const PERF_TIP_ALPHA=0.3;
+const perfAlpha=(r,rIn,rOut)=>1-(1-PERF_TIP_ALPHA)*Math.max(0,Math.min(1,(r-rIn)/((rOut-rIn)||1)));
+/* escala de la Vista de pozo: los lb/ft que corresponden a cada punta de la rampa */
+function updateIsoLegend(){
+  const box=document.getElementById("iso-legend"); if(!box) return;
+  const r=(isoMode==="fracplan"||isoMode==="fracreal")?fracIntensityRange():null;
+  box.style.display=r?"":"none";
+  if(r){ document.getElementById("iso-leg-min").textContent=Math.round(r.min);
+    document.getElementById("iso-leg-max").textContent=`${Math.round(r.max)} lb/ft`; }
+}
+/* Cambia la Vista de pozo desde afuera (picklist de Corva). false si ese modo no aplica al pad cargado. */
+function setIsoMode(mode){
+  if(!PAD) return false;
+  if(mode==="fracplan"||mode==="fracreal"){
+    const k=mode==="fracreal"?"actual":"plan";
+    if(!PAD.pad.wells.some(w=>(w.frac?.stages||[]).some(s=>s[k]?.prop_int_lbft!=null))) return false;
+  }
+  const r=document.querySelector(`input[name='isomode'][value='${mode}']`); if(!r) return false;
+  r.checked=true; isoMode=mode; refreshIsoColors(); return true;
 }
 
 let LAST_WARN="";
@@ -1711,32 +1860,46 @@ function buildPad(pad){
       if(seg.length<2) return;
       const c2=new THREE.CatmullRomCurve3(seg);
       const r=casingRadius(cas.phase, cas.od_in);
+      const rAt=md=>casingRadius(cas.phase, casingSegAt(cas,md)?.od_in??cas.od_in);   // radio del tramo en ese MD
+      const stepped=(cas.segments||[]).some(s=>s.od_in!=null && s.od_in!==cas.od_in);
       const isProd=cas.phase==="produccion";
       const col=CASING_COLOR[cas.phase]||0xd0d0d0;
       // aislación: más segmentos para que el coloreo por etapa/dogleg tenga bordes nítidos
       // (cada etapa mide ~100m; con ~600 anillos sobre ~6600m hay ~8 anillos/etapa).
-      const tubSeg=isProd ? Math.max(600,seg.length*3) : Math.max(80,seg.length);
+      const tubSeg=(isProd||stepped) ? Math.max(600,seg.length*3) : Math.max(80,seg.length);
       const geo=new THREE.TubeGeometry(c2, tubSeg, r, 14, false);
       const mat=new THREE.MeshStandardMaterial({color:col, metalness:.15, roughness:.65,
           transparent:!isProd, opacity:isProd?1:0.42, side:THREE.DoubleSide});
       const tube=new THREE.Mesh(geo, mat);
       tube.userData.kind="casing"; tube.userData.phase=cas.phase; tube.userData.radius=r;
+      // tabla arc-length→MD: cada anillo del tubo se ubica por longitud de arco de c2.
+      // Recorremos los puntos de seg acumulando distancia 3D y su MD paralelo.
+      const segMDs=[]; for(const s of st){ if(s.md<=cas.shoe_md) segMDs.push(s.md); } segMDs.push(cas.shoe_md);
+      const cum=[0]; for(let i=1;i<seg.length;i++) cum.push(cum[i-1]+seg[i].distanceTo(seg[i-1]));
+      const total=cum.at(-1)||1;
+      const ringMD=i=>{                 // MD del anillo i (0..tubSeg) por arc-length
+        const d=(i/tubSeg)*total;
+        let k=1; while(k<cum.length-1 && cum[k]<d) k++;
+        const t=(d-cum[k-1])/((cum[k]-cum[k-1])||1);
+        return segMDs[k-1]+(segMDs[k]-segMDs[k-1])*t;
+      };
+      if(stepped){                      // cambio de OD por tramo: cada anillo se escala sobre su centro
+        const pos=geo.attributes.position, RADIAL=14, ring=RADIAL+1;
+        for(let i=0;i<=tubSeg;i++){
+          const k=rAt(ringMD(i))/r; if(k===1) continue;
+          let cx=0,cy=0,cz=0;
+          for(let j=0;j<RADIAL;j++){ const v=i*ring+j; cx+=pos.getX(v); cy+=pos.getY(v); cz+=pos.getZ(v); }
+          cx/=RADIAL; cy/=RADIAL; cz/=RADIAL;
+          for(let j=0;j<ring;j++){ const v=i*ring+j;
+            pos.setXYZ(v, cx+(pos.getX(v)-cx)*k, cy+(pos.getY(v)-cy)*k, cz+(pos.getZ(v)-cz)*k); }
+        }
+        pos.needsUpdate=true;
+      }
       if(isProd){
-        // tabla arc-length→MD: cada anillo del tubo se ubica por longitud de arco de c2.
-        // Recorremos los puntos de seg acumulando distancia 3D y su MD paralelo.
-        const segMDs=[]; for(const s of st){ if(s.md<=cas.shoe_md) segMDs.push(s.md); } segMDs.push(cas.shoe_md);
-        const cum=[0]; for(let i=1;i<seg.length;i++) cum.push(cum[i-1]+seg[i].distanceTo(seg[i-1]));
-        const total=cum.at(-1)||1;
-        const ringMD=i=>{                 // MD del anillo i (0..tubSeg) por arc-length
-          const d=(i/tubSeg)*total;
-          let k=1; while(k<cum.length-1 && cum[k]<d) k++;
-          const t=(d-cum[k-1])/((cum[k]-cum[k-1])||1);
-          return segMDs[k-1]+(segMDs[k]-segMDs[k-1])*t;
-        };
         // rangos MD de cada etapa (primer top al último bottom de sus clusters)
         const stageRanges=(w.frac?.stages||[]).map(s=>{
           const mds=(s.clusters||[]).flatMap(c=>[c.top_md,c.bottom_md]).filter(x=>x!=null);
-          return mds.length?{stage:s.stage,md0:Math.min(...mds),md1:Math.max(...mds),propInt:s.plan?.prop_int_lbft??null}:null;
+          return mds.length?{stage:s.stage,md0:Math.min(...mds),md1:Math.max(...mds),propInt:s.plan?.prop_int_lbft??null,propIntReal:s.actual?.prop_int_lbft??null}:null;
         }).filter(Boolean);
         // dls interpolable por MD desde el survey
         const dlsAtMD=md=>{
@@ -1768,8 +1931,9 @@ function buildPad(pad){
         const mid=va.clone().add(vb).multiplyScalar(0.5);
         const axis=vb.clone().sub(va); let h=axis.length();
         if(h<1e-6){ axis.set(0,-1,0); h=0; }
-        const H=Math.max(h, r*2.5);               // alto mínimo para que sea visible pese a ser corto
-        const band=new THREE.Mesh(new THREE.CylinderGeometry(r*1.18, r*1.18, H, 20),
+        const rs=rAt(sj.top_md);
+        const H=Math.max(h, rs*2.5);              // alto mínimo para que sea visible pese a ser corto
+        const band=new THREE.Mesh(new THREE.CylinderGeometry(rs*1.18, rs*1.18, H, 20),
           new THREE.MeshStandardMaterial({color:0xffe500, metalness:.2, roughness:.5, emissive:0x3a3600, emissiveIntensity:.6}));
         band.quaternion.copy(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0), axis.normalize()));
         band.position.copy(mid);
@@ -1861,8 +2025,6 @@ function buildPad(pad){
     }
 
     const prodR=casingRadius("produccion", 5.0);   // radio de referencia (aislación)
-    const perfMatLight=new THREE.LineBasicMaterial({color:PERF_LIGHT});
-    const perfMatDark=new THREE.LineBasicMaterial({color:PERF_DARK});
     const plugMat=new THREE.MeshStandardMaterial({color:0xe5484d, metalness:.2, roughness:.5});
 
     // numeración de tapones en orden de bajada: N°1 = más profundo.
@@ -1872,31 +2034,31 @@ function buildPad(pad){
     stagesWithPlug.forEach((s,i)=>plugNumber.set(s.stage, i+1)); // 1 = más profundo
 
     (w.frac?.stages||[]).forEach((stg,si)=>{
-      // punzados: color turquesa que alterna claro/oscuro por etapa
-      const perfMat = (stg.stage % 2 === 0) ? perfMatLight : perfMatDark;
+      // punzados: un objeto y un material por etapa. refreshPerfColors pinta el material según la Vista de pozo;
+      // el atributo de color (RGBA) solo lleva la opacidad de cada vértice.
+      const linePos=[], lineCol=[];
+      const rOut=perfRadiusM, rIn=Math.min(prodR, perfRadiusM*0.2);   // radio real en metros (Configuración)
       (stg.clusters||[]).forEach(cl=>{
         const md=(cl.top_md!=null?cl.top_md:cl.bottom_md); if(md==null) return;
         const p=interpAtMD(st,md,wx); const center=toThree(p.x,p.y,p.tvd);
         const tan=tangentAtMD(md); const [u,v]=perpBasis(tan);
-        const rOut=perfRadiusM, rIn=Math.min(prodR, perfRadiusM*0.2);   // radio real en metros (Configuración)
-        const pos=[];
         const at=(ang,rad)=>center.clone()
           .add(u.clone().multiplyScalar(Math.cos(ang)*rad)).add(v.clone().multiplyScalar(Math.sin(ang)*rad));
-        // rama de árbol: cada raíz crece hacia afuera y se bifurca al ganar distancia
-        const branch=(ang,r0,r1,depth,spread)=>{
-          const a=at(ang,r0), b=at(ang,r1); pos.push(a.x,a.y,a.z, b.x,b.y,b.z);
-          if(depth<=0) return;
-          const nr=r1+(r1-r0)*0.85;
-          branch(ang-spread, r1, nr, depth-1, spread*0.7);
-          branch(ang+spread, r1, nr, depth-1, spread*0.7);
-        };
-        const nRoots=6, step=(rOut-rIn)*0.42;
-        for(let k=0;k<nRoots;k++) branch((k/nRoots)*Math.PI*2, rIn, rIn+step, 2, 0.28);
-        const geo=new THREE.BufferGeometry();
-        geo.setAttribute("position", new THREE.Float32BufferAttribute(pos,3));
-        const rays=new THREE.LineSegments(geo, perfMat);
-        rays.userData.kind="perf"; rays.userData.wellId=w.id; rays.userData.stage=stg.stage; g.add(rays);
+        for(const [ang,r0,r1] of perfBranches(rIn,rOut)){
+          const a=at(ang,r0), b=at(ang,r1);
+          linePos.push(a.x,a.y,a.z, b.x,b.y,b.z);
+          lineCol.push(1,1,1,perfAlpha(r0,rIn,rOut), 1,1,1,perfAlpha(r1,rIn,rOut));
+        }
       });
+      if(linePos.length){
+        const geo=new THREE.BufferGeometry();
+        geo.setAttribute("position", new THREE.Float32BufferAttribute(linePos,3));
+        geo.setAttribute("color", new THREE.Float32BufferAttribute(lineCol,4));
+        const rays=new THREE.LineSegments(geo, new THREE.LineBasicMaterial({vertexColors:true, transparent:true, depthWrite:false}));
+        rays.userData={kind:"perf", wellId:w.id, stage:stg.stage, perfBase:(stg.stage%2===0)?PERF_LIGHT:PERF_DARK,
+          propPlan:stg.plan?.prop_int_lbft??null, propReal:stg.actual?.prop_int_lbft??null};
+        g.add(rays);
+      }
 
       // tapones: cilindro rojo + etiqueta HTML "TPN N° x"
       if(stg.plug_md!=null){
@@ -1999,6 +2161,8 @@ function buildPad(pad){
             break; }
           case "CARTEL":
             if(el.md!=null && el.text){ const o=lbl(el.text, el.md, prodR*6);
+              o.el.style.whiteSpace="pre"; o.el.style.textAlign="center"; o.el.style.zIndex=1;   // por encima de las demás
+              if(instColor({color:el.bg})){ o.el.style.background=el.bg; o.el.style.color="#111"; }
               if(instColor(el)) o.el.style.borderColor=o.el.style.color=instColor(el); }   // solo si se eligió
             break;
         }
@@ -2012,6 +2176,13 @@ function buildPad(pad){
   // son verticales sintéticos (sin trayectoria cargada), se oculta el grupo.
   const hasSurvey=wells.some(w=>w.architecture!=="vertical");
   document.getElementById("grp-isomode").style.display=hasSurvey?"":"none";
+  // "Frac real" solo existe si el pad trae lo bombeado (hoy, solo desde Corva)
+  const hasReal=wells.some(w=>(w.frac?.stages||[]).some(s=>s.actual?.prop_int_lbft!=null));
+  document.getElementById("iso-fracreal").style.display=hasReal?"":"none";
+  if(!hasReal && isoMode==="fracreal"){ isoMode="normal";
+    const r=document.querySelector("input[name='isomode'][value='normal']"); if(r) r.checked=true; refreshIsoColors(); }
+  refreshPerfColors();
+  updateIsoLegend();
   buildWellMatrix(wells); buildGrids(); applyAllToggles(); frameAll(); updateSummary();
   // re-aplica en el próximo frame: evita que, recién cargado, alguna capa quede sin estado
   // hasta que el usuario toca un toggle (visibilidad no reflejada en el primer build).
@@ -2289,7 +2460,7 @@ document.getElementById("well-matrix").addEventListener("change",e=>{
   else if(t.matches("td.mx-well input[data-el]")){ const wid=t.closest("[data-wid]").dataset.wid, k=t.dataset.el; ensureVis(wid)[k]=t.checked; applyWellVis(wid); }
   else return;
   // el coloreo "por fracplan" se auto-normaliza a los pozos visibles → re-normalizar al cambiar visibilidad
-  if(isoMode==="fracplan") refreshIsoColors();
+  if(isoMode==="fracplan"||isoMode==="fracreal") refreshIsoColors();
   mxSyncMasters(); saveViewCfg();
 });
 // filtro de etapas de punzados (campo de texto por pozo / para todos)
@@ -2509,17 +2680,27 @@ canvas.addEventListener("mousemove",e=>{
   if(!info){ hoverTip.style.display="none"; return; }
   const stageTxt = info.stage!=null ? ` · <span class="s">E${info.stage}</span>` : "";
   const dlsTxt = info.dls!=null ? `<br><span class="d">dogleg</span> <span class="dl">${info.dls.toFixed(2)}</span> °/30m` : "";
-  // "cursor frac": suma los datos planificados de la etapa sobre la que se hace hover
+  // "cursor frac": suma los datos de la etapa sobre la que se hace hover, plan y real en sub-carteles
   let fracTxt="";
   if(SHOW_CURSOR_FRAC && info.stage!=null){
     const w=PAD?.pad.wells.find(x=>x.id===info.well);
-    const p=w?.frac?.stages?.find(s=>s.stage===info.stage)?.plan;
-    if(p){ const f=(v,d)=>v==null?"—":(+v).toFixed(d);
-      fracTxt=`<br><span class="fk">AS:</span> ${f(p.sand_t,1)} t · <span class="fk">Fluido:</span> ${f(p.fluid_m3,0)} m³`
+    const stg=w?.frac?.stages?.find(s=>s.stage===info.stage), p=stg?.plan, a=stg?.actual;
+    const f=(v,d)=>v==null?"—":(+v).toFixed(d);
+    const card=(cls,title,body)=>`<div class="ft-card ${cls}"><div class="ft-t">${title}</div>${body}</div>`;
+    fracTxt=card("ft-plan","Plan", p
+      ? `<span class="fk">AS:</span> ${f(p.sand_t,1)} t · <span class="fk">Fluido:</span> ${f(p.fluid_m3,0)} m³`
         +`<br><span class="fk">LongEt:</span> ${f(p.length_m,1)} m · <span class="fk">PropInt:</span> ${f(p.prop_int_lbft,0)} lb/ft`
         +`<br><span class="fk">FluidInt:</span> ${f(p.fluid_int_m3m,1)} m³/m`
-        +`<br><span class="fk">WL:</span> ${p.wl?escHtml(p.wl):"—"}`;
-    } else fracTxt=`<br><span class="d">sin datos de fracplan</span>`;
+        +`<br><span class="fk">WL:</span> ${p.wl?escHtml(p.wl):"—"}`
+      : `<span class="fk">sin datos</span>`);
+    if(w?.frac?.stages?.some(s=>s.actual)) fracTxt+=card("ft-real",`Real${a?.skipped?" · etapa salteada":""}${a?.screenout?" · screenout":""}`, a
+      ? `<span class="fk">AS:</span> ${f(a.sand_t,1)} t · <span class="fk">Fluido:</span> ${f(a.fluid_m3,0)} m³`
+        +`<br><span class="fk">PropInt:</span> ${f(a.prop_int_lbft,0)} lb/ft · <span class="fk">FluidInt:</span> ${f(a.fluid_int_m3m,1)} m³/m`
+        +`<br><span class="fk">Pres:</span> ${f(a.tp_avg_psi,0)} psi · <span class="fk">Caudal:</span> ${f(a.rate_avg_bpm,0)} bpm · <span class="fk">ISIP:</span> ${f(a.isip_psi,0)} psi`
+      : `<span class="fk">sin datos</span>`);
+    const pi=stg?.plug_info;
+    if(pi){ const txt=[pi.type,pi.make,pi.od_in!=null?`${pi.od_in}"`:null].filter(Boolean).join(" · ");
+      if(txt) fracTxt+=`<div class="ft-plug"><span class="fk">Tapón:</span> ${escHtml(txt)}</div>`; }
   }
   hoverTip.innerHTML=`<span class="w">${info.well}</span>${stageTxt}<br>MD <b>${Math.round(info.md)}</b> m · TVD <b>${Math.round(info.tvd)}</b> m${dlsTxt}${fracTxt}`;
   hoverTip.style.display="block";
@@ -2740,6 +2921,8 @@ function loadPadObject(obj, persist=true){
   syncBuilderFromPad(obj);   // el constructor refleja el pad cargado: picklists, MDs, metadata (editable)
   toast(`Pad ${obj.pad.id} cargado · ${obj.pad.wells.length} pozos`); show("v3d");
 }
+/* Pad que no viene de un archivo (Corva): "Guardar" no debe pisar el .vvwp que estuviera abierto */
+function loadRemotePad(obj){ PAD_FH=null; loadPadObject(obj); }
 /* Pad → constructor: llena metadata, picklists y cajas con lo cargado (JSON o generado), para
    poder EDITAR cualquier dato y re-aplicarlo con "Generar y ver pad". La tabla es el resumen. */
 function syncBuilderFromPad(pad){
@@ -2753,7 +2936,7 @@ function syncBuilderFromPad(pad){
     const casings={};
     (w.casings||[]).forEach(c=>{ casings[c.phase]={od_in:c.od_in??null, shoe_md:c.shoe_md??null,
       toc_md:c.toc_md??null, weight_ppf:c.weight_ppf??null, grade:c.grade??null,
-      segments:c.segments||undefined, short_joints:c.short_joints||undefined}; });
+      segments:c.segments?.map(s=>({...s})), short_joints:c.short_joints?.map(j=>({...j}))}; });
     const ni=normInstallation(w);
     const inst=ni ? {enabled:true, elements:ni.elements.map(el=>({...el}))} : {enabled:false, elements:[]};
     const prod=(w.casings||[]).find(c=>c.phase==="produccion");
@@ -2807,8 +2990,10 @@ function loadViewCfg(){
   if(cfg.hzero){ hzero=cfg.hzero; const s=document.getElementById("cfg-hzero"); if(s) s.value=hzero; }
   if(cfg.font){ document.getElementById("cfg-font").value=cfg.font; setLabelFont(cfg.font); }
   if(cfg.plugInv!=null){ plugCountInverted=!!cfg.plugInv; document.getElementById("cfg-pluginv").checked=plugCountInverted; }
-  if(typeof cfg.perfRadiusM==="number"){ perfRadiusM=cfg.perfRadiusM;
-    document.getElementById("cfg-perfradius").value=cfg.perfRadiusM;
+  // un valor guardado fuera del rango actual (antes era 1–200 m) vuelve al valor por defecto
+  if(typeof cfg.perfRadiusM==="number"){
+    perfRadiusM=(cfg.perfRadiusM>=PERF_RADIUS_MIN&&cfg.perfRadiusM<=PERF_RADIUS_MAX)?cfg.perfRadiusM:PERF_RADIUS_DEF;
+    document.getElementById("cfg-perfradius").value=perfRadiusM;
     document.getElementById("perfradius-val").textContent=perfRadiusM+" m"; }
   applyAllToggles(); syncCursorFrac();
 }
@@ -3100,8 +3285,10 @@ async function parseTallyPDF(buf, phase){
   const grade=mostCommon(grades);
   const mt=text.match(/Total\s+length\s+run\s+([\d,]+\.\d+)/i);
   const shoe=mt?parseFloat(mt[1].replace(/,/g,"")):null;
-  const rt = phase==="produccion" ? parseRunTally(text) : {shorts:[], shoetrack:null};
-  return {od_in:od, shoe_md:shoe, weight_ppf:weight, grade, short_joints:rt.shorts, shoetrack:rt.shoetrack};
+  const rt = phase==="produccion" ? parseRunTally(text) : {shorts:[], shoetrack:null, segments:null};
+  const deep=rt.segments?.at(-1);       // con tramos, el resumen es el tramo del zapato
+  return {od_in:deep?.od_in??od, shoe_md:shoe, weight_ppf:deep?.weight_ppf??weight, grade:deep?.grade??grade,
+    short_joints:rt.shorts, shoetrack:rt.shoetrack, segments:rt.segments};
 }
 /* Lee el "2.2 Run Tally" y separa piezas cortas (<10 m; los caños normales miden >10 m) en:
    - caños cortos: casing corto / XOVER del TRAMO MEDIO. Se ignoran los primeros y últimos `edgeM`
@@ -3109,7 +3296,8 @@ async function parseTallyPDF(buf, phase){
    - shoetrack: piezas cortas de los últimos `edgeM` m (zapato, collar flotador, camisas, cortos).
    Cada fila trae 3 decimales consecutivos = Longitud, Cum.Length, Set Depth (con/sin comas de miles).
    OJO: la fila corta NO trae "N° Tally", por eso ubicamos los 3 decimales sin asumir cuántos enteros
-   van antes. Set Depth = MD del TOPE de la pieza (≈ TD − Cum.Length) ⇒ bottom = Set Depth + Longitud. */
+   van antes. Set Depth = MD del FONDO de la pieza (la 1ra fila, el zapato, da el total corrido)
+   ⇒ top = Set Depth − Longitud. También arma los tramos: ver runTallySegments. */
 function parseRunTally(text, maxLen=10.0, edgeM=150){
   const m=text.match(/2\.2\s+Run\s+Tally([\s\S]*?)(?:\n\s*2\.3|\n\s*3\.|$)/i);
   const block=m?m[1]:text;
@@ -3126,12 +3314,12 @@ function parseRunTally(text, maxLen=10.0, edgeM=150){
     const desc=line.slice(mm.index+mm[0].length).trim().replace(/^(?:\d+(?:,\d{3})*\.\d+\s+)+/,"");
     rows.push({length, setd, desc});
   }
-  if(!rows.length) return {shorts:[], shoetrack:null};
-  const maxMD=Math.max(...rows.map(r=>r.setd+r.length));   // fondo de la sarta (≈ zapato)
+  if(!rows.length) return {shorts:[], shoetrack:null, segments:null};
+  const maxMD=Math.max(...rows.map(r=>r.setd));            // fondo de la sarta (≈ zapato)
   const shorts=[], stEls=[];
   for(const r of rows){
     if(r.length>=maxLen) continue;                     // caño normal
-    const top=round3(r.setd), bottom=round3(r.setd+r.length);
+    const top=round3(r.setd-r.length), bottom=round3(r.setd);
     if(top<edgeM) continue;                            // primeros 150 m (cabezal/colgador): se ignora
     if(bottom>maxMD-edgeM){                            // últimos 150 m: shoetrack
       stEls.push({desc:r.desc||"elemento", length_m:round3(r.length), top_md:top, bottom_md:bottom});
@@ -3142,7 +3330,29 @@ function parseRunTally(text, maxLen=10.0, edgeM=150){
   }
   shorts.sort((a,b)=>a.top_md-b.top_md);
   stEls.sort((a,b)=>a.top_md-b.top_md);                // somero → profundo
-  return {shorts, shoetrack: stEls.length?{elements:stEls}:null};
+  return {shorts, shoetrack: stEls.length?{elements:stEls}:null, segments:runTallySegments(rows,maxLen,maxMD)};
+}
+/* OD/libraje/grado que trae la descripción de una fila: "5, 18, P-110 ICY W-463" o `5.5" 23# P-110` */
+function casingSpecFromDesc(d){
+  const m=d.match(/(\d+ 1\/2|\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)\s*,\s*([A-Z])-?(\d{2,3})/)
+    || d.match(/(\d+ 1\/2|\d+(?:\.\d+)?)\s*(?:"|´´|'')\s*(\d+(?:\.\d+)?)\s*#\s*([A-Z])-?(\d{2,3})/);
+  if(!m) return null;
+  return {od_in:m[1].includes("/")?parseInt(m[1],10)+0.5:+m[1], weight_ppf:+m[2], grade:m[3]+m[4]};
+}
+/* Tramos = caños normales (las piezas cortas no definen tramo) con distinta especificación, de boca a
+   zapato; el XO queda en el tramo de arriba. null si es una sola especificación o la fila no la trae. */
+function runTallySegments(rows, maxLen, maxMD){
+  const segs=[];
+  rows.filter(r=>r.length>=maxLen).sort((a,b)=>a.setd-b.setd).forEach(r=>{
+    const sp=casingSpecFromDesc(r.desc); if(!sp) return;
+    const last=segs.at(-1);
+    if(last && last.od_in===sp.od_in && last.weight_ppf===sp.weight_ppf && last.grade===sp.grade) return;
+    segs.push({top_md:round3(r.setd-r.length), bottom_md:null, ...sp});
+  });
+  if(segs.length<2) return null;
+  segs.forEach((s,i)=>{ s.bottom_md=segs[i+1]?.top_md??round3(maxMD); });
+  segs[0].top_md=0;
+  return segs;
 }
 /* Alternativa al tally PDF: un XLSX simple de UNA solapa con los mismos campos, para TODAS las fases.
    Dos tablas: (1) por fase → od_in/shoe_md/weight_ppf/grade/toc_md; (2) piezas cortas + shoetrack.
@@ -3254,39 +3464,76 @@ function fmtCasingStatus(c){
   if(!c) return "—";
   let s=`${c.od_in!=null?fmtOD(c.od_in):"?"} @ ${c.shoe_md!=null?Math.round(c.shoe_md):"?"}`;
   if(c.grade) s+=" "+c.grade;
+  if(c.segments?.length) s+=` · ${c.segments.length} tramos`;
   if(c.short_joints?.length) s+=` · ${c.short_joints.length} caño(s) corto(s)`;
   return s;
 }
-/* listado de caños cortos detectados en el tally de aislación: longitud, MD desde y detalle
-   (cañería/acero + generales). Solo lectura: el dato vive en cas.short_joints del tally. */
-function shortsList(c){
-  const sjs=c.short_joints||[]; if(!sjs.length) return "";
-  const rows=sjs.map((sj,k)=>`<tr><td class="num">${k+1}</td><td>${sj.xover?"xover":"casing corto"}</td>
-      <td class="num">${Math.round(sj.top_md)} m</td><td class="num">${sj.length_m!=null?sj.length_m.toFixed(2)+" m":"—"}</td>
-      <td class="dim">${escHtml(sj.desc||"—")}</td></tr>`).join("");
-  return `<div class="cc-list"><div class="cc-title">↳ ${sjs.length} caño(s) corto(s) detectados</div>
-    <table class="tbl cc-tbl"><tr><th>#</th><th>Tipo</th><th>MD desde</th><th>Longitud</th><th>Cañería / acero · detalle</th></tr>${rows}</table></div>`;
+/* Caños cortos de la aislación: del tally, de Corva o a mano. MD del tope + largo. */
+function shortsEditor(i,c){
+  const sjs=c.short_joints||[];
+  const a=(k,f)=>`data-w="${i}" data-sj="${k}" data-sjf="${f}"`;
+  const rows=sjs.map((sj,k)=>`<div class="inst-el">
+      <input type="number" step="any" ${a(k,"top")} value="${sj.top_md??""}" placeholder="tope MD">
+      <input type="number" step="any" ${a(k,"len")} value="${sj.length_m??""}" placeholder="largo m">
+      <input type="text" ${a(k,"desc")} value="${escAttr(sj.desc||"")}" placeholder="descripción" style="width:170px">
+      <label class="inst-chk" title="Es un crossover"><input type="checkbox" ${a(k,"xover")} ${sj.xover?"checked":""}>XO</label>
+      <button class="btn" data-w="${i}" data-sj="${k}" data-sjact="del">✕</button></div>`).join("");
+  return `<div class="cc-list cc-edit"><div class="cc-title">${sjs.length?`↳ ${sjs.length} caño(s) corto(s)`:"Caños cortos"}</div>${rows}
+    <button class="btn" data-w="${i}" data-sjact="add">+ caño corto</button></div>`;
 }
-/* tramos (telescopado) de una fase: desde/hasta MD + OD/peso/grado. Solo lectura (viene del tally xlsx). */
-function segmentsList(c){
-  const sg=c.segments||[]; if(sg.length<2) return "";
-  const rows=sg.map(s=>`<tr><td class="num">${s.top_md!=null?Math.round(s.top_md):"?"}–${s.bottom_md!=null?Math.round(s.bottom_md):"?"} m</td>
-      <td>${s.od_in!=null?fmtOD(s.od_in):"?"}</td><td class="num">${s.weight_ppf!=null?s.weight_ppf+" lb/ft":"—"}</td>
-      <td>${escHtml(s.grade||"—")}</td></tr>`).join("");
-  return `<div class="cc-list"><div class="cc-title">↳ ${sg.length} tramo(s) (telescopado)</div>
-    <table class="tbl cc-tbl"><tr><th>Desde–Hasta MD</th><th>OD</th><th>Peso</th><th>Acero</th></tr>${rows}</table></div>`;
+/* Tramos de una fase: cambios de libraje, grado o diámetro de boca a zapato. Con tramos, OD/lb/ft/
+   acero/zapato del bloque son un resumen que da el tramo más profundo (ver syncSegmentSummary). */
+function segmentsEditor(i,ph,c){
+  const sg=c.segments||[];
+  const a=(k,f)=>`data-w="${i}" data-ph="${ph}" data-sg="${k}" data-sgf="${f}"`;
+  const rows=sg.map((s,k)=>`<div class="inst-el">
+      <input type="number" step="any" ${a(k,"top")} value="${s.top_md??""}" placeholder="desde MD">
+      <input type="number" step="any" ${a(k,"bottom")} value="${s.bottom_md??""}" placeholder="hasta MD">
+      <select ${a(k,"od")} title="OD">${odOptions(s.od_in)}</select>
+      <select ${a(k,"wt")} title="lb/ft">${wtOptions(s.od_in,s.weight_ppf)}</select>
+      <select ${a(k,"gr")} title="Acero">${grOptions(s.grade)}</select>
+      <button class="btn" data-w="${i}" data-ph="${ph}" data-sg="${k}" data-sgact="del">✕</button></div>`).join("");
+  return `<div class="cc-list cc-edit"><div class="cc-title">${sg.length?`↳ ${sg.length} tramos · el más profundo define el resumen`:"Tramos"}</div>${rows}
+    <button class="btn" data-w="${i}" data-ph="${ph}" data-sgact="add">+ tramo</button></div>`;
+}
+function addSegment(cas){
+  const spec={od_in:cas.od_in??null, weight_ppf:cas.weight_ppf??null, grade:cas.grade??null};
+  if(!cas.segments?.length){ cas.segments=[{top_md:0,bottom_md:null,...spec},{top_md:null,bottom_md:cas.shoe_md??null,...spec}]; return; }
+  cas.segments.push({top_md:cas.segments.at(-1).bottom_md,bottom_md:null,...spec});
+}
+function delSegment(cas,k){
+  const sg=cas.segments; sg.splice(k,1);
+  if(sg[k]) sg[k].top_md=k>0?sg[k-1].bottom_md:0;       // siguen contiguos
+  if(sg.length<2) cas.segments=undefined;               // un solo tramo: vuelve al bloque simple
+}
+/* filas completas, de somera a profunda (sin "desde" = donde termina la anterior) */
+function completeSegments(segs){
+  let prev=0;
+  return (segs||[]).filter(s=>s.bottom_md!=null).sort((a,b)=>a.bottom_md-b.bottom_md)
+    .map(s=>{ const top_md=s.top_md??prev; prev=s.bottom_md; return {...s,top_md}; });
+}
+/* el resumen de la fase sigue al tramo más profundo; refleja el cambio sin re-renderizar (no pierde el foco) */
+function syncSegmentSummary(cas, row){
+  const deep=completeSegments(cas.segments).at(-1); if(!deep) return;
+  Object.assign(cas,{od_in:deep.od_in, weight_ppf:deep.weight_ppf, grade:deep.grade, shoe_md:deep.bottom_md});
+  const g=row?.querySelector(".cas-grid"); if(!g) return;
+  g.querySelector('[data-c="od"]').innerHTML=odOptions(cas.od_in);
+  g.querySelector('[data-c="wt"]').innerHTML=wtOptions(cas.od_in,cas.weight_ppf);
+  g.querySelector('[data-c="gr"]').innerHTML=grOptions(cas.grade);
+  g.querySelector('[data-c="md"]').value=cas.shoe_md??"";
 }
 function phaseBlock(i,ph,label,c){ c=c||{};
+  const lock=c.segments?.length?' disabled title="Lo define el tramo más profundo"':"";
   return `<div class="phase-row"><span class="tag">${label}</span>
     <span class="btn filebtn">Tally .pdf<input type="file" accept=".pdf" data-w="${i}" data-kind="tally" data-phase="${ph}"></span>
     <span class="st" data-st="tally-${ph}-${i}">${(c.od_in!=null||c.shoe_md!=null)?fmtCasingStatus(c):"—"}</span>
     <div class="cas-grid">
-      <label>OD<select data-w="${i}" data-ph="${ph}" data-c="od">${odOptions(c.od_in)}</select></label>
-      <label>lb/ft<select data-w="${i}" data-ph="${ph}" data-c="wt">${wtOptions(c.od_in,c.weight_ppf)}</select></label>
-      <label>Acero<select data-w="${i}" data-ph="${ph}" data-c="gr">${grOptions(c.grade)}</select></label>
-      <label>Zapato MD<input type="number" data-w="${i}" data-ph="${ph}" data-c="md" value="${c.shoe_md??""}"></label>
+      <label>OD<select data-w="${i}" data-ph="${ph}" data-c="od"${lock}>${odOptions(c.od_in)}</select></label>
+      <label>lb/ft<select data-w="${i}" data-ph="${ph}" data-c="wt"${lock}>${wtOptions(c.od_in,c.weight_ppf)}</select></label>
+      <label>Acero<select data-w="${i}" data-ph="${ph}" data-c="gr"${lock}>${grOptions(c.grade)}</select></label>
+      <label>Zapato MD<input type="number" data-w="${i}" data-ph="${ph}" data-c="md" value="${c.shoe_md??""}"${lock}></label>
       <label>TOC MD<input type="number" data-w="${i}" data-ph="${ph}" data-c="toc" value="${c.toc_md??""}"></label>
-    </div>${segmentsList(c)}${ph==="produccion"?shortsList(c):""}</div>`;
+    </div>${segmentsEditor(i,ph,c)}${ph==="produccion"?shortsEditor(i,c):""}</div>`;
 }
 /* Instalación (v0.6): lista de elementos, uno por fila, agregados con botones. Cada input lleva
    data-if = nombre del campo del elemento (mismo nombre que en el pad JSON). */
@@ -3319,7 +3566,9 @@ function instRow(i,w,el,k){
     case "TPNC": body=num("top_md","desde MD")+num("bottom_md","hasta MD")+num("volume_l","vol (L)")+cap; break;
     case "FLUIDO": body=txt("name","nombre",110)+num("density_gcm3","dens. g/cm³",92)
       +num("top_md","desde MD")+num("bottom_md","hasta MD")+num("volume_l","vol (L)")+cap; break;
-    case "CARTEL": body=num("md","MD (m)")+txt("text","texto del cartel",230); break;
+    case "CARTEL": body=num("md","MD (m)")
+      +`<textarea ${a("text")} rows="2" placeholder="texto del cartel (Enter = otra línea)" style="width:230px">${escHtml(el.text??"")}</textarea>`
+      +`<input type="color" class="inst-color" ${a("bg")} value="${instColor({color:el.bg})||"#ffffff"}" title="Color de fondo del cartel">`; break;
     case "BHA": body=num("md","MD (m)")+chk("mdf","MDF","Con motor de fondo"); break;
     default: body=num("md","MD (m)");                     // TPN · PKR · ANCLA · BBA
   }
@@ -3407,7 +3656,7 @@ function parseRange(str){ str=(str||"").trim(); if(!str) return null;
   if(/^\d+(?:\.\d+)?$/.test(str)){ const v=+str; return {from:v, to:v+1}; }   // 1 número ⇒ 1 m
   return null;
 }
-function fracFromRows(rows){
+function fracFromRows(rows, prev){
   const stages={}, order=[];
   for(const r of rows){ const st=parseInt(r.stage,10); if(!(st>=0)) continue;
     const rg=parseRange(r.range); if(!rg) continue;
@@ -3416,6 +3665,9 @@ function fracFromRows(rows){
     else stages[st].clusters.push({n:null, top_md:rg.from, bottom_md:rg.to, incl:null, shots:null, charge:null, phasing:null});
   }
   order.sort((a,b)=>a-b);
+  // editar tapones o punzados no borra lo planificado ni lo bombeado de la etapa
+  (prev?.stages||[]).forEach(o=>{ const st=stages[o.stage]; if(!st) return;
+    for(const k of ["plan","actual","plug_info"]) if(o[k]) st[k]=o[k]; });
   return {total_stages:order.length, lp_md:null, collar_md:null, horizontal_ext_m:null,
     planned_vs_actual:"planned", stages:order.map(s=>stages[s])};
 }
@@ -3476,6 +3728,22 @@ function onWellField(e){
     else if(f==="toc") cas.toc_md=v===""?null:parseFloat(v);
     return;
   }
+  if(t.dataset.sgf){ const cas=w.casings[t.dataset.ph], k=+t.dataset.sg, sg=cas?.segments?.[k]; if(!sg) return;
+    const f=t.dataset.sgf, v=t.value, n=v===""?null:parseFloat(v), row=t.closest(".inst-el");
+    if(f==="top") sg.top_md=n;
+    else if(f==="bottom"){ sg.bottom_md=n; const nx=cas.segments[k+1];       // el siguiente arranca donde termina este
+      if(nx){ nx.top_md=n; row.nextElementSibling.querySelector('[data-sgf="top"]').value=n??""; } }
+    else if(f==="od"){ sg.od_in=n; sg.weight_ppf=null; row.querySelector('[data-sgf="wt"]').innerHTML=wtOptions(n,null); }
+    else if(f==="wt") sg.weight_ppf=n;
+    else if(f==="gr") sg.grade=v||null;
+    syncSegmentSummary(cas,t.closest(".phase-row"));
+    return; }
+  if(t.dataset.sjf){ const sj=w.casings.produccion?.short_joints?.[+t.dataset.sj]; if(!sj) return; const f=t.dataset.sjf;
+    if(f==="xover") sj.xover=t.checked;
+    else if(f==="desc") sj.desc=t.value;
+    else { const v=parseFloat(t.value); if(f==="top") sj.top_md=isFinite(v)?v:null; else sj.length_m=isFinite(v)?v:null; }
+    sj.bottom_md=(sj.top_md!=null&&sj.length_m!=null)?round3(sj.top_md+sj.length_m):null;
+    return; }
   if(t.dataset.if){ const el=w.install.elements[+t.dataset.ie]; if(!el) return; const f=t.dataset.if;
     if(t.type==="checkbox") el[f]=t.checked;
     else if(INST_NUM_FIELDS.includes(f)){ const v=parseFloat(t.value); el[f]=isFinite(v)?v:null; }
@@ -3494,12 +3762,22 @@ function onWellField(e){
     if(t.dataset.ff==="type") el.type=t.value;
     else if(t.dataset.ff==="stage") el.stage=t.value===""?null:parseInt(t.value,10);
     else if(t.dataset.ff==="range") el.range=t.value;
-    w.frac=fracFromRows(w.fracRows);          // el 3D usa w.frac: se rearma al editar
+    w.frac=fracFromRows(w.fracRows,w.frac);          // el 3D usa w.frac: se rearma al editar
     return; }
 }
 document.getElementById("b-wells").addEventListener("input",onWellField);
 document.getElementById("b-wells").addEventListener("change",onWellField);
 document.getElementById("b-wells").addEventListener("click",e=>{
+  const tsg=e.target.closest("[data-sgact]"), tsj=e.target.closest("[data-sjact]");
+  if(tsg){ const w=ING.wells[+tsg.dataset.w]; if(!w) return; const ph=tsg.dataset.ph;
+    const cas=w.casings[ph]||(w.casings[ph]={});
+    if(tsg.dataset.sgact==="add") addSegment(cas); else delSegment(cas,+tsg.dataset.sg);
+    renderWellCards(); return; }
+  if(tsj){ const w=ING.wells[+tsj.dataset.w]; if(!w) return;
+    const cas=w.casings.produccion||(w.casings.produccion={});
+    if(tsj.dataset.sjact==="add") (cas.short_joints||(cas.short_joints=[])).push({desc:"Caño corto",xover:false,top_md:null,length_m:6,bottom_md:null});
+    else cas.short_joints.splice(+tsj.dataset.sj,1);
+    renderWellCards(); return; }
   const ti=e.target.closest("[data-iact]"), ts=e.target.closest("[data-sact]");
   if(ti){ const i=+ti.dataset.w, w=ING.wells[i]; if(!w) return; const act=ti.dataset.iact;
     if(act==="enable"){ w.install.enabled=e.target.checked;
@@ -3535,8 +3813,8 @@ document.getElementById("b-wells").addEventListener("click",e=>{
       const body=tf.closest(".inst-wrap").querySelector(".inst-body");
       if(body) body.classList.toggle("disabled",!e.target.checked); return; }
     if(act==="add-PERF"||act==="add-TPN"){ w.fracRows.push({type:act.slice(4), stage:null, range:""});
-      w.frac=fracFromRows(w.fracRows); refillFrac(i); return; }
-    if(act==="del"){ w.fracRows.splice(+tf.dataset.fe,1); w.frac=fracFromRows(w.fracRows); refillFrac(i); return; }
+      w.frac=fracFromRows(w.fracRows,w.frac); refillFrac(i); return; }
+    if(act==="del"){ w.fracRows.splice(+tf.dataset.fe,1); w.frac=fracFromRows(w.fracRows,w.frac); refillFrac(i); return; }
     return;
   }
   // colapsar/expandir bloques (instalación / shoetrack / fracplan) al hacer click en el encabezado
@@ -3579,6 +3857,7 @@ document.getElementById("b-wells").addEventListener("change",async e=>{
       const wt=nearestWT(cas.od_in, c.weight_ppf); if(wt!=null) cas.weight_ppf=wt;
       if(c.grade) cas.grade=c.grade;
       if(c.shoe_md!=null) cas.shoe_md=c.shoe_md;
+      cas.segments = c.segments?.length ? c.segments : undefined;
       cas.short_joints = c.short_joints?.length ? c.short_joints : undefined;
       // shoetrack autodetectado → estado editable a mano
       if(c.shoetrack?.elements?.length){
@@ -3728,10 +4007,16 @@ function assemblePad(){
       if(!c || !(c.od_in!=null||c.shoe_md!=null||c.weight_ppf!=null||c.grade||c.toc_md!=null)) return;
       const cas={phase:ph, od_in:c.od_in??null, shoe_md:c.shoe_md??null, toc_md:c.toc_md??null,
         weight_ppf:c.weight_ppf??null, grade:c.grade??null};
-      if(c.segments?.length) cas.segments=c.segments;
-      if(c.short_joints?.length) cas.short_joints=c.short_joints;
+      const segs=completeSegments(c.segments);
+      if(segs.some(s=>s.top_md>=s.bottom_md)){ toast(`Tramos de ${ph} del pozo ${w.id||i+1}: "desde" debe ser menor que "hasta"`); err=1; return; }
+      if(segs.length>1){ const deep=segs.at(-1); cas.segments=segs;
+        Object.assign(cas,{od_in:deep.od_in, weight_ppf:deep.weight_ppf, grade:deep.grade, shoe_md:deep.bottom_md}); }
+      const shorts=(c.short_joints||[]).filter(j=>j.top_md!=null).sort((a,b)=>a.top_md-b.top_md)
+        .map(j=>({...j, bottom_md:j.bottom_md??(j.length_m!=null?round3(j.top_md+j.length_m):j.top_md)}));
+      if(shorts.length) cas.short_joints=shorts;
       casings.push(cas);
     });
+    if(err) return;
     // shoetrack (manual o autodetectado) → va en la aislación (produccion)
     if(w.shoetrack?.enabled){
       const els=(w.shoetrack.elements||[]).filter(el=>el.top_md!=null).map(el=>({
@@ -3808,7 +4093,7 @@ function instSummaryRows(w){
       case "ANCLA": det="ancla"; break;
       case "BBA": det="bomba"; break;
       case "BHA": det=el.mdf?"con motor de fondo (MDF)":"fresa"; break;
-      case "CARTEL": det=el.text||""; break;
+      case "CARTEL": det=(el.text||"").replace(/\n+/g," · "); break;
     }
     return {name:INST_LABEL[el.type]||el.type, od, where, det};
   });
@@ -4170,6 +4455,10 @@ function setDiamExagForExport(v){ diamExag=v; if(PAD) buildPad(PAD); }
   Object.defineProperty(exports, "escHtml", { get:()=>escHtml, enumerable:true });
   Object.defineProperty(exports, "escAttr", { get:()=>escAttr, enumerable:true });
   Object.defineProperty(exports, "onResize", { get:()=>onResize, enumerable:true });
+  Object.defineProperty(exports, "loadRemotePad", { get:()=>loadRemotePad, enumerable:true });
+  Object.defineProperty(exports, "show", { get:()=>show, enumerable:true });
+  Object.defineProperty(exports, "casingSegAt", { get:()=>casingSegAt, enumerable:true });
+  Object.defineProperty(exports, "setIsoMode", { get:()=>setIsoMode, enumerable:true });
   Object.defineProperty(exports, "WELL_COLORS", { get:()=>WELL_COLORS, enumerable:true });
   Object.defineProperty(exports, "OD_IN", { get:()=>OD_IN, enumerable:true });
   Object.defineProperty(exports, "CASING_COLOR", { get:()=>CASING_COLOR, enumerable:true });
@@ -4217,6 +4506,7 @@ function lum01(c){ return 0.2126*c.r + 0.7152*c.g + 0.0722*c.b; }
 function applyTheme(theme, store){
   V.world.traverse(o=>{
     const mats = o.material ? (Array.isArray(o.material)?o.material:[o.material]) : [];
+    const perf = o.userData?.kind==="perf";       // sus vertex colors son solo la opacidad: el color es del material
     mats.forEach(m=>{
       if(!m || store.has(m)) return;
       store.set(m, { color:m.color?m.color.clone():null,
@@ -4224,11 +4514,11 @@ function applyTheme(theme, store){
       if(!m.color) return;
       if(theme==="bw"){
         const g=lum01(m.color); m.color.setRGB(g,g,g);
-        if(m.vertexColors){ m.vertexColors=false; m.color.setRGB(0.5,0.5,0.5); }
+        if(m.vertexColors&&!perf){ m.vertexColors=false; m.color.setRGB(0.5,0.5,0.5); }
         if(m.emissive) m.emissive.setRGB(0,0,0);
       } else if(theme==="light"){
         // aclarar demasiado sobre blanco = invisible: oscurecer los casi-blancos
-        if(!m.vertexColors && lum01(m.color)>0.72){ m.color.multiplyScalar(0.45); }
+        if((perf||!m.vertexColors) && lum01(m.color)>0.72){ m.color.multiplyScalar(0.45); }
         if(m.emissive) m.emissive.setRGB(0,0,0);   // sin glow para papel
       }
       m.needsUpdate=true;
@@ -4431,11 +4721,23 @@ const { rasterizeSVG, canvasToFile, canvasToPDF } = __ns["./util.js"];
 /* ---- semiancho (px) por fase, anidados. No son OD reales: priorizan legibilidad ---- */
 const HALF = { guia:34, intermedia1:26, intermedia2:19, produccion:13 };
 const TBG_HALF = 6;
+/* el esquema no es a escala: un cambio de OD por tramo se exagera para que se lea (5½" sobre 5" = +30%) */
+const SEG_OD_GAIN = 3;
+/* un TBG más fino que el mayor del pozo también se exagera (2⅜" sobre 2⅞" = −35%), con piso */
+const TBG_OD_GAIN = 2, TBG_MIN_RATIO = 0.55;
+/* holgura mínima (px) entre los ejes de las paredes de dos cañerías anidadas: la pared + aire visible */
+const WALL_CLEAR = 7.2;
+/* AJUSTE ESQUEMÁTICO: lo que queda muy junto o muy corto se separa estirando el camino (el lienzo crece),
+   y lo que cae en el arco baja la curva para quedar en el tronco. La regla sigue al mismo mapeo. */
+const BBA_PX = 18;                     // largo de la bomba, siempre desde su MD hacia abajo
+const SCHEM_GAP = 14, SCHEM_GAP_BARE = 6, SCHEM_ARC_CLEAR = 18;
+const SCHEM_MIN_LEN = { TBG:34, VB:10, TPNC:16, FLUIDO:12 };
 /* varillas de bombeo: trazo fino, apenas (casi imperceptiblemente) más grueso cuanto mayor el Ø */
 const VB_W = { "3/4":1.7, "7/8":1.8, "1":1.9, "1.5":2.05, vastago:2.2 };
 const PHASE_ORDER = ["guia","intermedia1","intermedia2","produccion"];
 
 const INK="#111", DIM="#6a7178", WALL_W=3.2;
+const POINT_TYPES=["TPN","PKR","ANCLA","BBA","BHA"];
 const STAGE_PAL = ["#1f77b4","#e07a00","#2ca02c","#c02a2a","#8a5cc0","#8c564b","#c85aa8","#0f8fa6","#9a9a1e","#5a5a5a"];
 
 /* rampa dogleg (misma que la Vista 3D): 0→verde puro, medio→amarillo, máx→rojo.
@@ -4483,8 +4785,8 @@ function findKick(st, landingMD, tvdLand, Rm){
 function buildWellSVG(w, opts={}){
   const o = { cx:1, cy:1, diam:1, elw:6, shoe:1, font:10.5, margin:0, perfStages:"", from:null, to:null, theme:"color",
     els:{ casings:true, cement:true, shoes:true, plugs:true, tbg:true, instel:true, stages:true,
-          perf:true, shorts:false, shoetrack:false, ruler:true, extruler:false, labels:true,
-          fluids:true, cemplug:true, rods:true, bha:true, notes:true }, ...opts };
+          perf:true, shorts:false, xovers:true, shoetrack:false, ruler:true, extruler:false, labels:true,
+          fluids:true, cemplug:true, rods:true, bha:true, notes:true, schem:true }, ...opts };
   const bw = o.theme==="bw";
   const dg = o.theme==="dogleg";
   const FS = Math.max(6, o.font||10.5);                  // tamaño de letra base (px)
@@ -4503,10 +4805,28 @@ function buildWellSVG(w, opts={}){
   const fromMD = Math.max(0, Math.min(o.from==null?0:o.from, TD-1));
   const toMD   = Math.max(fromMD+1, Math.min(o.to==null?TD:o.to, TD));
 
-  const HW = ph => (HALF[ph]||13) * o.diam;
-  const maxHalf = HALF.guia * o.diam;
+  const casings=(w.casings||[]).slice().sort((a,b)=>PHASE_ORDER.indexOf(a.phase)-PHASE_ORDER.indexOf(b.phase));
   const tbgHalf = TBG_HALF * o.diam;
+  // relación de un tramo respecto de la cañería, y su rango en todos los tramos
+  const odRatio = (c,od) => (!od || !c.od_in || od===c.od_in) ? 1 : Math.max(0.5, 1+(od/c.od_in-1)*SEG_OD_GAIN);
+  const ratioRange = c => { const rs=[1, ...(c?.segments||[]).map(s=>odRatio(c,s.od_in))]; return [Math.min(...rs), Math.max(...rs)]; };
+  // semianchos anidados, de adentro hacia afuera: el MÍNIMO de cada cañería deja WALL_CLEAR sobre el MÁXIMO
+  // de la que lleva adentro, en cualquier tramo y con cualquier Ø del slider. Si no entra, crece la externa.
+  const halves={};
+  let maxHalf=tbgHalf;
+  for(const ph of PHASE_ORDER.slice().reverse()){
+    const [rMin,rMax]=ratioRange(casings.find(c=>c.phase===ph));
+    halves[ph]=Math.max((HALF[ph]||13)*o.diam, (maxHalf+WALL_CLEAR)/rMin);
+    maxHalf=halves[ph]*rMax;
+  }
+  const HW = ph => halves[ph]??halves.produccion;
   const prodHalf = HW("produccion");
+  const minHalfOf = c => HW(c.phase)*ratioRange(c)[0];
+  const maxHalfOf = c => HW(c.phase)*ratioRange(c)[1];
+  // semiancho de una cañería en un MD, según su tramo
+  const halfAt = (c,md) => HW(c.phase)*odRatio(c, V.casingSegAt(c,md)?.od_in);
+  const covering = md => casings.filter(c=>c.shoe_md!=null && c.shoe_md>=md-1e-6);
+  const innerHalf = md => { const c=covering(md).at(-1); return (c?halfAt(c,md):prodHalf)-WALL_W/2; };
 
   const tvdAt = md => sampleMD(st, md).tvd;
   // DLS interpolado por MD desde el survey (misma idea que dlsAtMD de la Vista 3D)
@@ -4529,20 +4849,88 @@ function buildWellSVG(w, opts={}){
   const yScale = trunkVisible ? (660/vertSpan)*o.cy : 1;
   const xScale = latVisMD>0 ? (720/Math.max(latVisMD,1))*o.cx : 1;
 
+  // ---------- instalación: elementos (copia), con los que comparten MD apenas corridos para que no se pisen ----------
+  const inst = V.normInstallation(w)?.elements || [];
+  const instOf = t => inst.filter(e=>e.type===t);
+  inst.forEach(el=>{ if(el.md!=null) el.md_real=el.md; });
+  { const pts=inst.filter(el=>POINT_TYPES.includes(el.type)&&el.md!=null).sort((a,b)=>a.md-b.md);
+    for(let i=1;i<pts.length;i++) if(pts[i].md-pts[i-1].md<0.05) pts[i].md=pts[i-1].md+0.05;
+    // la bomba cuelga hacia abajo: un TBG que termina justo en su MD termina después de ella
+    instOf("BBA").forEach(b=>{ if(b.md==null) return;
+      instOf("TBG").forEach(t=>{ if(t.bottom_md!=null && Math.abs(t.bottom_md-b.md)<0.05) t.bottom_md=b.md+0.05; }); }); }
+  const tbgOn = o.els.tbg ? instOf("TBG").filter(el=>el.top_md!=null&&el.bottom_md!=null) : [];
+  const tbgOdMax = Math.max(0, ...tbgOn.map(el=>el.od_in||0));
+  const tbgHalfOf = el => (!el?.od_in||!tbgOdMax) ? tbgHalf : tbgHalf*Math.max(TBG_MIN_RATIO, 1+(el.od_in/tbgOdMax-1)*TBG_OD_GAIN);
+  const tbgAt = md => tbgOn.filter(el=>md>=Math.min(el.top_md,el.bottom_md)&&md<=Math.max(el.top_md,el.bottom_md)).at(-1);
+  const tbgHalfAt = md => tbgHalfOf(tbgAt(md));
+  const sideHalfH = md => Math.max(9, o.elw*1.6, Math.max(4, innerHalf(md)-tbgHalfAt(md)-0.6)*1.5)/2;
+  const plugHalfH = md => Math.max(8, o.elw*1.4, innerHalf(md)*0.35)/2;
+  const bhaHalf = md => Math.max(4, innerHalf(md)*0.84);
+
+  // ---------- ajuste esquemático: cuánto hay que estirar el camino para que cada cosa se lea ----------
+  const trunkRealPx = (a,b) => Math.abs(tvdAt(b)-tvdAt(a))*yScale;
+  let arcStart=kickMD;                                   // MD donde arranca el arco dibujado
+  const stretch=[];                                      // [md, px agregados hasta ese md]
+  if(o.els.schem!==false && inst.length){
+    const evs=[], add=(md,up=0,down=0)=>{ if(md!=null && md>=fromMD && md<=toMD) evs.push({md,up,down}); };
+    const ranges=[];
+    const addRange=el=>{ const a=Math.min(el.top_md,el.bottom_md), b=Math.max(el.top_md,el.bottom_md);
+      add(a); add(b); if(a>=fromMD&&b<=toMD) ranges.push({a,b,min:SCHEM_MIN_LEN[el.type]||0}); };
+    inst.forEach(el=>{ const t=el.type;
+      if(["TPN","PKR","ANCLA"].includes(t)&&o.els.instel&&el.md!=null){ const h=t==="TPN"?plugHalfH(el.md):sideHalfH(el.md); add(el.md,h,h); }
+      else if(t==="BBA"&&o.els.rods&&el.md!=null) add(el.md,0,BBA_PX);
+      else if(t==="BHA"&&o.els.bha&&el.md!=null) add(el.md,bhaHalf(el.md)*(el.mdf?5.7:2.5),0);
+      else if(el.top_md!=null&&el.bottom_md!=null){
+        if((t==="TBG"&&o.els.tbg)||(t==="VB"&&o.els.rods)||(t==="TPNC"&&o.els.cemplug)) addRange(el);
+        // un fluido largo no pide nada: solo se ajusta si queda tan corto que no se lee
+        else if(t==="FLUIDO"&&o.els.fluids&&el.bottom_md<=kickMD&&trunkRealPx(el.top_md,el.bottom_md)<SCHEM_MIN_LEN.FLUIDO) addRange(el);
+      }
+    });
+    // lo que cae dentro del arco baja la curva y queda en el tronco
+    if(!isVerticalWell && evs.length){
+      const inArc=evs.filter(e=>e.md>kickMD&&e.md<landingMD).map(e=>e.md);
+      if(inArc.length) arcStart=Math.min(Math.max(...inArc)+2, landingMD-0.25);
+      add(arcStart,SCHEM_ARC_CLEAR,0);
+    }
+    evs.sort((a,b)=>a.md-b.md);
+    const ev=[];                                         // los del mismo MD son un solo evento
+    for(const e of evs){ const l=ev.at(-1);
+      if(l&&e.md-l.md<0.01){ l.up=Math.max(l.up,e.up); l.down=Math.max(l.down,e.down); } else ev.push({...e}); }
+    const isTrunk=md=>isVerticalWell||md<=arcStart;
+    const realPx=(a,b)=>isTrunk(b)?trunkRealPx(a,b):(a>=landingMD?(b-a)*xScale:Infinity);
+    const gaps=ev.map((e,i)=>{ if(!i) return 0; const p=ev[i-1], g=p.down+e.up;
+      return Math.max(realPx(p.md,e.md), g+(g>0?SCHEM_GAP:SCHEM_GAP_BARE)); });
+    const idxOf=md=>ev.findIndex(e=>Math.abs(e.md-md)<0.011);
+    ranges.forEach(r=>{ const i0=idxOf(r.a), i1=idxOf(r.b); if(i0<0||i1<=i0) return;
+      const len=gaps.slice(i0+1,i1+1).reduce((x,y)=>x+y,0);
+      if(isFinite(len)&&len<r.min) gaps[i1]+=r.min-len; });
+    let acc=0;
+    ev.forEach((e,i)=>{ if(i){ const real=realPx(ev[i-1].md,e.md); if(isFinite(real)) acc+=Math.max(0,gaps[i]-real); } stretch.push([e.md,acc]); });
+  }
+  // px agregados al camino hasta un MD
+  const extraAt = md => {
+    if(!stretch.length||md<=stretch[0][0]) return 0;
+    for(let i=1;i<stretch.length;i++) if(md<=stretch[i][0]){ const [a,ea]=stretch[i-1], [b,eb]=stretch[i];
+      return ea+(eb-ea)*(md-a)/((b-a)||1); }
+    return stretch.at(-1)[1];
+  };
+
   // --- camino canónico (coords "crudas", luego se trasladan) ---
   // tronco: x=0, y=tvd*yScale. arco: cuarto de círculo de radio R (px) = build TVD * yScale.
   // lateral: y=cte, x avanza por MD.
-  const Ykick = tvdKick*yScale, Yland = tvdLand*yScale;
-  const R = isVerticalWell ? 0 : Math.max(Yland - Ykick, 24);
+  // Con ajuste esquemático, el tronco llega hasta arcStart (TVD real + lo estirado) y el arco sigue desde ahí.
+  const R = isVerticalWell ? 0 : Math.max((tvdLand-tvdKick)*yScale, 24);
+  const Ykick = tvdAt(arcStart)*yScale+extraAt(arcStart), Yland = Ykick+R;
   const Xland = R;
+  const extraLand = extraAt(landingMD);
   const pos = md => {
-    if(md<=kickMD || isVerticalWell){
-      return { x:0, y:tvdAt(md)*yScale, tx:0, ty:1, nx:-1, ny:0 };
+    if(md<=arcStart || isVerticalWell){
+      return { x:0, y:tvdAt(md)*yScale+extraAt(md), tx:0, ty:1, nx:-1, ny:0 };
     }
     if(md>=landingMD){
-      return { x:Xland+(md-landingMD)*xScale, y:Yland, tx:1, ty:0, nx:0, ny:1 };
+      return { x:Xland+(md-landingMD)*xScale+extraAt(md)-extraLand, y:Yland, tx:1, ty:0, nx:0, ny:1 };
     }
-    const t=(md-kickMD)/Math.max(landingMD-kickMD,1);
+    const t=(md-arcStart)/Math.max(landingMD-arcStart,1e-3);
     const phi=Math.PI - (Math.PI/2)*t;                    // 180° → 90°
     const cx=R, cy=Ykick;                                 // centro del arco
     const x=cx+R*Math.cos(phi), y=cy+R*Math.sin(phi);
@@ -4571,6 +4959,14 @@ function buildWellSVG(w, opts={}){
   const laneBase = YlandF-teethLen-14;                   // base de las etiquetas rotadas (suben)
   const latBoxTop = laneBase-(hasLanes?laneSpace-20:8);  // techo de la caja del zapato lateral
   const rulerBottomTvd = tvdLand+100;                    // la regla sigue 100 m debajo del fondo
+  // la regla usa el mismo mapeo que el camino: en lo estirado, los ticks quedan más separados
+  const tvdArc = isVerticalWell ? Infinity : tvdAt(arcStart);
+  const mdAtTvd = d => { let p=st[0];
+    for(const s of st){ if((s.tvd||0)>=d) return p.md+(s.md-p.md)*(d-(p.tvd||0))/(((s.tvd||0)-(p.tvd||0))||1); p=s; }
+    return TD; };
+  const rulerY = d => d<=tvdArc ? d*yScale+extraAt(mdAtTvd(d))
+    : tvdLand>tvdArc && d<=tvdLand ? Ykick+(Yland-Ykick)*(d-tvdArc)/(tvdLand-tvdArc)
+    : (tvdLand>tvdArc ? Yland+(d-tvdLand)*yScale : Ykick+(d-tvdArc)*yScale);
 
   const S=[];                                            // fragmentos SVG
   const boxes=[];                                        // cajas de etiqueta (tronco/arco)
@@ -4586,36 +4982,58 @@ function buildWellSVG(w, opts={}){
     cemPattern("cemplug", V.INST_DEFCOLOR.TPNC)+`</defs>`);
 
   // banda (polígono cerrado) entre offsets ±w a lo largo del camino [a..b]
-  const bandPts=(a,b,n=90)=>{ const arr=[]; for(let i=0;i<=n;i++) arr.push(P(a+(b-a)*i/n)); return arr; };
+  // el arco siempre bien muestreado: con muestras parejas por MD, una curva cerrada queda poligonal
+  const ARC_N=48;
+  const bandPts=(a,b,n=90)=>{ const ms=[]; for(let i=0;i<=n;i++) ms.push(a+(b-a)*i/n);
+    const p=Math.max(a,arcStart), q=Math.min(b,landingMD);
+    if(!isVerticalWell && q>p){ const k=Math.max(2,Math.round(ARC_N*(q-p)/Math.max(landingMD-arcStart,1e-3)));
+      for(let i=0;i<=k;i++) ms.push(p+(q-p)*i/k); ms.sort((x,y)=>x-y); }
+    return ms.map(P); };
   const sideLine=(pts,sgn,w)=>pts.map(p=>({x:p.x+p.nx*sgn*w, y:p.y+p.ny*sgn*w}));
   const polyPath=pts=>"M "+pts.map(p=>`${f1(p.x)},${f1(p.y)}`).join(" L ");
   const bandPath=(pts,w)=>polyPath(sideLine(pts,1,w))+" L "+sideLine(pts,-1,w).reverse().map(p=>`${f1(p.x)},${f1(p.y)}`).join(" L ")+" Z";
   const ringPath=(pts,wIn,wOut,sgn)=>polyPath(sideLine(pts,sgn,wIn))+" L "+sideLine(pts,sgn,wOut).reverse().map(p=>`${f1(p.x)},${f1(p.y)}`).join(" L ")+" Z";
 
   // ---------- cañerías (de externa a interna): cemento → interior blanco → paredes → zapato ----------
-  const casings=(w.casings||[]).slice().sort((a,b)=>PHASE_ORDER.indexOf(a.phase)-PHASE_ORDER.indexOf(b.phase));
   casings.forEach(c=>{
     if(c.shoe_md==null) return;
-    const half=HW(c.phase);
+    const half=minHalfOf(c);
     const a=fromMD, b=Math.min(c.shoe_md,toMD); if(b<=a) return;
     const pts=bandPts(a,b);
     // cemento del anular (TOC→zapato) — punteado
     if(o.els.cement && c.toc_md!=null && c.toc_md<b){
       const idx=PHASE_ORDER.indexOf(c.phase);
-      const outer=idx>0 ? HW(PHASE_ORDER[idx-1]) : half+12*o.diam;
+      const ext=idx>0 && casings.find(x=>x.phase===PHASE_ORDER[idx-1]);
+      const outer=idx>0 ? (ext?minHalfOf(ext):HW(PHASE_ORDER[idx-1]))-WALL_W/2 : maxHalfOf(c)+12*o.diam;
       const ca=Math.max(c.toc_md,a), cpts=bandPts(ca,b,70);
       for(const sgn of [1,-1]) S.push(`<path d="${ringPath(cpts,half,outer,sgn)}" fill="url(#cem)" stroke="#9a9a9a" stroke-width="0.6"/>`);
       // cielo de cemento (línea en el TOC) + etiqueta
       const ft=P(ca);
       for(const sgn of [1,-1]) S.push(`<line x1="${f1(ft.x+ft.nx*sgn*half)}" y1="${f1(ft.y+ft.ny*sgn*half)}" x2="${f1(ft.x+ft.nx*sgn*outer)}" y2="${f1(ft.y+ft.ny*sgn*outer)}" stroke="#777" stroke-width="1.6"/>`);
-      if(o.els.labels) queueLabel(ft, [`TOC ${V.fmtOD(c.od_in)}`, `${Math.round(c.toc_md)} m`], "#666", maxHalf, ca);
+      if(o.els.labels) queueLabel(ft, [`TOC ${V.fmtOD(c.od_in)}`, `${Math.round(c.toc_md)} m`], "#666", outer, ca);
     }
     if(!o.els.casings) return;
-    // interior blanco (tapa el cemento/las paredes de la fase externa)
-    S.push(`<path d="${bandPath(pts,half)}" fill="#ffffff"/>`);
-    // paredes gruesas
-    for(const sgn of [1,-1]) S.push(`<path d="${polyPath(sideLine(pts,sgn,half))}" fill="none" stroke="${INK}" stroke-width="${WALL_W}"/>`);
+    // un trozo por tramo (sin tramos, uno solo): interior blanco que tapa el cemento y las paredes de la
+    // fase externa + paredes gruesas
+    const cuts=(c.segments||[]).map(s=>s.top_md).filter(m=>m!=null&&m>a&&m<b).sort((x,y)=>x-y);
+    const marks=[a,...cuts,b];
+    for(let i=1;i<marks.length;i++){ const p=marks[i-1], q=marks[i], hw=halfAt(c,(p+q)/2);
+      const sp=bandPts(p,q,Math.max(8,Math.round(90*(q-p)/(b-a))));
+      S.push(`<path d="${bandPath(sp,hw)}" fill="#ffffff"/>`);
+      for(const sgn of [1,-1]) S.push(`<path d="${polyPath(sideLine(sp,sgn,hw))}" fill="none" stroke="${INK}" stroke-width="${WALL_W}"/>`);
+    }
+    // cambio de tramo: hombro si cambia el OD, marca hacia afuera si solo cambia libraje o grado
+    cuts.forEach(m=>{ const up=V.casingSegAt(c,m-0.01), down=V.casingSegAt(c,m+0.01), f=P(m);
+      const h0=halfAt(c,m-0.01), h1=halfAt(c,m+0.01), inner=Math.min(h0,h1), outer=Math.max(Math.max(h0,h1),inner+5);
+      for(const sgn of [1,-1]) S.push(`<line x1="${f1(f.x+f.nx*sgn*inner)}" y1="${f1(f.y+f.ny*sgn*inner)}" x2="${f1(f.x+f.nx*sgn*outer)}" y2="${f1(f.y+f.ny*sgn*outer)}" stroke="${INK}" stroke-width="${WALL_W}"/>`);
+      if(o.els.labels && o.els.xovers && up && down){
+        const spec=sg=>[V.fmtOD(sg.od_in??c.od_in), sg.weight_ppf!=null?`${sg.weight_ppf}#`:null, sg.grade!==(up.grade)||sg.grade!==(down.grade)?sg.grade:null].filter(Boolean).join(" ");
+        queueLabel(f, [`XO ${spec(up)} → ${spec(down)}`, `${Math.round(m)} m · TVD ${Math.round(tvdAt(m))} m`], INK, outer, m);
+      }
+    });
   });
+  const prodCas = casings.find(c=>c.phase==="produccion");
+  const prodHalfAt = md => prodCas?halfAt(prodCas,md):prodHalf;
 
   // ---------- coloreo por dogleg: interior del pozo pintado con la rampa verde→rojo ----------
   // Normalizado al DLS máximo del rango visible (auto-normalización, como el isoMode de la Vista 3D).
@@ -4624,11 +5042,11 @@ function buildWellSVG(w, opts={}){
     for(const s of st) if(s.md>=fromMD&&s.md<=toMD) dlsMax=Math.max(dlsMax, s.dls||0);
     dlsMax=Math.max(dlsMax, dlsAt(fromMD), dlsAt(toMD));
     if(dlsMax>0){
-      const n=240, w2=prodHalf-WALL_W/2;
+      const n=240;
       for(let i=0;i<n;i++){
         const a=fromMD+(toMD-fromMD)*i/n, b=fromMD+(toMD-fromMD)*(i+1)/n;
         const col=dlsColor(dlsAt((a+b)/2)/dlsMax);
-        S.push(`<path d="${bandPath(bandPts(a,b,3),w2)}" fill="${col}" stroke="${col}" stroke-width="0.5"/>`);
+        S.push(`<path d="${bandPath(bandPts(a,b,3),prodHalfAt((a+b)/2)-WALL_W/2)}" fill="${col}" stroke="${col}" stroke-width="0.5"/>`);
       }
       // leyenda de escala (barra 0→máx) bajo el título
       S.push(`<defs><linearGradient id="dlsg" x1="0" y1="0" x2="1" y2="0">`+
@@ -4643,26 +5061,25 @@ function buildWellSVG(w, opts={}){
   }
 
   // ---------- INSTALACIÓN: helpers ----------
-  const inst = V.normInstallation(w)?.elements || [];
-  const instOf = t => inst.filter(e=>e.type===t);
   const clipR = el => [Math.max(Math.min(el.top_md,el.bottom_md),fromMD), Math.min(Math.max(el.top_md,el.bottom_md),toMD)];
   const inRange = el => { if(el.top_md==null||el.bottom_md==null) return false; const [a,b]=clipR(el); return b>a; };
   const inPt = el => el.md!=null && el.md>=fromMD && el.md<=toMD;
   const rngTxt = el => `${Math.round(el.top_md)}–${Math.round(el.bottom_md)} m`;
   // cañería más interna / más externa que cubre md (casings va de externa a interna)
-  const covering = md => casings.filter(c=>c.shoe_md!=null && c.shoe_md>=md-1e-6);
-  const innerHalf = md => { const c=covering(md).at(-1); return (c?HW(c.phase):prodHalf)-WALL_W/2; };
-  const outerHalf = md => { const c=covering(md)[0]; return c?HW(c.phase):prodHalf; };
+  const outerHalf = md => { const c=covering(md)[0]; return c?halfAt(c,md):prodHalf; };
   const nSeg = (a,b,max=120) => Math.max(3, Math.min(max, Math.round((b-a)/Math.max(toMD-fromMD,1)*240)));
-  // relleno del interior de la cañería entre a y b, cortado en cada zapato (cambia el ID)
+  // relleno del interior de la cañería entre a y b, cortado en cada zapato y tramo (cambia el ID)
   const fillInterior = (a,b,fill,extra="") => {
-    const cuts=[...new Set([a,b,...casings.map(c=>c.shoe_md).filter(m=>m!=null&&m>a&&m<b)])].sort((x,y)=>x-y);
+    const cuts=[...new Set([a,b,...casings.flatMap(c=>[c.shoe_md,...(c.segments||[]).map(s=>s.top_md)]).filter(m=>m!=null&&m>a&&m<b)])].sort((x,y)=>x-y);
     let g="";
     for(let i=1;i<cuts.length;i++){ const p=cuts[i-1], q=cuts[i];
       g+=`<path d="${bandPath(bandPts(p,q,nSeg(p,q)), innerHalf((p+q)/2))}" fill="${fill}"${extra}/>`; }
     return g;
   };
-  const pxPerMD = md => { const a=P0(md-0.5), b=P0(md+0.5); return Math.hypot(b.x-a.x, b.y-a.y)||1; };
+  // un cartel en el mismo MD (±1 m) que un elemento puntual reemplaza su etiqueta automática
+  const notes = o.els.notes&&o.els.labels ? instOf("CARTEL").filter(el=>el.md!=null&&el.text) : [];
+  const hasNote = el => notes.some(n=>Math.abs(n.md-(el.md_real??el.md))<=1);
+  const mdTxt = el => `${Math.round(el.md_real??el.md)} m`;
   // color elegido por elemento (o el default del corte). En B&N: trazos en tinta, rellenos en gris.
   const baseOf = el => V.instColor(el) || V.INST_DEFCOLOR[el.type] || INK;
   const inkOf  = el => bw ? INK : baseOf(el);
@@ -4673,8 +5090,8 @@ function buildWellSVG(w, opts={}){
     return `url(#${id})`; };
 
   // ---------- TBG (por rango desde/hasta): interior blanco ahora, paredes después de los fluidos ----------
-  const tbgs = o.els.tbg ? instOf("TBG").filter(inRange) : [];
-  tbgs.forEach(el=>{ const [a,b]=clipR(el); S.push(`<path d="${bandPath(bandPts(a,b,nSeg(a,b,90)),tbgHalf)}" fill="#ffffff"/>`); });
+  const tbgs = tbgOn.filter(inRange);
+  tbgs.forEach(el=>{ const [a,b]=clipR(el); S.push(`<path d="${bandPath(bandPts(a,b,nSeg(a,b,90)),tbgHalfOf(el))}" fill="#ffffff"/>`); });
 
   // rango MD visible de una etapa (tope del primer cluster → fondo del último), o null
   const stageRange = stg => {
@@ -4694,7 +5111,7 @@ function buildWellSVG(w, opts={}){
       const col=STAGE_PAL[(stg.stage||0)%STAGE_PAL.length];
       if(!bw && !dg){
         const pts=bandPts(r.md0,r.md1,24);
-        S.push(`<path d="${bandPath(pts,prodHalf-WALL_W/2)}" fill="${col}" fill-opacity="0.85"/>`);
+        S.push(`<path d="${bandPath(pts,prodHalfAt((r.md0+r.md1)/2)-WALL_W/2)}" fill="${col}" fill-opacity="0.85"/>`);
       }
       if(o.els.labels){       // el N° se dibuja más abajo, por encima de la instalación (fluidos, TBG…)
         const f=P((r.md0+r.md1)/2);
@@ -4750,15 +5167,19 @@ function buildWellSVG(w, opts={}){
 
   // ---------- TBG: paredes (por encima de fluidos/cemento) + cartel de specs al pie ----------
   tbgs.forEach(el=>{
-    const [a,b]=clipR(el), pts=bandPts(a,b,nSeg(a,b,90));
-    for(const sgn of [1,-1]) S.push(`<path d="${polyPath(sideLine(pts,sgn,tbgHalf))}" fill="none" stroke="${inkOf(el)}" stroke-width="1.6"/>`);
+    const [a,b]=clipR(el), pts=bandPts(a,b,nSeg(a,b,90)), hw=tbgHalfOf(el);
+    for(const sgn of [1,-1]) S.push(`<path d="${polyPath(sideLine(pts,sgn,hw))}" fill="none" stroke="${inkOf(el)}" stroke-width="1.6"/>`);
+    // hombro contra el TBG que sigue, si cambia el diámetro (2⅞" → cola de 2⅜")
+    const nx=tbgs.find(x=>x!==el&&Math.abs(Math.min(x.top_md,x.bottom_md)-el.bottom_md)<=1), hn=nx?tbgHalfOf(nx):hw;
+    if(nx&&hn!==hw){ const f=P(el.bottom_md);
+      for(const sgn of [1,-1]) S.push(`<line x1="${f1(f.x+f.nx*sgn*hw)}" y1="${f1(f.y+f.ny*sgn*hw)}" x2="${f1(f.x+f.nx*sgn*hn)}" y2="${f1(f.y+f.ny*sgn*hn)}" stroke="${inkOf(el)}" stroke-width="1.6"/>`); }
     if(o.els.labels && el.bottom_md<=toMD){
       const specs=[el.od_in!=null?`TBG ${V.fmtOD(el.od_in)}`:"TBG"];
       if(el.weight_ppf!=null) specs.push(`${el.weight_ppf}#/ft`);
       if(el.grade) specs.push(el.grade);
       const where = el.top_md>0.5 ? rngTxt(el) : `${Math.round(el.bottom_md)} m`;
       queueLabel(P(el.bottom_md), [specs.join(" "), `${where} · TVD ${Math.round(tvdAt(el.bottom_md))} m`],
-        bw?INK:(V.instColor(el)||"#0b6b76"), tbgHalf+6, el.bottom_md);
+        bw?INK:(V.instColor(el)||"#0b6b76"), hw+6, el.bottom_md);
     }
   });
 
@@ -4776,17 +5197,12 @@ function buildWellSVG(w, opts={}){
         el.top_md>0.5?rngTxt(el):`${Math.round(el.bottom_md)} m`], INK, 3, el.bottom_md);
   });
 
-  // ---------- bomba (BBA): tramo corto del Ø del TBG, relleno de color con anillos transversales ----------
+  // ---------- bomba (BBA): tramo corto del Ø del TBG, siempre desde su MD hacia abajo, con anillos transversales ----------
   // (pieza mecánica: se distingue del cemento —pintas— y de los fluidos —rayado diagonal—)
   if(o.els.rods) instOf("BBA").filter(inPt).forEach(el=>{
-    const Lmd=Math.max(24, tbgHalf*4.5)/pxPerMD(el.md);
-    const a=Math.max(fromMD, el.md-Lmd/2), b=Math.min(toMD, el.md+Lmd/2), hw=tbgHalf+0.8;
-    const fill=bw?"#e2e2e2":fillOf(el), ink=bw?INK:shade(baseOf(el),0.45);
-    S.push(`<path d="${bandPath(bandPts(a,b,12), hw)}" fill="${fill}" stroke="${ink}" stroke-width="1.3"/>`);
-    const pa=P(a), pb=P(b), n=Math.max(3, Math.round(Math.hypot(pb.x-pa.x, pb.y-pa.y)/4.2));
-    for(let k=1;k<n;k++){ const f=P(a+(b-a)*k/n);
-      S.push(`<line x1="${f1(f.x+f.nx*hw)}" y1="${f1(f.y+f.ny*hw)}" x2="${f1(f.x-f.nx*hw)}" y2="${f1(f.y-f.ny*hw)}" stroke="${ink}" stroke-width="0.9"/>`); }
-    if(o.els.labels) queueLabel(P(el.md), ["BBA (bomba)", `${Math.round(el.md)} m`], INK, tbgHalf+2, el.md);
+    const f=P(el.md), hw=tbgHalfAt(el.md)+0.8;
+    S.push(drawPump(f, BBA_PX, hw, bw?"#e2e2e2":fillOf(el), bw?INK:shade(baseOf(el),0.45)));
+    if(o.els.labels&&!hasNote(el)) queueLabel({...f, x:f.x+f.tx*BBA_PX/2, y:f.y+f.ty*BBA_PX/2}, ["BBA", mdTxt(el)], INK, hw+1, el.md);
   });
 
   // ---------- punzados: "dientes" esquemáticos hacia la formación (no 1:1 con los tiros reales) ----------
@@ -4796,7 +5212,7 @@ function buildWellSVG(w, opts={}){
       if(stageFilter && !stageFilter.has(stg.stage)) return;
       const r=stageRange(stg); if(!r) return;
       const col=bw?INK:STAGE_PAL[(stg.stage||0)%STAGE_PAL.length];
-      S.push(drawTeeth(P, r.md0, r.md1, prodHalf, col, teethLen));
+      S.push(drawTeeth(P, r.md0, r.md1, prodHalfAt((r.md0+r.md1)/2), col, teethLen));
     });
   }
 
@@ -4807,10 +5223,11 @@ function buildWellSVG(w, opts={}){
     w.frac.stages.forEach(stg=>{
       if(stg.plug_md==null||stg.plug_md<fromMD||stg.plug_md>toMD) return;
       const f=P(stg.plug_md);
-      S.push(blockAcross(f, prodHalf, o.elw, INK));
+      const hp=prodHalfAt(stg.plug_md);
+      S.push(blockAcross(f, hp, o.elw, INK));
       if(o.els.labels){ const n=V.plugCountInverted?(withPlug.length-num.get(stg.stage)+1):num.get(stg.stage);
         if(stg.plug_md>=landingMD) lanes.push({ f, text:`TPN N° ${n} · ${Math.round(stg.plug_md)} m`, color:INK });
-        else queueLabel(f, [`TPN N° ${n}`, `${Math.round(stg.plug_md)} m`], INK, prodHalf, stg.plug_md);
+        else queueLabel(f, [`TPN N° ${n}`, `${Math.round(stg.plug_md)} m`], INK, hp, stg.plug_md);
       }
     });
   }
@@ -4821,21 +5238,24 @@ function buildWellSVG(w, opts={}){
   // Cartel SIEMPRE horizontal (caja): en el lateral solo los tapones de frac van rotados.
   if(o.els.instel) inst.filter(el=>["TPN","PKR","ANCLA"].includes(el.type) && inPt(el)).forEach(el=>{
     const f=P(el.md);
+    const hw=tbgHalfAt(el.md);
     S.push(el.type==="TPN" ? drawPlugX(f, innerHalf(el.md), o.elw, inkOf(el))
-         : drawSideBoxes(f, tbgHalf, innerHalf(el.md), o.elw, inkOf(el), el.type==="PKR"?"x":"wedge"));
-    if(o.els.labels) queueLabel(f, [el.type==="ANCLA"?"Ancla":el.type, `${Math.round(el.md)} m`], INK, tbgHalf+8, el.md);
+         : drawSideBoxes(f, hw, innerHalf(el.md), o.elw, inkOf(el), el.type==="PKR"?"x":"wedge"));
+    if(o.els.labels&&!hasNote(el)) queueLabel(f, [el.type==="ANCLA"?"Ancla":el.type, mdTxt(el)], INK, hw+8, el.md);
   });
 
   // ---------- BHA: fresa (± motor de fondo), punta en el MD apuntando hacia donde avanza el pozo ----------
   if(o.els.bha) instOf("BHA").filter(inPt).forEach(el=>{
     const f=P(el.md), H=Math.max(4, innerHalf(el.md)*0.84);
     S.push(drawBHA(f, H, !!el.mdf, inkOf(el)));
-    if(o.els.labels) queueLabel(f, [el.mdf?"BHA c/ MDF":"BHA (fresa)", `${Math.round(el.md)} m`], INK, H, el.md);
+    if(o.els.labels&&!hasNote(el)) queueLabel(f, [el.mdf?"BHA c/ MDF":"BHA (fresa)", mdTxt(el)], INK, H, el.md);
   });
 
   // ---------- carteles libres: texto en caja con flecha apuntando al MD ----------
-  if(o.els.notes && o.els.labels) instOf("CARTEL").filter(el=>inPt(el) && el.text).forEach(el=>{
-    queueLabel(P(el.md), String(el.text).split(/\n/), inkOf(el), outerHalf(el.md)+1, el.md, {arrow:inkOf(el)});
+  notes.filter(inPt).forEach(el=>{
+    const bg=V.instColor({color:el.bg});
+    queueLabel(P(el.md), String(el.text).split(/\n/), inkOf(el), outerHalf(el.md)+1, el.md,
+      {arrow:inkOf(el), note:true, bg:bg&&bw?(bg.toLowerCase()==="#ffffff"?null:grayOf(bg)):bg});
   });
 
   // ---------- zapatos: triángulos macizos hacia afuera ----------
@@ -4865,9 +5285,10 @@ function buildWellSVG(w, opts={}){
     casings.forEach(c=>{
       if(o.els.shorts)(c.short_joints||[]).forEach(sj=>{ if(sj.top_md==null||sj.top_md<fromMD||sj.top_md>toMD) return;
         const f=P(sj.top_md);
-        S.push(blockAcross(f, prodHalf, 4, bw?"#666":"#d9b800"));
+        const hs=prodHalfAt(sj.top_md);
+        S.push(blockAcross(f, hs, 4, bw?"#666":"#d9b800"));
         if(o.els.labels) queueLabel(f, [sj.desc||(sj.xover?"XOVER":"Caño corto"), lenPos(sj)],
-          bw?INK:"#8a6d00", prodHalf, sj.top_md); });
+          bw?INK:"#8a6d00", hs, sj.top_md); });
       if(o.els.shoetrack){
         const els=(c.shoetrack?.elements||[]).filter(el=>el.top_md!=null&&el.top_md>=fromMD&&el.top_md<=toMD);
         if(els.length){
@@ -4888,13 +5309,15 @@ function buildWellSVG(w, opts={}){
     const step=niceStep(vertSpan/30);
     const rx=leftMargin-30;
     const y0v=tvdFrom, y1v=rulerBottomTvd;               // sigue 100 m debajo del fondo
-    S.push(`<line x1="${rx}" y1="${f1(y0v*yScale+dy)}" x2="${rx}" y2="${f1(y1v*yScale+dy)}" stroke="${DIM}" stroke-width="1"/>`);
+    S.push(`<line x1="${rx}" y1="${f1(rulerY(y0v)+dy)}" x2="${rx}" y2="${f1(rulerY(y1v)+dy)}" stroke="${DIM}" stroke-width="1"/>`);
+    let lastY=-Infinity;                                 // sin encimar números si el tramo quedó comprimido
     for(let d=Math.ceil(y0v/step)*step; d<=y1v+0.5; d+=step){
-      const y=d*yScale+dy;
-      S.push(`<line x1="${rx-5}" y1="${f1(y)}" x2="${rx}" y2="${f1(y)}" stroke="${DIM}" stroke-width="1"/>`
-        +`<text x="${rx-8}" y="${f1(y+3)}" font-family="ui-monospace,monospace" font-size="${f1(FS*0.9)}" fill="${DIM}" text-anchor="end">${Math.round(d)}</text>`);
+      const y=rulerY(d)+dy;
+      S.push(`<line x1="${rx-5}" y1="${f1(y)}" x2="${rx}" y2="${f1(y)}" stroke="${DIM}" stroke-width="1"/>`);
+      if(y-lastY<FS){ continue; } lastY=y;
+      S.push(`<text x="${rx-8}" y="${f1(y+3)}" font-family="ui-monospace,monospace" font-size="${f1(FS*0.9)}" fill="${DIM}" text-anchor="end">${Math.round(d)}</text>`);
     }
-    S.push(`<text x="${rx-8}" y="${f1(y0v*yScale+dy-12)}" font-family="ui-monospace,monospace" font-size="${f1(FS*0.95)}" fill="${DIM}" text-anchor="end">TVD (m)</text>`);
+    S.push(`<text x="${rx-8}" y="${f1(rulerY(y0v)+dy-12)}" font-family="ui-monospace,monospace" font-size="${f1(FS*0.95)}" fill="${DIM}" text-anchor="end">TVD (m)</text>`);
   }
 
   // ---------- regla de extensión (MD) DEBAJO del esquema ----------
@@ -4943,6 +5366,7 @@ function buildWellSVG(w, opts={}){
       maxX+dx+maxHalf+teethLen+6);
     S.push(rb.svg); boxRight=rb.right; boxBottom=rb.bottom; labelTop=rb.top;
     S.push(rl.svg); labelTop=Math.min(labelTop, rl.top);
+    S.push(rb.notes);                                    // los carteles van siempre por encima del resto
   }
 
   // ---------- anti-desborde superior ----------
@@ -4965,7 +5389,7 @@ function buildWellSVG(w, opts={}){
 
   // ---------- dimensiones del lienzo: crecen para contener TODO (cajas incluidas, sin recortes) ----------
   const width  = Math.round(Math.max(maxX+dx+maxHalf+teethLen+24, boxRight+18, extRight+12, 460)+2*M);
-  const height = Math.round(Math.max(maxY+dy+maxHalf+teethLen+26, rulerBottomTvd*yScale+dy+28, boxBottom+18, extBottom+12)+shift+2*M);
+  const height = Math.round(Math.max(maxY+dy+maxHalf+teethLen+26, rulerY(rulerBottomTvd)+dy+28, boxBottom+18, extBottom+12)+shift+2*M);
 
   const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`+
     `<rect width="${width}" height="${height}" fill="#ffffff"/>`+S.join("")+`</svg>`;
@@ -4975,7 +5399,9 @@ function buildWellSVG(w, opts={}){
      La clasificación es por MD (no por tangente): un zapato en pleno arco sigue siendo "tronco".
      En pozo vertical NUNCA hay lateral (el fondo del pozo va a la columna, no a caja flotante). */
   function queueLabel(f, lines, color, half=maxHalf, md=null, extra={}){
-    boxes.push({ f, lines, color, half, ...extra,
+    const key=lines.join("|");                           // identifica la caja si el usuario la elimina
+    if(o.hiddenLabels?.has(key)) return;
+    boxes.push({ f, lines, color, half, key, ...extra,
       lateral: !isVerticalWell && (md!=null ? md>=landingMD : Math.abs(f.tx)>Math.abs(f.ty)) });
   }
 }
@@ -4986,7 +5412,7 @@ function buildWellSVG(w, opts={}){
    lugar libre más cercano por encima de su ancla (desplazándose en x y luego hacia arriba), sin pisar
    otras cajas ni el pozo (`obstacles`). Los líderes se dibujan antes que las cajas (quedan debajo). */
 function renderBoxes(list, colX, trunkLimitY, latBoxTop, FS=10.5, laneZone=null, obstacles=[], minX=6, laneTop=Infinity, xSoft=Infinity){
-  if(!list.length) return { svg:"", right:0, bottom:0, top:Infinity };
+  if(!list.length) return { svg:"", notes:"", right:0, bottom:0, top:Infinity };
   const fs=FS, lh=FS*1.33, padX=FS*0.95, padY=FS*0.57, TOP=38, GAP=10;
   const swW=L=>L.swatch?fs*1.5:0;                         // muestra de color (fluido / cemento)
   const measure=L=>({ w:Math.max(...L.lines.map(t=>t.length))*fs*0.6+2*padX+swW(L), h:L.lines.length*lh+2*padY });
@@ -5033,7 +5459,7 @@ function renderBoxes(list, colX, trunkLimitY, latBoxTop, FS=10.5, laneZone=null,
     const b=best||{x:x0, y:y0};
     const p={L, w, h, x:b.x, y:b.y}; occ.push(p); lat.push(p);
   }
-  let leads="", out="", vbid=0, right=0, bottom=0, top=Infinity;
+  let leads="", out="", noteLeads="", noteOut="", vbid=0, right=0, bottom=0, top=Infinity;
   const arrowCols=new Set();
   const emit=(p,ax,ay)=>{
     const {x,y,w,h,L}=p, id=vbid++;
@@ -5041,19 +5467,21 @@ function renderBoxes(list, colX, trunkLimitY, latBoxTop, FS=10.5, laneZone=null,
     const ac=L.arrow===true?"#333":L.arrow; if(ac) arrowCols.add(ac);
     const st=ac?`stroke="${ac}" stroke-width="1" marker-start="url(#arw-${ac.slice(1)})"`:`stroke="#aaa" stroke-width="0.8"`;
     const ex=ax<x+w/2?x:x+w;                             // el líder llega al lado más cercano de la caja
-    leads+=`<line class="vlead" data-vb="${id}" x1="${f1(ax)}" y1="${f1(ay)}" x2="${f1(ex)}" y2="${f1(y+h/2)}" ${st}/>`;
-    out+=`<g class="vbox" data-vb="${id}" data-x="${f1(x)}" data-y="${f1(y)}" data-w="${f1(w)}" data-h="${f1(h)}" style="cursor:move">`
-      +box(x, y, w, h, L.lines, L.color, fs, lh, padY, L.swatch)+`</g>`;
+    const lead=`<line class="vlead" data-vb="${id}" x1="${f1(ax)}" y1="${f1(ay)}" x2="${f1(ex)}" y2="${f1(y+h/2)}" ${st}/>`;
+    const g=`<g class="vbox" data-vb="${id}" data-key="${V.escAttr(L.key||"")}" data-x="${f1(x)}" data-y="${f1(y)}" data-w="${f1(w)}" data-h="${f1(h)}" style="cursor:move">`
+      +box(x, y, w, h, L.lines, L.color, fs, lh, padY, L.swatch, L.bg)+`</g>`;
+    if(L.note){ noteLeads+=lead; noteOut+=g; } else { leads+=lead; out+=g; }
     right=Math.max(right, x+w); bottom=Math.max(bottom, y+h); top=Math.min(top, y);
   };
-  for(const p of trunk) emit(p, p.L.f.x+p.L.half, p.L.f.y);
-  for(const p of lat) emit(p, p.L.f.x, p.L.f.y-p.L.half);
+  // el líder sale de la pared del lado de la caja, sobre la NORMAL del camino: en el arco la pared no está
+  // al costado del eje sino girada con la curva
+  for(const p of [...trunk, ...lat]) emit(p, p.L.f.x-p.L.f.nx*p.L.half, p.L.f.y-p.L.f.ny*p.L.half);
   // flecha de los carteles, del color de cada uno (un <marker> por color usado)
   const defs=arrowCols.size?`<defs>${[...arrowCols].map(c=>`<marker id="arw-${c.slice(1)}" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="${c}"/></marker>`).join("")}</defs>`:"";
-  return { svg:defs+leads+out, right, bottom, top };
+  return { svg:defs+leads+out, notes:noteLeads+noteOut, right, bottom, top };
 }
-function box(x,y,w,h,lines,color,fs,lh,padY,swatch){
-  let g=`<rect x="${f1(x)}" y="${f1(y)}" width="${f1(w)}" height="${f1(h)}" fill="#ffffff" stroke="#555" stroke-width="0.9"/>`;
+function box(x,y,w,h,lines,color,fs,lh,padY,swatch,bg){
+  let g=`<rect x="${f1(x)}" y="${f1(y)}" width="${f1(w)}" height="${f1(h)}" fill="${bg||"#ffffff"}" stroke="#555" stroke-width="0.9"/>`;
   let x0=x;                                             // con muestra: cuadradito a la izquierda, texto corrido
   if(swatch){ const q=fs*0.95; x0=x+fs*1.5;
     g+=`<rect x="${f1(x+fs*0.6)}" y="${f1(y+h/2-q/2)}" width="${f1(q)}" height="${f1(q)}" fill="${swatch}" stroke="#555" stroke-width="0.6"/>`; }
@@ -5144,6 +5572,14 @@ function drawBHA(f, H, mdf, col){
     const b1=u0-0.19*H, b0=b1-0.5*H;                                   // anillo (sub) sobre la fresa
     g+=rect(b0,b1,0.81*H)+rect(b0-3.0*H,b0,0.42*H);                     // + cuerpo del motor
   }
+  return g;
+}
+/* bomba: símbolo rígido en el marco local del MD, desde el MD hacia el fondo (u = 0..len), con anillos */
+function drawPump(f, len, hw, fill, ink){
+  const pt=(u,v)=>`${f1(f.x+f.tx*u+f.nx*v)},${f1(f.y+f.ty*u+f.ny*v)}`;
+  let g=`<polygon points="${pt(0,-hw)} ${pt(0,hw)} ${pt(len,hw)} ${pt(len,-hw)}" fill="${fill}" stroke="${ink}" stroke-width="1.3"/>`;
+  const n=Math.max(3, Math.round(len/4.2));
+  for(let k=1;k<n;k++){ const u=len*k/n; g+=`<path d="M${pt(u,-hw)} L${pt(u,hw)}" fill="none" stroke="${ink}" stroke-width="0.9"/>`; }
   return g;
 }
 /* centralizador de varilla: rombo chico centrado en la varilla */
@@ -5320,6 +5756,13 @@ function populateWells(){
   if(wells.some(w=>w.id===prev)) sel.value=prev;
 }
 function currentWell(){ const id=$("ex2d-well")?.value; return V.PAD?.pad?.wells?.find(w=>w.id===id)||null; }
+/* cajas eliminadas (por pozo): duran hasta que cambia el pad, es decir "Generar y ver pad" o cualquier carga */
+const HIDDEN=new Map(); let hiddenPad=null;
+function hiddenFor(id){
+  if(hiddenPad!==V.PAD){ HIDDEN.clear(); hiddenPad=V.PAD; }
+  if(!HIDDEN.has(id)) HIDDEN.set(id,new Set());
+  return HIDDEN.get(id);
+}
 function read2DOpts(){
   const el=k=>document.querySelector(`[data-ex2d-el="${k}"]`)?.checked;
   return { cx:parseFloat($("ex2d-cx").value), cy:parseFloat($("ex2d-cy").value),
@@ -5328,12 +5771,12 @@ function read2DOpts(){
     font:parseFloat($("ex2d-font").value), perfStages:$("ex2d-perfstages").value,
     from: $("ex2d-from").value===""?null:parseFloat($("ex2d-from").value),
     to: $("ex2d-to").value===""?null:parseFloat($("ex2d-to").value),
-    theme: $("ex2d-theme").value,
+    theme: $("ex2d-theme").value, hiddenLabels:hiddenFor($("ex2d-well")?.value),
     els:{ casings:el("casings"), cement:el("cement"), shoes:el("shoes"), plugs:el("plugs"),
       tbg:el("tbg"), instel:el("instel"), stages:el("stages"), perf:el("perf"),
-      shorts:el("shorts"), shoetrack:el("shoetrack"), ruler:el("ruler"), extruler:el("extruler"),
+      shorts:el("shorts"), xovers:el("xovers"), shoetrack:el("shoetrack"), ruler:el("ruler"), extruler:el("extruler"),
       labels:el("labels"), fluids:el("fluids"), cemplug:el("cemplug"), rods:el("rods"),
-      bha:el("bha"), notes:el("notes") } };
+      bha:el("bha"), notes:el("notes"), schem:el("schem") } };
 }
 function render2D(){
   const w=currentWell(); const box=$("ex2d-box"); if(!box) return;
@@ -5432,10 +5875,20 @@ function wireZoom(boxId){
 }
 
 /* ---- cajas de etiqueta arrastrables: mouse-over muestra el puntero, drag las mueve y el líder sigue.
-   El shoetrack es UNA caja (lista sus componentes), así que el pack se mueve entero con este drag. ---- */
+   El shoetrack es UNA caja (lista sus componentes), así que el pack se mueve entero con este drag.
+   Mientras se arrastra aparece un círculo con una X: soltar la caja ahí la elimina. Es HTML, fuera del
+   SVG, así que nunca llega a la imagen exportada. ---- */
 function wireBoxDrag(boxId){
   const box=$(boxId); if(!box) return;
-  let drag=null;
+  let drag=null, trash=null;
+  const overTrash=e=>{ if(!trash) return false; const r=trash.getBoundingClientRect();
+    return Math.hypot(e.clientX-(r.left+r.width/2), e.clientY-(r.top+r.height/2))<r.width*0.75; };
+  const showTrash=()=>{ const r=box.getBoundingClientRect();
+    trash=document.createElement("div"); trash.className="ex-trash"; trash.textContent="✕";
+    trash.style.left=(Math.max(r.left,0)+Math.min(r.right,innerWidth))/2+"px";
+    trash.style.top=(Math.min(r.bottom,innerHeight)-78)+"px";
+    document.body.appendChild(trash); };
+  const hideTrash=()=>{ trash?.remove(); trash=null; };
   box.addEventListener("pointerdown",e=>{
     const g=e.target.closest(".vbox"); if(!g) return;
     const svg=box.querySelector("svg"); if(!svg) return;
@@ -5451,6 +5904,8 @@ function wireBoxDrag(boxId){
     if(!drag) return;
     const p=drag.toSvg(e.clientX,e.clientY);
     const tx=drag.tx0+p.x-drag.p0.x, ty=drag.ty0+p.y-drag.p0.y;
+    if(!trash && Math.hypot(p.x-drag.p0.x, p.y-drag.p0.y)>3) showTrash();
+    trash?.classList.toggle("over", overTrash(e));
     drag.g.dataset.tx=tx; drag.g.dataset.ty=ty;
     drag.g.setAttribute("transform",`translate(${tx.toFixed(1)} ${ty.toFixed(1)})`);
     const lead=drag.svg.querySelector(`.vlead[data-vb="${drag.g.dataset.vb}"]`);
@@ -5462,7 +5917,15 @@ function wireBoxDrag(boxId){
       lead.setAttribute("y2", (by+bh/2).toFixed(1));
     }
   });
-  box.addEventListener("pointerup",()=>{ drag=null; });
+  box.addEventListener("pointerup",e=>{
+    if(drag && overTrash(e)){
+      if(drag.g.dataset.key) hiddenFor($("ex2d-well")?.value).add(drag.g.dataset.key);
+      drag.svg.querySelector(`.vlead[data-vb="${drag.g.dataset.vb}"]`)?.remove();
+      drag.g.remove();
+    }
+    drag=null; hideTrash();
+  });
+  box.addEventListener("pointercancel",()=>{ drag=null; hideTrash(); });
 }
 function syncRangePlaceholders(){
   const w=currentWell(); if(!w) return;
@@ -5471,6 +5934,661 @@ function syncRangePlaceholders(){
 }
 
   Object.defineProperty(exports, "initExport", { get:()=>initExport, enumerable:true });
+  return exports;
+})();
+
+/* ===== corva.js ===== */
+__ns["./corva.js"] = (function(){
+  "use strict";
+  const exports = {};
+/*
+  corva.js — cliente de Corva (solo lectura) y conversión al schema del pad. Sin DOM ni THREE:
+  el harness de node lo evalúa tal cual. Spec del mapeo y sus límites en docs/corva.md.
+
+  Regla: a Corva solo se le hacen GET; la única excepción es el login/renovación de token.
+*/
+
+const API="https://api.corva.ai";
+/* data.corva.ai NO habilita CORS para páginas locales (file:// ni localhost); esta ruta de la API
+   core sí (Access-Control-Allow-Origin: *) y devuelve los mismos registros. El swagger la marca
+   como deprecada: si Corva la retira, la app ya no puede leer datos sin un proxy. */
+const DATA=API+"/api/core/v1/data/corva/";
+const SESSION_KEY="vv-corva-v1";
+const PARALLEL=8;                  // Corva anda bien con 8 pedidos en paralelo
+const FT=0.3048, BBL=0.158987, LB_PER_T=2204.62;
+const DLS_100FT_TO_30M=30/30.48;   // Corva da el DLS en °/100 ft; el schema lo usa en °/30 m
+const STD_OD=[4.5,5.0,5.5,7.0,7.625,8.625,9.625,10.75,11.75,13.375,16.0,18.625,20.0];
+const SHOETRACK_MAX_M=150;         // mismo criterio que la ingesta de tally: últimos ~150 m
+const MAX_PAD_SPAN_M=2000;         // bocas más separadas que esto = coordenadas mal cargadas
+const SURVEY_GAP_M=50;             // survey y cañería difieren en el fondo por más de esto → se avisa
+const MIN_RUN_JOINTS=5;            // columna de tiros real; con menos, Corva carga un largo de relleno
+const SHORT_MIN_M=4, SHORT_MAX_M=10;   // largo de un caño corto; fuera de esto, el CCL detectó otra cosa
+const CCL_CLUSTER_M=8, CCL_MIN_VOTES=4, CCL_MIN_SHARE=0.15;   // cortos del CCL: ver mapCclShorts
+const PLUG_MATCH_M=1;              // un tapón de data.plugs corresponde a la etapa si difiere menos que esto
+const ACTUAL_MAX_RATIO=1.8, ACTUAL_MIN_SAND_RATIO=0.02;   // real/diseño fuera de esto = dato mal cargado
+
+/* PADs de la cuenta que no son PADs: copias técnicas y visores para compañías de servicio.
+   Sus datos están en los pozos reales. */
+const HIDDEN_PAD_IDS=new Set(["2622","11746"]);
+const isHiddenPad=(id,name)=>HIDDEN_PAD_IDS.has(String(id)) || /^viewer\b/i.test(name||"");
+
+const num=v=>(typeof v==="number"&&isFinite(v))?v:null;
+const round=(v,d=3)=>{ if(v==null) return null; const k=10**d; return Math.round(v*k)/k; };
+const ftToM=v=>{ const n=num(v); return n==null?null:round(n*FT); };
+const naturalCmp=(a,b)=>String(a).localeCompare(String(b),"es",{numeric:true,sensitivity:"base"});
+
+/* ============ Sesión ============
+   Se guarda el token de renovación, NUNCA la contraseña. Con remember=false queda solo en memoria. */
+let session=null;
+function storedSession(){ try{ return JSON.parse(localStorage.getItem(SESSION_KEY)||"null"); }catch(e){ return null; } }
+function writeSession(){
+  try{ if(session?.remember) localStorage.setItem(SESSION_KEY,JSON.stringify(session));
+    else localStorage.removeItem(SESSION_KEY); }catch(e){ /* sin almacenamiento: dura lo que la pestaña */ }
+}
+function restoreSession(){ session=storedSession(); return sessionInfo(); }
+function sessionInfo(){ return session?{email:session.email, exp:session.exp, remember:!!session.remember}:null; }
+function clearSession(){ session=null; writeSession(); }
+
+function jwtExp(jwt){
+  try{ const b=jwt.split(".")[1].replace(/-/g,"+").replace(/_/g,"/");
+    return JSON.parse(atob(b)).exp||0; }catch(e){ return 0; }
+}
+async function postToken(auth){
+  let r;
+  try{ r=await fetch(API+"/v1/user_token",{method:"POST",
+    headers:{"Content-Type":"application/json","Accept":"application/json"}, body:JSON.stringify({auth})}); }
+  catch(e){ throw new Error("Sin conexión con Corva"); }
+  const body=await r.json().catch(()=>null);
+  if(r.status===401) throw Object.assign(new Error("Corva rechazó el login: revisá mail, contraseña y código"),{status:401});
+  if(!r.ok || !body?.jwt) throw Object.assign(new Error(body?.message||body?.error||`Corva rechazó el login (HTTP ${r.status})`),{status:r.status});
+  return body;
+}
+function adoptTokens(body, email, remember){
+  session={email, jwt:body.jwt, exp:jwtExp(body.jwt), refresh:body.refresh_token||session?.refresh||null, remember};
+  writeSession();
+}
+async function login(email, password, {mode="", code="", remember=true}={}){
+  const auth={email,password};
+  if(mode){ auth.verification_mode=mode; auth.verification_code=code; }
+  adoptTokens(await postToken(auth), email, remember);
+  return sessionInfo();
+}
+async function renew(){
+  if(!session?.refresh) throw new Error("Sesión de Corva vencida: volvé a conectarte en Configuración");
+  try{ adoptTokens(await postToken({refresh_token:session.refresh}), session.email, session.remember); }
+  catch(e){ if(e.status) throw new Error("Sesión de Corva vencida: volvé a conectarte en Configuración"); throw e; }
+}
+async function freshToken(){
+  if(!session) throw new Error("Sin conexión a Corva: cargá tus credenciales en Configuración");
+  if(session.exp-Date.now()/1000<300) await renew();
+  return session.jwt;
+}
+
+/* GET autenticado; si Corva rechaza el token, renueva una vez y reintenta. */
+async function get(url){
+  for(let retry=true;;retry=false){
+    const jwt=await freshToken();
+    let r;
+    try{ r=await fetch(url,{headers:{"Authorization":"Bearer "+jwt,"Accept":"application/json"}}); }
+    catch(e){ throw new Error("Sin conexión con Corva"); }
+    if((r.status===401||r.status===403) && retry){ await renew(); continue; }
+    if(!r.ok){ const b=await r.json().catch(()=>null);
+      throw Object.assign(new Error(b?.message||`Corva respondió HTTP ${r.status}`),{status:r.status}); }
+    return r.json();
+  }
+}
+function dataset(name, params){
+  return get(DATA+name+"?"+new URLSearchParams(params));
+}
+
+async function listPads(){
+  const body=await get(API+"/v2/pads?per_page=1000");
+  return (body.data||[]).map(p=>({id:String(p.id), name:p.attributes?.name||String(p.id)}))
+    .filter(p=>!isHiddenPad(p.id,p.name)).sort((a,b)=>naturalCmp(a.name,b.name));
+}
+
+/* ============ Registros de Corva → schema del pad (funciones puras) ============ */
+
+/* "OPE.Xx.ABC-1234(h) ST01" → "ABC-1234h ST01" (operador.provincia. afuera, sin paréntesis) */
+function wellShortId(name){
+  return String(name||"").replace(/^[A-Z]{2,4}\.[A-Za-z]{2}\./,"").replace(/[()]/g,"").replace(/\s+/g," ").trim();
+}
+/* El nombre del pad es texto libre y termina en nombres de archivo: sin separadores de ruta */
+function padSafeId(name){ return String(name||"PAD").replace(/[\\/:*?"<>|]+/g,"-").replace(/\s+/g," ").trim(); }
+
+/* De los registros (más nuevo primero) vale el más profundo, y a igual fondo el más nuevo: el más
+   nuevo a veces es parcial (el último puede quedar miles de metros antes que el anterior). */
+function pickSurvey(records){
+  const fondo=r=>Math.max(0,...(r.data?.stations||[]).map(s=>num(s.measured_depth)??0));
+  let best=null, bestMD=-1;
+  for(const r of records||[]){ const d=fondo(r); if(d>bestMD+1){ best=r; bestMD=d; } }
+  return best;
+}
+function mapSurvey(rec, nsOffset=0){
+  const raw=rec?.data?.stations; if(!Array.isArray(raw)) return null;
+  const seen=new Set(), stations=[];
+  raw.filter(s=>num(s.measured_depth)!=null).sort((a,b)=>a.measured_depth-b.measured_depth).forEach(s=>{
+    const md=ftToM(s.measured_depth); if(seen.has(md)) return; seen.add(md);    // MD repetida rompe la curva 3D
+    const ns=ftToM(s.northing);
+    stations.push({md, incl:num(s.inclination), azim:num(s.azimuth), tvd:ftToM(s.tvd),
+      ns:ns==null?null:round(ns+nsOffset), ew:ftToM(s.easting), vsec:ftToM(s.vertical_section),
+      dls:num(s.dls)==null?null:round(s.dls*DLS_100FT_TO_30M)});
+  });
+  if(stations.length<2) return null;
+  return {vsec_azimuth_deg:num(rec.data.vertical_section_azimuth), stations};
+}
+
+/* Corva da 7.62/7.626 para el 7 5/8": se encaja al OD estándar más cercano */
+function normOD(od){
+  const n=num(od); if(n==null) return null;
+  const hit=STD_OD.find(s=>Math.abs(s-n)<0.02);
+  return hit??n;
+}
+function normGrade(g){ return g?String(g).trim().replace(/(^|\s)([A-Z])-(\d)/g,"$1$2$3"):null; }   // N-80 → N80
+
+/* Fase por OD. Corva carga los tramos de cada pozo en cualquier orden, y puede faltar alguna fase. */
+function phaseForOD(od){
+  if(od>=11) return "guia";
+  if(od>=8.5) return "intermedia1";
+  if(od>=6.5) return "intermedia2";
+  return "produccion";
+}
+/* Piezas al fondo de la aislación, de abajo hacia arriba a partir del zapato. Los `components` de
+   Corva son un resumen (no suman la longitud del casing), así que solo sirve el tramo final. */
+function shoetrackFromComponents(components, shoeMD){
+  const comps=[...(components||[])].sort((a,b)=>(a.order??0)-(b.order??0));
+  const els=[]; let bottom=shoeMD;
+  for(let i=comps.length-1;i>=0;i--){
+    const c=comps[i], len=ftToM(c.length); if(len==null) break;
+    if(c.family==="casing_joints" && (c.number_of_joints??1)>2) break;   // llegó a la columna de tiros
+    if(shoeMD-(bottom-len)>SHOETRACK_MAX_M) break;
+    els.unshift({desc:String(c.name||c.family||"elemento").trim(), family:c.family, length_m:len,
+      top_md:round(bottom-len), bottom_md:round(bottom)});
+    bottom-=len;
+  }
+  return els;
+}
+const shortInRange=(top,bottom,shoeMD)=>top>SHOETRACK_MAX_M && bottom<shoeMD-SHOETRACK_MAX_M;   // igual que en el tally
+function mapShortJoints(tallyRec, shoeMD){
+  return (tallyRec?.data?.short_joints||[]).map(j=>{
+    const top_md=ftToM(j.start_depth), bottom_md=ftToM(j.end_depth);
+    return {desc:"Caño corto", xover:false, length_m:round(bottom_md-top_md,2), top_md, bottom_md, source:"tally"};
+  }).filter(j=>j.top_md!=null && j.bottom_md!=null && shortInRange(j.top_md,j.bottom_md,shoeMD))
+    .sort((a,b)=>a.top_md-b.top_md);
+}
+/* Cortos detectados por wireline: cada corrida (`completion.ccl-collars`) marca los suyos y también
+   ruido. Vale el que se repite en muchas corridas. Contra un tally da los mismos cortos,
+   a menos de 4 m. */
+function mapCclShorts(runs, shoeMD){
+  const pts=[];
+  (runs||[]).forEach(r=>(r.data?.short_joints||[]).forEach(j=>{
+    const a=ftToM(j.start_depth), b=ftToM(j.end_depth); if(a==null||b==null) return;
+    if(b-a>=SHORT_MIN_M && b-a<=SHORT_MAX_M) pts.push({a,len:b-a}); }));
+  pts.sort((x,y)=>x.a-y.a);
+  const groups=[];
+  pts.forEach(p=>{ const g=groups.at(-1);
+    if(g && p.a-g.at(-1).a<CCL_CLUSTER_M) g.push(p); else groups.push([p]); });
+  const minVotes=Math.max(CCL_MIN_VOTES,(runs||[]).length*CCL_MIN_SHARE);
+  const avg=(g,f)=>g.reduce((s,p)=>s+p[f],0)/g.length;
+  return groups.filter(g=>g.length>=minVotes).map(g=>{
+    const top_md=round(avg(g,"a"),1), len=round(avg(g,"len"),1);
+    return {desc:"Caño corto (CCL)", xover:false, length_m:len, top_md, bottom_md:round(top_md+len,1), source:"ccl"};
+  }).filter(j=>shortInRange(j.top_md,j.bottom_md,shoeMD));
+}
+
+/* Corva lista los `components` de arriba hacia abajo, y el primero es un largo de relleno (1 caño de
+   12 m) que no llega a superficie: los largos solo cierran contando desde el zapato. Ese primero se
+   lleva lo que falta hasta boca de pozo. Validado contra tallys y partes diarios. Sin una columna de tiros real, o si no entra en el pozo, no hay posiciones confiables: null. */
+function layoutComponents(components, shoeMD){
+  const comps=[...(components||[])].sort((a,b)=>(a.order??0)-(b.order??0));
+  if(!comps.some(c=>c.family==="casing_joints" && (c.number_of_joints??1)>=MIN_RUN_JOINTS)) return null;
+  const out=[]; let bottom=shoeMD;
+  for(let i=comps.length-1;i>=1;i--){
+    const len=ftToM(comps[i].length); if(len==null||bottom-len<0) return null;
+    out.unshift({c:comps[i], top_md:round(bottom-len), bottom_md:round(bottom)});
+    bottom-=len;
+  }
+  out.unshift({c:comps[0], top_md:0, bottom_md:round(bottom)});
+  return out;
+}
+/* OD/libraje/grado de un componente. El nombre manda: `linear_weight` suele estar mal cargado
+   (`5" 21.4# P-110` figura con 17.4 o 18). */
+function componentSpec(c){
+  const m=String(c.name||"").match(/^\s*([\d.]+)\s*"\s*([\d.]+)\s*#\s*([A-Z]-?\d{2,3})?/);
+  return { od_in:normOD(m?parseFloat(m[1]):c.outer_diameter),
+    weight_ppf:round(m?parseFloat(m[2]):num(c.linear_weight),2), grade:normGrade(m?.[3]||c.grade) };
+}
+const sameSpec=(a,b)=>a.od_in===b.od_in && a.weight_ppf===b.weight_ppf && a.grade===b.grade;
+const specTxt=s=>`${s.od_in}" ${s.weight_ppf}#`;
+/* Tramos = columnas de tiros consecutivas con distinta especificación; el XO queda en el tramo de arriba */
+function segmentsFromLayout(layout, shoeMD){
+  const segs=[];
+  layout.forEach((p,i)=>{
+    if(p.c.family!=="casing_joints" || (i>0 && (p.c.number_of_joints??1)<MIN_RUN_JOINTS)) return;
+    const sp=componentSpec(p.c);
+    if(segs.length && sameSpec(segs.at(-1),sp)) return;
+    segs.push({top_md:p.top_md, bottom_md:null, ...sp});
+  });
+  segs.forEach((s,i)=>{ s.bottom_md=segs[i+1]?.top_md??round(shoeMD); });
+  if(segs[0]) segs[0].top_md=0;
+  return segs.length>1?segs:null;
+}
+/* Corto intercalado en la columna (pup/marker), lejos del cabezal y del shoetrack */
+function layoutShorts(layout, shoeMD){
+  return layout.filter((p,i)=>i>0 && (p.c.family==="pup"||p.c.family==="marker_point"))
+    .filter(p=>shortInRange(p.top_md,p.bottom_md,shoeMD))
+    .map(p=>({desc:`${String(p.c.name||"Caño corto").trim()} (inferido)`, xover:false,
+      length_m:round(p.bottom_md-p.top_md,2), top_md:p.top_md, bottom_md:p.bottom_md, source:"componentes"}));
+}
+function mapCasings(records, tallyRec, cclRuns, warn=()=>{}){
+  const strings=(records||[]).map(r=>r.data||{}).filter(c=>num(c.bottom_depth)!=null)
+    .map(c=>({od:normOD(c.outer_diameter), shoe:ftToM(c.bottom_depth), weight:round(num(c.linear_weight),2),
+      grade:normGrade(c.grade), components:c.components}))
+    .filter(c=>c.od!=null).sort((a,b)=>a.shoe-b.shoe);
+  const byPhase={};
+  strings.forEach(c=>{
+    let ph=phaseForOD(c.od);
+    // dos 7 5/8": el más profundo es la aislación del pozo 
+    if(byPhase[ph] && ph==="intermedia2") ph="produccion";
+    byPhase[ph]=c;   // en orden de profundidad: si se repite, queda el más profundo
+  });
+  const order=["guia","intermedia1","intermedia2","produccion"];
+  return order.filter(ph=>byPhase[ph]).map(ph=>{
+    const c=byPhase[ph];
+    const cas={phase:ph, od_in:c.od, shoe_md:c.shoe, toc_md:null, weight_ppf:c.weight, grade:c.grade};
+    const layout=layoutComponents(c.components,c.shoe);
+    const segs=layout?segmentsFromLayout(layout,c.shoe):null;
+    if(segs){ const deep=segs.at(-1);
+      Object.assign(cas,{segments:segs, od_in:deep.od_in, weight_ppf:deep.weight_ppf??cas.weight_ppf, grade:deep.grade??cas.grade}); }
+    if(ph==="produccion"){
+      if(!layout){
+        const specs=(c.components||[]).filter(x=>x.family==="casing_joints").map(componentSpec);
+        const distinct=specs.filter((s,i)=>specs.findIndex(x=>sameSpec(x,s))===i);
+        if(distinct.length>1) warn(`Corva nombra ${distinct.map(specTxt).join(" y ")} pero no dónde cambia: cargá los tramos a mano`);
+      }
+      // Lo normal es 18# arriba y 21.4# abajo. A veces Corva lo tiene al revés que el tally.
+      if(segs && segs[0].od_in===segs.at(-1).od_in && segs[0].weight_ppf>segs.at(-1).weight_ppf)
+        warn(`el tramo de arriba (${specTxt(segs[0])}) figura más pesado que el de abajo (${specTxt(segs.at(-1))}): revisalo contra el tally`);
+      let shorts=mapShortJoints(tallyRec,c.shoe);
+      if(!shorts.length) shorts=mapCclShorts(cclRuns,c.shoe);
+      if(!shorts.length && layout) shorts=layoutShorts(layout,c.shoe);
+      if(shorts.length) cas.short_joints=shorts;
+      const els=shoetrackFromComponents(c.components,c.shoe); if(els.length) cas.shoetrack={elements:els};
+    }
+    return cas;
+  });
+}
+
+function sandLb(proppants){
+  const k={lb:1,lbs:1,"100lb":100,sack:100,kg:2.20462,t:LB_PER_T,tn:LB_PER_T,ton:LB_PER_T};
+  return (proppants||[]).reduce((s,p)=>s+(num(p.amount)||0)*(k[p.unit]??0),0);
+}
+function fluidM3(fluids){
+  const k={bbl:BBL,m3:1,gal:0.00378541,l:0.001};
+  return (fluids||[]).reduce((s,f)=>s+(num(f.amount)||0)*(k[f.unit]??0),0);
+}
+function inclAt(stations, md){
+  if(!stations?.length) return null;
+  let best=stations[0];
+  for(const s of stations) if(Math.abs(s.md-md)<Math.abs(best.md-md)) best=s;
+  return best.incl;
+}
+const median=a=>{ const s=[...a].sort((x,y)=>x-y); return s.length?s[Math.floor(s.length/2)]:null; };
+const orNull=v=>(v>0?v:null);   // sin arena/fluido informado no es lo mismo que cero
+
+/* completion.data.actual-stages → stage.actual. La geometría (tapón, punzados) de ese dataset es copia
+   del diseño, así que solo aporta lo bombeado. Arena o fluido fuera de rango contra el diseño son datos
+   mal cargados en Corva (unidad cambiada, volumen duplicado): quedan en null y se avisa con `doubtful`. */
+function mapActual(d, plan, len){
+  let sand=orNull(sandLb(d.proppants)/LB_PER_T), m3=orNull(fluidM3(d.fluids)), doubtful=false;
+  if(sand!=null && plan?.sand_t>0){ const k=sand/plan.sand_t;
+    if(k>ACTUAL_MAX_RATIO||k<ACTUAL_MIN_SAND_RATIO){ sand=null; doubtful=true; } }
+  if(m3!=null && plan?.fluid_m3>0 && m3/plan.fluid_m3>ACTUAL_MAX_RATIO){ m3=null; doubtful=true; }
+  const actual={ sand_t:round(sand,1), fluid_m3:round(m3,1),
+    prop_int_lbft:(sand!=null&&len>0)?round(sand*LB_PER_T/(len/FT),1):null,
+    fluid_int_m3m:(m3!=null&&len>0)?round(m3/len,2):null,
+    tp_avg_psi:num(d.average_treating_pressure), tp_max_psi:num(d.max_treating_pressure??d.maximum_treating_pressure),
+    rate_avg_bpm:num(d.average_pumping_rate), rate_max_bpm:num(d.max_pumping_rate??d.maximum_pumping_rate),
+    isip_psi:num(d.end_isip??d.end_of_job_isip), pump_time_min:num(d.total_pump_time) };
+  if(d.skipped) actual.skipped=true;
+  if(d.screenout) actual.screenout=true;
+  return {actual, doubtful};
+}
+const cleanNA=v=>(v==null||/^n\/?a$/i.test(String(v).trim()))?null:v;
+/* completion.data.plugs: misma profundidad que el diseño, numerada al revés. Aporta tipo, marca y OD. */
+function plugInfoFor(plugs, plugMD){
+  if(plugMD==null||!plugs?.length) return {info:null, off:false};
+  const best=plugs.reduce((b,p)=>Math.abs(p.md-plugMD)<Math.abs(b.md-plugMD)?p:b);
+  if(Math.abs(best.md-plugMD)>PLUG_MATCH_M) return {info:null, off:true};
+  const info={type:cleanNA(best.type), make:cleanNA(best.make), model:cleanNA(best.model), od_in:num(best.outside_diameter)};
+  return {info:Object.values(info).some(v=>v!=null)?info:null, off:false};
+}
+
+/* completion.data.stages (diseño) → frac del pad. Mismo orden que el fracplan: etapas de somera a
+   profunda, clusters de somero a profundo, y N° de cluster corrido desde el fondo. */
+function mapFrac(records, survey, casings, actualRecs, plugRecs, warn=()=>{}){
+  const raw=(records||[]).map(r=>r.data||{}).filter(d=>num(d.stage_number)!=null);
+  if(!raw.length) return {total_stages:0, stages:[]};
+  const byStage=new Map(); raw.forEach(d=>byStage.set(d.stage_number,d));     // etapa repetida: vale la última
+  const deepFirst=[...byStage.values()].sort((a,b)=>a.stage_number-b.stage_number);
+  // longitud de etapa = de tapón a tapón; la más somera no tiene tapón arriba → mediana de las demás
+  const lengths=new Map();
+  deepFirst.forEach((d,i)=>{ const next=deepFirst[i+1];
+    const from=ftToM(d.plug_depth??d.bottom_perforation), to=next?ftToM(next.plug_depth):null;
+    if(from!=null && to!=null && from>to) lengths.set(d.stage_number,from-to); });
+  const medLen=median([...lengths.values()]);
+  const actualBy=new Map((actualRecs||[]).map(r=>r.data||{}).filter(d=>num(d.stage_number)!=null).map(d=>[d.stage_number,d]));
+  const plugs=(plugRecs||[]).map(r=>r.data||{}).filter(d=>num(d.top_depth)!=null).map(d=>({...d, md:ftToM(d.top_depth)}));
+  let n=0, nDoubtful=0, nPlugOff=0;
+  const stages=deepFirst.map(d=>{
+    const st=survey?.stations;
+    let cls=(d.perforation_clusters||[]).filter(c=>num(c.top_md)!=null)
+      .sort((a,b)=>b.top_md-a.top_md).map(c=>({
+        n:++n, top_md:ftToM(c.top_md), bottom_md:ftToM(c.bottom_md),
+        incl:inclAt(st,ftToM(c.top_md)), shots:num(c.cluster_shots), charge:null, phasing:num(c.perforation_phasing) }));
+    // pozos viejos sin clusters en Corva: un único tramo con el intervalo punzado de la etapa
+    if(!cls.length && num(d.top_perforation)!=null && num(d.bottom_perforation)!=null){
+      cls=[{n:++n, top_md:ftToM(d.top_perforation), bottom_md:ftToM(d.bottom_perforation),
+        incl:inclAt(st,ftToM(d.top_perforation)), shots:num(d.total_shots), charge:null, phasing:null}];
+    }
+    const stage={stage:d.stage_number, plug_md:ftToM(d.plug_depth), clusters:cls.reverse()};
+    const lb=sandLb(d.proppants), m3=fluidM3(d.fluids);
+    let len=lengths.get(d.stage_number)??medLen;
+    if(len==null && num(d.perforated_length)!=null) len=d.perforated_length*FT;
+    if((lb>0||m3>0) && len>0){
+      const spf=num(d.shot_per_foot), ehd=num(d.ehd);
+      stage.plan={ sand_t:round(lb/LB_PER_T,1), fluid_m3:round(m3,1),
+        prop_int_lbft:round(lb/(len/FT),1), fluid_int_m3m:round(m3/len,2), length_m:round(len,2),
+        wl:[spf!=null?`${spf} spf`:null, ehd!=null?`EHD ${ehd}"`:null].filter(Boolean).join(" · ")||null };
+    }
+    const realRec=actualBy.get(d.stage_number);
+    if(realRec){ const {actual,doubtful}=mapActual(realRec,stage.plan,len); stage.actual=actual; if(doubtful) nDoubtful++; }
+    const {info,off}=plugInfoFor(plugs,stage.plug_md);
+    if(info) stage.plug_info=info;
+    if(off) nPlugOff++;
+    return stage;
+  }).filter(s=>s.clusters.length||s.plug_md!=null).sort((a,b)=>b.stage-a.stage);
+  const nReal=stages.filter(s=>s.actual).length;
+  if(nReal && nReal<stages.length) warn(`Corva tiene datos reales de ${nReal} de ${stages.length} etapas`);
+  if(nDoubtful) warn(`${nDoubtful} etapa(s) con arena o fluido real dudoso en Corva: ese valor no se usa`);
+  if(nPlugOff) warn(`${nPlugOff} tapón(es) a más de ${PLUG_MATCH_M} m entre las etapas y completion.data.plugs: se usan los de las etapas`);
+  const lp=survey?.stations.find(s=>(s.incl??0)>=89);
+  const prod=casings.find(c=>c.phase==="produccion");
+  const toe=(prod?.shoetrack?.elements||[]).find(el=>el.family==="toe_sleeve");
+  const lp_md=lp?lp.md:null, collar_md=toe?toe.top_md:null;
+  return { total_stages:stages.length, lp_md, collar_md,
+    horizontal_ext_m:(lp_md!=null&&collar_md!=null)?round(collar_md-lp_md,1):null,
+    planned_vs_actual:"planned", stages };
+}
+
+/* Bocas en metros respecto del primer pozo. Sin coordenadas, o con un pozo a kilómetros (dato mal
+   cargado), se cae a la línea estándar cada 10 m. */
+function wellheadOffsets(lonLats){
+  const line=lonLats.map((_,i)=>({x:i*10,y:0}));
+  if(lonLats.some(p=>num(p?.longitude)==null||num(p?.latitude)==null)) return line;
+  const {longitude:lon0,latitude:lat0}=lonLats[0], kx=111320*Math.cos(lat0*Math.PI/180), ky=110540;
+  const pts=lonLats.map(p=>({x:round((p.longitude-lon0)*kx,1), y:round((p.latitude-lat0)*ky,1)}));
+  const span=Math.max(...pts.map(p=>Math.hypot(p.x,p.y)));
+  return span>MAX_PAD_SPAN_M?line:pts;
+}
+function wellSummary(w){
+  const nSt=w.survey.stations.length, nCas=w.casings.length, nEt=w.frac.stages.length;
+  const nReal=w.frac.stages.filter(s=>s.actual).length;
+  const prod=w.casings.find(c=>c.phase==="produccion");
+  const parts=[`${nSt} estaciones`,`${nCas} cañerías`,`${nEt} etapas`];
+  if(nReal) parts.push(`${nReal} con datos reales`);
+  if(prod?.segments) parts.push(`${prod.segments.length} tramos`);
+  if(prod?.short_joints) parts.push(`${prod.short_joints.length} caños cortos`);
+  return `${w.id}: ${parts.join(" · ")}`;
+}
+
+/* raws: [{attrs, asset, survey, casing, stages, actual, plugs, tally, ccl}] → pad del schema + avisos por pozo */
+function buildPadObject(padId, padName, raws){
+  const warnings=[], usable=raws.filter(r=>{
+    if(r.survey?.data?.stations?.length) return true;
+    warnings.push(`${wellShortId(r.attrs.name)}: sin survey en Corva, se omite`); return false; });
+  if(!usable.length) throw new Error("Corva no tiene surveys para los pozos de este pad");
+  usable.sort((a,b)=>naturalCmp(wellShortId(a.attrs.name),wellShortId(b.attrs.name)));
+  const heads=wellheadOffsets(usable.map(r=>r.attrs.lon_lat));
+  const wells=usable.map((r,i)=>{
+    const head=heads[i];
+    // el visor ubica cada boca solo por x: el corrimiento N/S real se suma a las estaciones
+    const survey=mapSurvey(r.survey, Math.abs(head.y)>=1?head.y:0);
+    const id=wellShortId(r.attrs.name)||String(r.attrs.asset_id);
+    const warn=msg=>warnings.push(`${id}: ${msg}`);
+    const casings=mapCasings(r.casing, r.tally, r.ccl, warn);
+    const frac=mapFrac(r.stages, survey, casings, r.actual, r.plugs, warn);
+    casings.forEach(c=>c.shoetrack?.elements.forEach(el=>delete el.family));
+    if(!casings.length) warnings.push(`${id}: sin cañerías en Corva`);
+    if(!frac.stages.length) warnings.push(`${id}: sin etapas de fractura en Corva`);
+    const td=survey.stations.at(-1).md, deepest=Math.max(0,...casings.map(c=>c.shoe_md));
+    if(deepest>0 && Math.abs(deepest-td)>SURVEY_GAP_M) warnings.push(`${id}: el survey llega a ${Math.round(td)} m y la cañería a ${Math.round(deepest)} m`);
+    const twin=heads.findIndex((h,k)=>k<i && h.x===head.x && h.y===head.y);
+    if(twin>=0) warnings.push(`${id}: misma coordenada de boca que ${wellShortId(usable[twin].attrs.name)} en Corva`);
+    return { id, name:r.attrs.name, well_number:i+1, architecture:"horizontal",
+      target:r.asset?.target_formation||null,
+      wellhead:{x:head.x, y:head.y, rkb_elev_m:null, ground_elev_m:null},
+      survey, casings, frac };
+  });
+  const noShorts=wells.filter(w=>{ const p=w.casings.find(c=>c.phase==="produccion"); return p && !p.short_joints; }).map(w=>w.id);
+  if(noShorts.length) warnings.push(`Sin caños cortos en Corva: ${noShorts.join(", ")}. Se cargan con el tally o a mano en Manual`);
+  // separación estándar (la usa el constructor Manual): la menor en E/O, para no contar pozos de otra locación
+  const gaps=heads.slice(1).map((h,i)=>Math.abs(h.x-heads[i].x)).filter(g=>g>=1);
+  return { warnings, pad:{ schema_version:1, app:"vaca-viewer", generated_at:new Date().toISOString(),
+    pad:{ id:padSafeId(padName), name:padName, field:usable[0].asset?.basin||null, operator:null, campaign:null,
+      source:{provider:"corva", pad_id:String(padId)},
+      surface:{wellhead_spacing_m:gaps.length?round(Math.min(...gaps),1):10, line_azimuth_deg:90}, wells } } };
+}
+
+/* ============ Traer un pad completo ============ */
+async function pool(tasks, size){
+  const out=new Array(tasks.length); let next=0;
+  await Promise.all(Array.from({length:Math.min(size,tasks.length)},async()=>{
+    while(next<tasks.length){ const i=next++; out[i]=await tasks[i](); }
+  }));
+  return out;
+}
+/* Esta ruta quiere el sort SIN comillas: con JSON válido responde 200 pero ignora el orden */
+const SORT_OLD={sort:"{timestamp: 1}"}, SORT_NEW={sort:"{timestamp: -1}"};
+/* Solo los campos que se usan: pumping_schedule y components por etapa pesan mucho */
+const STAGE_FIELDS=["stage_number","plug_depth","top_perforation","bottom_perforation","perforated_length",
+  "total_shots","shot_per_foot","ehd","perforation_clusters","proppants","fluids"].map(f=>"data."+f).join(",");
+const ACTUAL_FIELDS=["stage_number","proppants","fluids","average_treating_pressure","max_treating_pressure",
+  "maximum_treating_pressure","average_pumping_rate","max_pumping_rate","maximum_pumping_rate","end_isip",
+  "end_of_job_isip","total_pump_time","skipped","screenout"].map(f=>"data."+f).join(",");
+
+async function fetchPad(padId, padName, onProgress=()=>{}){
+  onProgress("Pidiendo los pozos del pad…");
+  const body=await get(`${API}/v2/pads/${encodeURIComponent(padId)}/wells`);
+  const wells=(body.data||[]).map(w=>w.attributes||{}).filter(a=>a.asset_id!=null && !a.custom_properties?.is_asset_viewer);
+  if(!wells.length) throw new Error("Corva no lista pozos para este pad");
+  const failures=[]; let done=0, total=0;
+  /* un dataset que falla no tira el pad; sí corta si ya no hay conexión o sesión (sin .status) */
+  const fetchDs=(a,name,params)=>async()=>{
+    try{ return await dataset(name,{asset_id:a.asset_id,...params}); }
+    catch(e){ if(!e.status) throw e; failures.push(`${wellShortId(a.name)}: ${name} no disponible (${e.message})`); return null; }
+    finally{ done++; onProgress(`Leyendo datos de ${wells.length} pozos… ${done}/${total}`); }
+  };
+  const tasks=[], slot=[];
+  wells.forEach((a,w)=>{
+    const add=(key,name,params)=>{ slot.push([w,key]); tasks.push(fetchDs(a,name,params)); };
+    add("survey","data.actual_survey",{...SORT_NEW,limit:20});
+    add("casing","data.casing",{...SORT_OLD,limit:50});
+    add("stages","completion.data.stages",{...SORT_OLD,limit:500,fields:STAGE_FIELDS});
+    add("actual","completion.data.actual-stages",{...SORT_OLD,limit:500,fields:ACTUAL_FIELDS});
+    add("plugs","completion.data.plugs",{...SORT_OLD,limit:500});
+    add("tally","completion.casing-tally",{...SORT_NEW,limit:1});
+    add("ccl","completion.ccl-collars",{...SORT_OLD,limit:500,fields:"data.short_joints"});
+    add("asset","assets",{...SORT_OLD,limit:1});
+  });
+  total=tasks.length;
+  const results=await pool(tasks,PARALLEL);
+  const raws=wells.map(attrs=>({attrs}));
+  results.forEach((res,i)=>{ const [w,key]=slot[i], list=Array.isArray(res)?res:[];
+    raws[w][key]=(key==="survey")?pickSurvey(list):((key==="asset"||key==="tally")?(list[0]||null):list); });
+  const {pad,warnings}=buildPadObject(padId,padName,raws);
+  return {pad, warnings:[...failures,...warnings], summary:pad.pad.wells.map(wellSummary)};
+}
+
+
+  Object.defineProperty(exports, "restoreSession", { get:()=>restoreSession, enumerable:true });
+  Object.defineProperty(exports, "sessionInfo", { get:()=>sessionInfo, enumerable:true });
+  Object.defineProperty(exports, "clearSession", { get:()=>clearSession, enumerable:true });
+  Object.defineProperty(exports, "login", { get:()=>login, enumerable:true });
+  Object.defineProperty(exports, "listPads", { get:()=>listPads, enumerable:true });
+  Object.defineProperty(exports, "fetchPad", { get:()=>fetchPad, enumerable:true });
+  Object.defineProperty(exports, "wellShortId", { get:()=>wellShortId, enumerable:true });
+  Object.defineProperty(exports, "padSafeId", { get:()=>padSafeId, enumerable:true });
+  Object.defineProperty(exports, "pickSurvey", { get:()=>pickSurvey, enumerable:true });
+  Object.defineProperty(exports, "mapSurvey", { get:()=>mapSurvey, enumerable:true });
+  Object.defineProperty(exports, "mapCasings", { get:()=>mapCasings, enumerable:true });
+  Object.defineProperty(exports, "mapFrac", { get:()=>mapFrac, enumerable:true });
+  Object.defineProperty(exports, "mapActual", { get:()=>mapActual, enumerable:true });
+  Object.defineProperty(exports, "mapCclShorts", { get:()=>mapCclShorts, enumerable:true });
+  Object.defineProperty(exports, "layoutComponents", { get:()=>layoutComponents, enumerable:true });
+  Object.defineProperty(exports, "segmentsFromLayout", { get:()=>segmentsFromLayout, enumerable:true });
+  Object.defineProperty(exports, "componentSpec", { get:()=>componentSpec, enumerable:true });
+  Object.defineProperty(exports, "wellheadOffsets", { get:()=>wellheadOffsets, enumerable:true });
+  Object.defineProperty(exports, "buildPadObject", { get:()=>buildPadObject, enumerable:true });
+  Object.defineProperty(exports, "isHiddenPad", { get:()=>isHiddenPad, enumerable:true });
+  return exports;
+})();
+
+/* ===== corva-ui.js ===== */
+__ns["./corva-ui.js"] = (function(){
+  "use strict";
+  const exports = {};
+/*
+  corva-ui.js — cablea las solapas de Datos (Manual / Corva) y las credenciales en Configuración.
+  El cliente y la conversión viven en corva.js (sin DOM).
+*/
+const { restoreSession, sessionInfo, clearSession, login, listPads, fetchPad } = __ns["./corva.js"];
+const { loadRemotePad, show, escHtml, setIsoMode } = __ns["./viewer.js"];
+const $=id=>document.getElementById(id);
+let padsLoaded=false, busy=false;
+
+function setMsg(el, text, kind=""){ el.textContent=text; el.classList.toggle("cv-ok",kind==="ok"); el.classList.toggle("cv-err",kind==="err"); }
+
+/* ---- Configuración: credenciales ---- */
+function renderAccount(){
+  const s=sessionInfo();
+  $("cv-account").style.display=s?"block":"none";
+  $("cv-login").style.display=s?"none":"block";
+  if(s){
+    const until=s.exp?new Date(s.exp*1000).toLocaleDateString("es-AR"):"—";
+    $("cv-who").textContent=s.email;
+    $("cv-exp").textContent=until;
+    $("cv-keep").textContent=s.remember?"Guardada en este navegador":"Solo hasta cerrar la pestaña";
+  }
+  renderPadPicker();
+}
+async function connect(e){
+  e.preventDefault();
+  const email=$("cv-email").value.trim(), pass=$("cv-pass").value, mode=$("cv-mfa").value, code=$("cv-code").value.trim();
+  if(!email||!pass){ setMsg($("cv-auth-status"),"Completá mail y contraseña","err"); return; }
+  if(mode&&!code){ setMsg($("cv-auth-status"),"Completá el código de verificación","err"); return; }
+  setMsg($("cv-auth-status"),"Validando con Corva…");
+  $("cv-connect").disabled=true;
+  try{
+    await login(email,pass,{mode,code,remember:$("cv-remember").checked});
+    const pads=await listPads();     // valida de punta a punta: el token sirve para leer
+    $("cv-pass").value=""; $("cv-code").value="";
+    fillPads(pads);
+    renderAccount();
+    setMsg($("cv-auth-status"),`✓ Conexión válida · ${pads.length} PADs disponibles`,"ok");
+  }catch(err){
+    clearSession(); renderAccount();
+    setMsg($("cv-auth-status"),err.message,"err");
+  }finally{ $("cv-connect").disabled=false; }
+}
+async function validate(){
+  setMsg($("cv-auth-status"),"Validando con Corva…");
+  try{ const pads=await listPads(); fillPads(pads); renderAccount();
+    setMsg($("cv-auth-status"),`✓ Conexión válida · ${pads.length} PADs disponibles`,"ok"); }
+  catch(err){ renderAccount(); setMsg($("cv-auth-status"),err.message,"err"); }
+}
+function disconnect(){
+  clearSession(); padsLoaded=false;
+  $("cv-pad").innerHTML="";
+  setMsg($("cv-auth-status"),""); setMsg($("cv-status"),""); $("cv-log").innerHTML="";
+  renderAccount();
+}
+
+/* ---- Solapa Corva: picklist y carga ---- */
+function fillPads(pads){
+  const sel=$("cv-pad"), prev=sel.value;
+  sel.innerHTML=`<option value="">Elegí un pad…</option>`+pads.map(p=>`<option value="${escHtml(p.id)}">${escHtml(p.name)}</option>`).join("");
+  if(pads.some(p=>p.id===prev)) sel.value=prev;
+  padsLoaded=true;
+  syncLoadBtn();
+}
+function syncLoadBtn(){ $("cv-load").disabled=busy||!$("cv-pad").value; }
+function renderPadPicker(){
+  const on=!!sessionInfo();
+  $("cv-noauth").style.display=on?"none":"block";
+  $("cv-picker").style.display=on?"block":"none";
+}
+async function refreshPads(){
+  setMsg($("cv-status"),"Pidiendo la lista de PADs…");
+  try{ const pads=await listPads(); fillPads(pads); setMsg($("cv-status"),`${pads.length} PADs disponibles`); }
+  catch(err){ setMsg($("cv-status"),err.message,"err"); }
+}
+/* picklist Frac plan / real: colorea el pad cargado. Sin datos reales, cae al plan y lo devuelve como aviso. */
+function applyFracView(){
+  const want=$("cv-frac").value;
+  if(setIsoMode(want)) return null;
+  if(want==="fracreal" && setIsoMode("fracplan")){ $("cv-frac").value="fracplan";
+    return "Este pad no tiene datos reales de fractura: se muestra el plan."; }
+  return null;
+}
+async function loadPad(){
+  const sel=$("cv-pad"), id=sel.value; if(!id||busy) return;
+  const name=sel.options[sel.selectedIndex].textContent;
+  busy=true; syncLoadBtn();
+  $("cv-log").innerHTML="";
+  setMsg($("cv-status"),"Conectando…");
+  try{
+    const {pad,warnings,summary}=await fetchPad(id,name,txt=>setMsg($("cv-status"),txt));
+    $("cv-log").innerHTML=summary.map(s=>`<div>${escHtml(s)}</div>`).join("")
+      +warnings.map(s=>`<div class="cv-warn">⚠ ${escHtml(s)}</div>`).join("");
+    setMsg($("cv-status"),`✓ ${name} cargado desde Corva`,"ok");
+    loadRemotePad(pad);
+    const note=applyFracView();
+    if(note) $("cv-log").insertAdjacentHTML("beforeend",`<div class="cv-warn">⚠ ${escHtml(note)}</div>`);
+  }catch(err){ setMsg($("cv-status"),err.message,"err"); }
+  finally{ busy=false; syncLoadBtn(); }
+}
+
+function wireTabs(){
+  document.querySelectorAll(".sub-tab").forEach(btn=>btn.addEventListener("click",()=>{
+    const id=btn.dataset.dtab;
+    document.querySelectorAll(".sub-tab").forEach(b=>b.classList.toggle("active",b===btn));
+    document.querySelectorAll(".sub-pane").forEach(p=>p.classList.toggle("active",p.id===id));
+    if(id==="dt-corva" && sessionInfo() && !padsLoaded) refreshPads();
+  }));
+}
+
+function initCorva(){
+  wireTabs();
+  restoreSession();
+  renderAccount();
+  $("cv-form").addEventListener("submit",connect);
+  $("cv-mfa").addEventListener("change",e=>{ $("cv-code-row").style.display=e.target.value?"flex":"none"; });
+  $("cv-validate").addEventListener("click",validate);
+  $("cv-disconnect").addEventListener("click",disconnect);
+  $("cv-pad").addEventListener("change",syncLoadBtn);
+  $("cv-frac").addEventListener("change",()=>{ const note=applyFracView(); if(note) setMsg($("cv-status"),note,"err"); });
+  // la Vista de pozo también elige plan o real: el picklist la acompaña
+  document.querySelectorAll("input[name='isomode']").forEach(r=>{
+    const sync=()=>{ if(r.checked && (r.value==="fracplan"||r.value==="fracreal")) $("cv-frac").value=r.value; };
+    r.addEventListener("change",sync); sync(); });
+  $("cv-load").addEventListener("click",loadPad);
+  $("cv-refresh").addEventListener("click",refreshPads);
+  $("cv-goconfig").addEventListener("click",()=>show("vconfig"));
+  syncLoadBtn();
+}
+
+  Object.defineProperty(exports, "initCorva", { get:()=>initCorva, enumerable:true });
   return exports;
 })();
 
@@ -5485,7 +6603,9 @@ __ns["./main.js"] = (function(){
 */
 
 const { initExport } = __ns["./export-ui.js"];
+const { initCorva } = __ns["./corva-ui.js"];
 initExport();
+initCorva();
 
 
   return exports;

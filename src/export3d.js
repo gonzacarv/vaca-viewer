@@ -33,6 +33,7 @@ function lum01(c){ return 0.2126*c.r + 0.7152*c.g + 0.0722*c.b; }
 function applyTheme(theme, store){
   V.world.traverse(o=>{
     const mats = o.material ? (Array.isArray(o.material)?o.material:[o.material]) : [];
+    const perf = o.userData?.kind==="perf";       // sus vertex colors son solo la opacidad: el color es del material
     mats.forEach(m=>{
       if(!m || store.has(m)) return;
       store.set(m, { color:m.color?m.color.clone():null,
@@ -40,11 +41,11 @@ function applyTheme(theme, store){
       if(!m.color) return;
       if(theme==="bw"){
         const g=lum01(m.color); m.color.setRGB(g,g,g);
-        if(m.vertexColors){ m.vertexColors=false; m.color.setRGB(0.5,0.5,0.5); }
+        if(m.vertexColors&&!perf){ m.vertexColors=false; m.color.setRGB(0.5,0.5,0.5); }
         if(m.emissive) m.emissive.setRGB(0,0,0);
       } else if(theme==="light"){
         // aclarar demasiado sobre blanco = invisible: oscurecer los casi-blancos
-        if(!m.vertexColors && lum01(m.color)>0.72){ m.color.multiplyScalar(0.45); }
+        if((perf||!m.vertexColors) && lum01(m.color)>0.72){ m.color.multiplyScalar(0.45); }
         if(m.emissive) m.emissive.setRGB(0,0,0);   // sin glow para papel
       }
       m.needsUpdate=true;

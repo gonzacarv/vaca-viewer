@@ -52,10 +52,12 @@ const OD_IN={guia:13.375,intermedia1:9.625,intermedia2:7.625,produccion:5.0};
 const CASING_COLOR={guia:0xe8c96a, intermedia1:0x7fc7e0, intermedia2:0xb79fe0, produccion:0xf2ede2};
 /* Punzados: turquesa que alterna claro/oscuro entre etapas consecutivas */
 const PERF_LIGHT=0x6ff5e8, PERF_DARK=0x17c4b0;
+const PERF_NODATA=0x6b7480;            // en las vistas de frac, etapa sin el dato de intensidad
+const PERF_RADIUS_MIN=80, PERF_RADIUS_MAX=250, PERF_RADIUS_DEF=120;   // extensión de las fracturas (m)
 /* Nombres de fase para la leyenda (sin medidas, la fase es lo estable) */
 const PHASE_LABEL={guia:"Guía", intermedia1:"Intermedia 1", intermedia2:"Intermedia 2", produccion:"Aislación"};
 
-let PAD=null, wellObjects={}, vexag=1, diamExag=40, plugCountInverted=false, perfRadiusM=20;
+let PAD=null, wellObjects={}, vexag=1, diamExag=40, plugCountInverted=false, perfRadiusM=PERF_RADIUS_DEF;
 let odFormat="decimal";          // "decimal" (7.625") | "imperial" (7 5/8")
 /* OD en pulgadas → texto. Imperial redondea a octavos (los OD de casing son fracciones de 1/8"). */
 function fmtOD(od){
@@ -134,17 +136,22 @@ function rampColor(val, mn, mx){
   else       c.lerpColors(DLS_MID,DLS_HIGH,(t-0.5)/0.5);
   return c;
 }
-/* rango [min,max] de Prop Intensity (lb/ft) para auto-normalizar el coloreo "por fracplan".
-   Solo cuenta pozos con la AISLACIÓN visible (pozo visible + fase producción encendida): así la
-   escala se ajusta a lo que se está viendo. */
+/* rango de Prop Intensity (lb/ft) para auto-normalizar el coloreo por fracplan o por lo bombeado (cada
+   uno con su propia escala). Solo cuenta pozos con la AISLACIÓN visible (pozo visible + fase producción
+   encendida): así la escala se ajusta a lo que se está viendo. Son el mínimo y el máximo sin el 5% extremo
+   de cada lado: una etapa cortada o mal cargada no se come la rampa (en lo real, la mitad de las etapas
+   entra en menos del 10% del rango total); esas etapas quedan en el color de la punta. */
 function fracIntensityRange(){
-  let mn=Infinity, mx=-Infinity;
+  const vals=[];
   ((PAD&&PAD.pad&&PAD.pad.wells)||[]).forEach(w=>{
     const v=VIS[w.id]; if(v && (v.well===false || v.produccion===false)) return;
-    (w.frac?.stages||[]).forEach(s=>{ const p=s.plan?.prop_int_lbft;
-      if(typeof p==="number"&&isFinite(p)){ mn=Math.min(mn,p); mx=Math.max(mx,p); } });
+    (w.frac?.stages||[]).forEach(s=>{ const p=(isoMode==="fracreal"?s.actual:s.plan)?.prop_int_lbft;
+      if(typeof p==="number"&&isFinite(p)) vals.push(p); });
   });
-  return isFinite(mn)?{min:mn,max:mx}:null;
+  if(!vals.length) return null;
+  vals.sort((a,b)=>a-b);
+  const at=q=>vals[Math.round(q*(vals.length-1))], lo=at(.05), hi=at(.95);
+  return hi>lo?{min:lo,max:hi}:{min:vals[0],max:vals.at(-1)};
 }
 
 /* radio visual (m) de una cañería según su OD real y la exageración de diámetro */
@@ -190,13 +197,15 @@ function casingID(od, wt){
   const v=od*od-wt/2.67; return v>0?Math.sqrt(v):null;
 }
 const PHASE_DEPTH={guia:0,intermedia1:1,intermedia2:2,produccion:3};
+/* tramo de casing telescopado que cubre `md` (null si la cañería no tiene tramos o el MD queda afuera) */
+const casingSegAt=(c,md)=>(c?.segments||[]).find(s=>s.top_md!=null&&s.bottom_md!=null&&md>=s.top_md-1e-6&&md<=s.bottom_md+1e-6)||null;
 /* capacidad (L/m) de la cañería más interna que cubre `md` (la del tramo telescopado si lo hay) */
 function capacityAt(casings, md){
   let best=null;
   for(const c of casings||[]) if(c.shoe_md!=null && c.shoe_md>=md-1e-6
       && (!best || (PHASE_DEPTH[c.phase]??0)>(PHASE_DEPTH[best.phase]??0))) best=c;
   if(!best) return null;
-  const sg=(best.segments||[]).find(s=>s.top_md!=null&&s.bottom_md!=null&&md>=s.top_md-1e-6&&md<=s.bottom_md+1e-6);
+  const sg=casingSegAt(best,md);
   const id=casingID(sg?.od_in??best.od_in, sg?.weight_ppf??best.weight_ppf);
   return id ? 0.506707*id*id : null;          // π/4·(ID·0.0254 m)²·1000 L/m³
 }
@@ -344,7 +353,7 @@ function applyIsoColors(tube){
     if(mat.userData._emissivePatched){ mat.onBeforeCompile=()=>{}; mat.userData._emissivePatched=false; mat.needsUpdate=true; }
     mat.needsUpdate=true; return;
   }
-  const isFrac = isoMode==="fracplan";
+  const isFrac = isoMode==="fracplan" || isoMode==="fracreal";
   const fracRng = isFrac ? fracIntensityRange() : null;
   const isDogleg = isoMode==="dogleg_lateral" || isoMode==="dogleg_build" || isoMode==="dogleg_total";
   // frontera curva/lateral = MD del inicio de la primera etapa (primer cluster de la etapa más somera)
@@ -376,10 +385,11 @@ function applyIsoColors(tube){
       const sr=iso.stageRanges.find(r=>md>=r.md0 && md<=r.md1);
       if(sr) c.copy(sr.stage%2===0?STAGE_A:STAGE_B);
       else   c.copy(ISO_BASE);                  // fuera de etapas (arriba del 1er cluster)
-    } else if(isFrac){                          // por fracplan: intensidad de arena (lb/ft) por etapa
+    } else if(isFrac){                          // por fracplan o real: intensidad de arena (lb/ft) por etapa
       const sr=iso.stageRanges.find(r=>md>=r.md0 && md<=r.md1);
-      if(sr && sr.propInt!=null && fracRng) c.copy(rampColor(sr.propInt, fracRng.min, fracRng.max));
-      else c.copy(ISO_BASE);                    // fuera de etapas o sin dato de fracplan
+      const pi=isoMode==="fracreal"?sr?.propIntReal:sr?.propInt;
+      if(pi!=null && fracRng) c.copy(rampColor(pi, fracRng.min, fracRng.max));
+      else c.copy(ISO_BASE);                    // fuera de etapas o sin el dato
     } else { // dogleg_lateral | dogleg_build | dogleg_total
       if(dlsInSeg(md)) c.copy(dlsColor(iso.dlsAtMD(md), segMax));
       else             c.copy(ISO_BASE);        // el otro tramo queda en gris, no compite
@@ -408,6 +418,58 @@ function refreshIsoColors(){
   Object.values(wellObjects).forEach(g=>g.traverse(o=>{
     if(o.userData.kind==="casing" && o.userData.phase==="produccion" && o.userData.iso) applyIsoColors(o);
   }));
+  refreshPerfColors();
+  updateIsoLegend();
+}
+/* Punzados: en las vistas de frac, la intensidad de la etapa con la misma rampa y escala que el tubo.
+   En el resto, el turquesa que alterna por etapa. */
+function refreshPerfColors(){
+  const isFrac=isoMode==="fracplan"||isoMode==="fracreal", rng=isFrac?fracIntensityRange():null;
+  Object.values(wellObjects).forEach(g=>g.traverse(o=>{
+    if(o.userData.kind!=="perf") return;
+    const pi=isoMode==="fracreal"?o.userData.propReal:o.userData.propPlan;
+    if(!isFrac) o.material.color.set(o.userData.perfBase);
+    else if(pi!=null&&rng) o.material.color.copy(rampColor(pi,rng.min,rng.max));
+    else o.material.color.set(PERF_NODATA);
+  }));
+}
+/* Fractura de un cluster: rama de árbol. Cada raíz crece hacia afuera y se bifurca al ganar distancia, y la
+   punta llega justo a la extensión elegida. Cada tramo es [ángulo, radio inicial, radio final]. */
+const PERF_ROOTS=6, PERF_DEPTH=2, PERF_SPREAD=0.28, PERF_GROW=0.85;
+function perfBranches(rIn,rOut){
+  const out=[];
+  let parts=0; for(let d=0;d<=PERF_DEPTH;d++) parts+=Math.pow(PERF_GROW,d);
+  const step=(rOut-rIn)/parts;
+  const branch=(ang,r0,r1,depth,spread)=>{ out.push([ang,r0,r1]);
+    if(depth<=0) return;
+    const nr=r1+(r1-r0)*PERF_GROW;
+    branch(ang-spread, r1, nr, depth-1, spread*0.7);
+    branch(ang+spread, r1, nr, depth-1, spread*0.7);
+  };
+  for(let k=0;k<PERF_ROOTS;k++) branch((k/PERF_ROOTS)*Math.PI*2, rIn, rIn+step, PERF_DEPTH, PERF_SPREAD);
+  return out;
+}
+/* La intensidad cae con la distancia al pozo: opacidad plena en la salida, PERF_TIP_ALPHA en la extensión
+   máxima (la punta se sigue viendo). */
+const PERF_TIP_ALPHA=0.3;
+const perfAlpha=(r,rIn,rOut)=>1-(1-PERF_TIP_ALPHA)*Math.max(0,Math.min(1,(r-rIn)/((rOut-rIn)||1)));
+/* escala de la Vista de pozo: los lb/ft que corresponden a cada punta de la rampa */
+function updateIsoLegend(){
+  const box=document.getElementById("iso-legend"); if(!box) return;
+  const r=(isoMode==="fracplan"||isoMode==="fracreal")?fracIntensityRange():null;
+  box.style.display=r?"":"none";
+  if(r){ document.getElementById("iso-leg-min").textContent=Math.round(r.min);
+    document.getElementById("iso-leg-max").textContent=`${Math.round(r.max)} lb/ft`; }
+}
+/* Cambia la Vista de pozo desde afuera (picklist de Corva). false si ese modo no aplica al pad cargado. */
+function setIsoMode(mode){
+  if(!PAD) return false;
+  if(mode==="fracplan"||mode==="fracreal"){
+    const k=mode==="fracreal"?"actual":"plan";
+    if(!PAD.pad.wells.some(w=>(w.frac?.stages||[]).some(s=>s[k]?.prop_int_lbft!=null))) return false;
+  }
+  const r=document.querySelector(`input[name='isomode'][value='${mode}']`); if(!r) return false;
+  r.checked=true; isoMode=mode; refreshIsoColors(); return true;
 }
 
 let LAST_WARN="";
@@ -450,32 +512,46 @@ function buildPad(pad){
       if(seg.length<2) return;
       const c2=new THREE.CatmullRomCurve3(seg);
       const r=casingRadius(cas.phase, cas.od_in);
+      const rAt=md=>casingRadius(cas.phase, casingSegAt(cas,md)?.od_in??cas.od_in);   // radio del tramo en ese MD
+      const stepped=(cas.segments||[]).some(s=>s.od_in!=null && s.od_in!==cas.od_in);
       const isProd=cas.phase==="produccion";
       const col=CASING_COLOR[cas.phase]||0xd0d0d0;
       // aislación: más segmentos para que el coloreo por etapa/dogleg tenga bordes nítidos
       // (cada etapa mide ~100m; con ~600 anillos sobre ~6600m hay ~8 anillos/etapa).
-      const tubSeg=isProd ? Math.max(600,seg.length*3) : Math.max(80,seg.length);
+      const tubSeg=(isProd||stepped) ? Math.max(600,seg.length*3) : Math.max(80,seg.length);
       const geo=new THREE.TubeGeometry(c2, tubSeg, r, 14, false);
       const mat=new THREE.MeshStandardMaterial({color:col, metalness:.15, roughness:.65,
           transparent:!isProd, opacity:isProd?1:0.42, side:THREE.DoubleSide});
       const tube=new THREE.Mesh(geo, mat);
       tube.userData.kind="casing"; tube.userData.phase=cas.phase; tube.userData.radius=r;
+      // tabla arc-length→MD: cada anillo del tubo se ubica por longitud de arco de c2.
+      // Recorremos los puntos de seg acumulando distancia 3D y su MD paralelo.
+      const segMDs=[]; for(const s of st){ if(s.md<=cas.shoe_md) segMDs.push(s.md); } segMDs.push(cas.shoe_md);
+      const cum=[0]; for(let i=1;i<seg.length;i++) cum.push(cum[i-1]+seg[i].distanceTo(seg[i-1]));
+      const total=cum.at(-1)||1;
+      const ringMD=i=>{                 // MD del anillo i (0..tubSeg) por arc-length
+        const d=(i/tubSeg)*total;
+        let k=1; while(k<cum.length-1 && cum[k]<d) k++;
+        const t=(d-cum[k-1])/((cum[k]-cum[k-1])||1);
+        return segMDs[k-1]+(segMDs[k]-segMDs[k-1])*t;
+      };
+      if(stepped){                      // cambio de OD por tramo: cada anillo se escala sobre su centro
+        const pos=geo.attributes.position, RADIAL=14, ring=RADIAL+1;
+        for(let i=0;i<=tubSeg;i++){
+          const k=rAt(ringMD(i))/r; if(k===1) continue;
+          let cx=0,cy=0,cz=0;
+          for(let j=0;j<RADIAL;j++){ const v=i*ring+j; cx+=pos.getX(v); cy+=pos.getY(v); cz+=pos.getZ(v); }
+          cx/=RADIAL; cy/=RADIAL; cz/=RADIAL;
+          for(let j=0;j<ring;j++){ const v=i*ring+j;
+            pos.setXYZ(v, cx+(pos.getX(v)-cx)*k, cy+(pos.getY(v)-cy)*k, cz+(pos.getZ(v)-cz)*k); }
+        }
+        pos.needsUpdate=true;
+      }
       if(isProd){
-        // tabla arc-length→MD: cada anillo del tubo se ubica por longitud de arco de c2.
-        // Recorremos los puntos de seg acumulando distancia 3D y su MD paralelo.
-        const segMDs=[]; for(const s of st){ if(s.md<=cas.shoe_md) segMDs.push(s.md); } segMDs.push(cas.shoe_md);
-        const cum=[0]; for(let i=1;i<seg.length;i++) cum.push(cum[i-1]+seg[i].distanceTo(seg[i-1]));
-        const total=cum.at(-1)||1;
-        const ringMD=i=>{                 // MD del anillo i (0..tubSeg) por arc-length
-          const d=(i/tubSeg)*total;
-          let k=1; while(k<cum.length-1 && cum[k]<d) k++;
-          const t=(d-cum[k-1])/((cum[k]-cum[k-1])||1);
-          return segMDs[k-1]+(segMDs[k]-segMDs[k-1])*t;
-        };
         // rangos MD de cada etapa (primer top al último bottom de sus clusters)
         const stageRanges=(w.frac?.stages||[]).map(s=>{
           const mds=(s.clusters||[]).flatMap(c=>[c.top_md,c.bottom_md]).filter(x=>x!=null);
-          return mds.length?{stage:s.stage,md0:Math.min(...mds),md1:Math.max(...mds),propInt:s.plan?.prop_int_lbft??null}:null;
+          return mds.length?{stage:s.stage,md0:Math.min(...mds),md1:Math.max(...mds),propInt:s.plan?.prop_int_lbft??null,propIntReal:s.actual?.prop_int_lbft??null}:null;
         }).filter(Boolean);
         // dls interpolable por MD desde el survey
         const dlsAtMD=md=>{
@@ -507,8 +583,9 @@ function buildPad(pad){
         const mid=va.clone().add(vb).multiplyScalar(0.5);
         const axis=vb.clone().sub(va); let h=axis.length();
         if(h<1e-6){ axis.set(0,-1,0); h=0; }
-        const H=Math.max(h, r*2.5);               // alto mínimo para que sea visible pese a ser corto
-        const band=new THREE.Mesh(new THREE.CylinderGeometry(r*1.18, r*1.18, H, 20),
+        const rs=rAt(sj.top_md);
+        const H=Math.max(h, rs*2.5);              // alto mínimo para que sea visible pese a ser corto
+        const band=new THREE.Mesh(new THREE.CylinderGeometry(rs*1.18, rs*1.18, H, 20),
           new THREE.MeshStandardMaterial({color:0xffe500, metalness:.2, roughness:.5, emissive:0x3a3600, emissiveIntensity:.6}));
         band.quaternion.copy(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0), axis.normalize()));
         band.position.copy(mid);
@@ -600,8 +677,6 @@ function buildPad(pad){
     }
 
     const prodR=casingRadius("produccion", 5.0);   // radio de referencia (aislación)
-    const perfMatLight=new THREE.LineBasicMaterial({color:PERF_LIGHT});
-    const perfMatDark=new THREE.LineBasicMaterial({color:PERF_DARK});
     const plugMat=new THREE.MeshStandardMaterial({color:0xe5484d, metalness:.2, roughness:.5});
 
     // numeración de tapones en orden de bajada: N°1 = más profundo.
@@ -611,31 +686,31 @@ function buildPad(pad){
     stagesWithPlug.forEach((s,i)=>plugNumber.set(s.stage, i+1)); // 1 = más profundo
 
     (w.frac?.stages||[]).forEach((stg,si)=>{
-      // punzados: color turquesa que alterna claro/oscuro por etapa
-      const perfMat = (stg.stage % 2 === 0) ? perfMatLight : perfMatDark;
+      // punzados: un objeto y un material por etapa. refreshPerfColors pinta el material según la Vista de pozo;
+      // el atributo de color (RGBA) solo lleva la opacidad de cada vértice.
+      const linePos=[], lineCol=[];
+      const rOut=perfRadiusM, rIn=Math.min(prodR, perfRadiusM*0.2);   // radio real en metros (Configuración)
       (stg.clusters||[]).forEach(cl=>{
         const md=(cl.top_md!=null?cl.top_md:cl.bottom_md); if(md==null) return;
         const p=interpAtMD(st,md,wx); const center=toThree(p.x,p.y,p.tvd);
         const tan=tangentAtMD(md); const [u,v]=perpBasis(tan);
-        const rOut=perfRadiusM, rIn=Math.min(prodR, perfRadiusM*0.2);   // radio real en metros (Configuración)
-        const pos=[];
         const at=(ang,rad)=>center.clone()
           .add(u.clone().multiplyScalar(Math.cos(ang)*rad)).add(v.clone().multiplyScalar(Math.sin(ang)*rad));
-        // rama de árbol: cada raíz crece hacia afuera y se bifurca al ganar distancia
-        const branch=(ang,r0,r1,depth,spread)=>{
-          const a=at(ang,r0), b=at(ang,r1); pos.push(a.x,a.y,a.z, b.x,b.y,b.z);
-          if(depth<=0) return;
-          const nr=r1+(r1-r0)*0.85;
-          branch(ang-spread, r1, nr, depth-1, spread*0.7);
-          branch(ang+spread, r1, nr, depth-1, spread*0.7);
-        };
-        const nRoots=6, step=(rOut-rIn)*0.42;
-        for(let k=0;k<nRoots;k++) branch((k/nRoots)*Math.PI*2, rIn, rIn+step, 2, 0.28);
-        const geo=new THREE.BufferGeometry();
-        geo.setAttribute("position", new THREE.Float32BufferAttribute(pos,3));
-        const rays=new THREE.LineSegments(geo, perfMat);
-        rays.userData.kind="perf"; rays.userData.wellId=w.id; rays.userData.stage=stg.stage; g.add(rays);
+        for(const [ang,r0,r1] of perfBranches(rIn,rOut)){
+          const a=at(ang,r0), b=at(ang,r1);
+          linePos.push(a.x,a.y,a.z, b.x,b.y,b.z);
+          lineCol.push(1,1,1,perfAlpha(r0,rIn,rOut), 1,1,1,perfAlpha(r1,rIn,rOut));
+        }
       });
+      if(linePos.length){
+        const geo=new THREE.BufferGeometry();
+        geo.setAttribute("position", new THREE.Float32BufferAttribute(linePos,3));
+        geo.setAttribute("color", new THREE.Float32BufferAttribute(lineCol,4));
+        const rays=new THREE.LineSegments(geo, new THREE.LineBasicMaterial({vertexColors:true, transparent:true, depthWrite:false}));
+        rays.userData={kind:"perf", wellId:w.id, stage:stg.stage, perfBase:(stg.stage%2===0)?PERF_LIGHT:PERF_DARK,
+          propPlan:stg.plan?.prop_int_lbft??null, propReal:stg.actual?.prop_int_lbft??null};
+        g.add(rays);
+      }
 
       // tapones: cilindro rojo + etiqueta HTML "TPN N° x"
       if(stg.plug_md!=null){
@@ -738,6 +813,8 @@ function buildPad(pad){
             break; }
           case "CARTEL":
             if(el.md!=null && el.text){ const o=lbl(el.text, el.md, prodR*6);
+              o.el.style.whiteSpace="pre"; o.el.style.textAlign="center"; o.el.style.zIndex=1;   // por encima de las demás
+              if(instColor({color:el.bg})){ o.el.style.background=el.bg; o.el.style.color="#111"; }
               if(instColor(el)) o.el.style.borderColor=o.el.style.color=instColor(el); }   // solo si se eligió
             break;
         }
@@ -751,6 +828,13 @@ function buildPad(pad){
   // son verticales sintéticos (sin trayectoria cargada), se oculta el grupo.
   const hasSurvey=wells.some(w=>w.architecture!=="vertical");
   document.getElementById("grp-isomode").style.display=hasSurvey?"":"none";
+  // "Frac real" solo existe si el pad trae lo bombeado (hoy, solo desde Corva)
+  const hasReal=wells.some(w=>(w.frac?.stages||[]).some(s=>s.actual?.prop_int_lbft!=null));
+  document.getElementById("iso-fracreal").style.display=hasReal?"":"none";
+  if(!hasReal && isoMode==="fracreal"){ isoMode="normal";
+    const r=document.querySelector("input[name='isomode'][value='normal']"); if(r) r.checked=true; refreshIsoColors(); }
+  refreshPerfColors();
+  updateIsoLegend();
   buildWellMatrix(wells); buildGrids(); applyAllToggles(); frameAll(); updateSummary();
   // re-aplica en el próximo frame: evita que, recién cargado, alguna capa quede sin estado
   // hasta que el usuario toca un toggle (visibilidad no reflejada en el primer build).
@@ -1028,7 +1112,7 @@ document.getElementById("well-matrix").addEventListener("change",e=>{
   else if(t.matches("td.mx-well input[data-el]")){ const wid=t.closest("[data-wid]").dataset.wid, k=t.dataset.el; ensureVis(wid)[k]=t.checked; applyWellVis(wid); }
   else return;
   // el coloreo "por fracplan" se auto-normaliza a los pozos visibles → re-normalizar al cambiar visibilidad
-  if(isoMode==="fracplan") refreshIsoColors();
+  if(isoMode==="fracplan"||isoMode==="fracreal") refreshIsoColors();
   mxSyncMasters(); saveViewCfg();
 });
 // filtro de etapas de punzados (campo de texto por pozo / para todos)
@@ -1248,17 +1332,27 @@ canvas.addEventListener("mousemove",e=>{
   if(!info){ hoverTip.style.display="none"; return; }
   const stageTxt = info.stage!=null ? ` · <span class="s">E${info.stage}</span>` : "";
   const dlsTxt = info.dls!=null ? `<br><span class="d">dogleg</span> <span class="dl">${info.dls.toFixed(2)}</span> °/30m` : "";
-  // "cursor frac": suma los datos planificados de la etapa sobre la que se hace hover
+  // "cursor frac": suma los datos de la etapa sobre la que se hace hover, plan y real en sub-carteles
   let fracTxt="";
   if(SHOW_CURSOR_FRAC && info.stage!=null){
     const w=PAD?.pad.wells.find(x=>x.id===info.well);
-    const p=w?.frac?.stages?.find(s=>s.stage===info.stage)?.plan;
-    if(p){ const f=(v,d)=>v==null?"—":(+v).toFixed(d);
-      fracTxt=`<br><span class="fk">AS:</span> ${f(p.sand_t,1)} t · <span class="fk">Fluido:</span> ${f(p.fluid_m3,0)} m³`
+    const stg=w?.frac?.stages?.find(s=>s.stage===info.stage), p=stg?.plan, a=stg?.actual;
+    const f=(v,d)=>v==null?"—":(+v).toFixed(d);
+    const card=(cls,title,body)=>`<div class="ft-card ${cls}"><div class="ft-t">${title}</div>${body}</div>`;
+    fracTxt=card("ft-plan","Plan", p
+      ? `<span class="fk">AS:</span> ${f(p.sand_t,1)} t · <span class="fk">Fluido:</span> ${f(p.fluid_m3,0)} m³`
         +`<br><span class="fk">LongEt:</span> ${f(p.length_m,1)} m · <span class="fk">PropInt:</span> ${f(p.prop_int_lbft,0)} lb/ft`
         +`<br><span class="fk">FluidInt:</span> ${f(p.fluid_int_m3m,1)} m³/m`
-        +`<br><span class="fk">WL:</span> ${p.wl?escHtml(p.wl):"—"}`;
-    } else fracTxt=`<br><span class="d">sin datos de fracplan</span>`;
+        +`<br><span class="fk">WL:</span> ${p.wl?escHtml(p.wl):"—"}`
+      : `<span class="fk">sin datos</span>`);
+    if(w?.frac?.stages?.some(s=>s.actual)) fracTxt+=card("ft-real",`Real${a?.skipped?" · etapa salteada":""}${a?.screenout?" · screenout":""}`, a
+      ? `<span class="fk">AS:</span> ${f(a.sand_t,1)} t · <span class="fk">Fluido:</span> ${f(a.fluid_m3,0)} m³`
+        +`<br><span class="fk">PropInt:</span> ${f(a.prop_int_lbft,0)} lb/ft · <span class="fk">FluidInt:</span> ${f(a.fluid_int_m3m,1)} m³/m`
+        +`<br><span class="fk">Pres:</span> ${f(a.tp_avg_psi,0)} psi · <span class="fk">Caudal:</span> ${f(a.rate_avg_bpm,0)} bpm · <span class="fk">ISIP:</span> ${f(a.isip_psi,0)} psi`
+      : `<span class="fk">sin datos</span>`);
+    const pi=stg?.plug_info;
+    if(pi){ const txt=[pi.type,pi.make,pi.od_in!=null?`${pi.od_in}"`:null].filter(Boolean).join(" · ");
+      if(txt) fracTxt+=`<div class="ft-plug"><span class="fk">Tapón:</span> ${escHtml(txt)}</div>`; }
   }
   hoverTip.innerHTML=`<span class="w">${info.well}</span>${stageTxt}<br>MD <b>${Math.round(info.md)}</b> m · TVD <b>${Math.round(info.tvd)}</b> m${dlsTxt}${fracTxt}`;
   hoverTip.style.display="block";
@@ -1479,6 +1573,8 @@ function loadPadObject(obj, persist=true){
   syncBuilderFromPad(obj);   // el constructor refleja el pad cargado: picklists, MDs, metadata (editable)
   toast(`Pad ${obj.pad.id} cargado · ${obj.pad.wells.length} pozos`); show("v3d");
 }
+/* Pad que no viene de un archivo (Corva): "Guardar" no debe pisar el .vvwp que estuviera abierto */
+function loadRemotePad(obj){ PAD_FH=null; loadPadObject(obj); }
 /* Pad → constructor: llena metadata, picklists y cajas con lo cargado (JSON o generado), para
    poder EDITAR cualquier dato y re-aplicarlo con "Generar y ver pad". La tabla es el resumen. */
 function syncBuilderFromPad(pad){
@@ -1492,7 +1588,7 @@ function syncBuilderFromPad(pad){
     const casings={};
     (w.casings||[]).forEach(c=>{ casings[c.phase]={od_in:c.od_in??null, shoe_md:c.shoe_md??null,
       toc_md:c.toc_md??null, weight_ppf:c.weight_ppf??null, grade:c.grade??null,
-      segments:c.segments||undefined, short_joints:c.short_joints||undefined}; });
+      segments:c.segments?.map(s=>({...s})), short_joints:c.short_joints?.map(j=>({...j}))}; });
     const ni=normInstallation(w);
     const inst=ni ? {enabled:true, elements:ni.elements.map(el=>({...el}))} : {enabled:false, elements:[]};
     const prod=(w.casings||[]).find(c=>c.phase==="produccion");
@@ -1546,8 +1642,10 @@ function loadViewCfg(){
   if(cfg.hzero){ hzero=cfg.hzero; const s=document.getElementById("cfg-hzero"); if(s) s.value=hzero; }
   if(cfg.font){ document.getElementById("cfg-font").value=cfg.font; setLabelFont(cfg.font); }
   if(cfg.plugInv!=null){ plugCountInverted=!!cfg.plugInv; document.getElementById("cfg-pluginv").checked=plugCountInverted; }
-  if(typeof cfg.perfRadiusM==="number"){ perfRadiusM=cfg.perfRadiusM;
-    document.getElementById("cfg-perfradius").value=cfg.perfRadiusM;
+  // un valor guardado fuera del rango actual (antes era 1–200 m) vuelve al valor por defecto
+  if(typeof cfg.perfRadiusM==="number"){
+    perfRadiusM=(cfg.perfRadiusM>=PERF_RADIUS_MIN&&cfg.perfRadiusM<=PERF_RADIUS_MAX)?cfg.perfRadiusM:PERF_RADIUS_DEF;
+    document.getElementById("cfg-perfradius").value=perfRadiusM;
     document.getElementById("perfradius-val").textContent=perfRadiusM+" m"; }
   applyAllToggles(); syncCursorFrac();
 }
@@ -1839,8 +1937,10 @@ async function parseTallyPDF(buf, phase){
   const grade=mostCommon(grades);
   const mt=text.match(/Total\s+length\s+run\s+([\d,]+\.\d+)/i);
   const shoe=mt?parseFloat(mt[1].replace(/,/g,"")):null;
-  const rt = phase==="produccion" ? parseRunTally(text) : {shorts:[], shoetrack:null};
-  return {od_in:od, shoe_md:shoe, weight_ppf:weight, grade, short_joints:rt.shorts, shoetrack:rt.shoetrack};
+  const rt = phase==="produccion" ? parseRunTally(text) : {shorts:[], shoetrack:null, segments:null};
+  const deep=rt.segments?.at(-1);       // con tramos, el resumen es el tramo del zapato
+  return {od_in:deep?.od_in??od, shoe_md:shoe, weight_ppf:deep?.weight_ppf??weight, grade:deep?.grade??grade,
+    short_joints:rt.shorts, shoetrack:rt.shoetrack, segments:rt.segments};
 }
 /* Lee el "2.2 Run Tally" y separa piezas cortas (<10 m; los caños normales miden >10 m) en:
    - caños cortos: casing corto / XOVER del TRAMO MEDIO. Se ignoran los primeros y últimos `edgeM`
@@ -1848,7 +1948,8 @@ async function parseTallyPDF(buf, phase){
    - shoetrack: piezas cortas de los últimos `edgeM` m (zapato, collar flotador, camisas, cortos).
    Cada fila trae 3 decimales consecutivos = Longitud, Cum.Length, Set Depth (con/sin comas de miles).
    OJO: la fila corta NO trae "N° Tally", por eso ubicamos los 3 decimales sin asumir cuántos enteros
-   van antes. Set Depth = MD del TOPE de la pieza (≈ TD − Cum.Length) ⇒ bottom = Set Depth + Longitud. */
+   van antes. Set Depth = MD del FONDO de la pieza (la 1ra fila, el zapato, da el total corrido)
+   ⇒ top = Set Depth − Longitud. También arma los tramos: ver runTallySegments. */
 function parseRunTally(text, maxLen=10.0, edgeM=150){
   const m=text.match(/2\.2\s+Run\s+Tally([\s\S]*?)(?:\n\s*2\.3|\n\s*3\.|$)/i);
   const block=m?m[1]:text;
@@ -1865,12 +1966,12 @@ function parseRunTally(text, maxLen=10.0, edgeM=150){
     const desc=line.slice(mm.index+mm[0].length).trim().replace(/^(?:\d+(?:,\d{3})*\.\d+\s+)+/,"");
     rows.push({length, setd, desc});
   }
-  if(!rows.length) return {shorts:[], shoetrack:null};
-  const maxMD=Math.max(...rows.map(r=>r.setd+r.length));   // fondo de la sarta (≈ zapato)
+  if(!rows.length) return {shorts:[], shoetrack:null, segments:null};
+  const maxMD=Math.max(...rows.map(r=>r.setd));            // fondo de la sarta (≈ zapato)
   const shorts=[], stEls=[];
   for(const r of rows){
     if(r.length>=maxLen) continue;                     // caño normal
-    const top=round3(r.setd), bottom=round3(r.setd+r.length);
+    const top=round3(r.setd-r.length), bottom=round3(r.setd);
     if(top<edgeM) continue;                            // primeros 150 m (cabezal/colgador): se ignora
     if(bottom>maxMD-edgeM){                            // últimos 150 m: shoetrack
       stEls.push({desc:r.desc||"elemento", length_m:round3(r.length), top_md:top, bottom_md:bottom});
@@ -1881,7 +1982,29 @@ function parseRunTally(text, maxLen=10.0, edgeM=150){
   }
   shorts.sort((a,b)=>a.top_md-b.top_md);
   stEls.sort((a,b)=>a.top_md-b.top_md);                // somero → profundo
-  return {shorts, shoetrack: stEls.length?{elements:stEls}:null};
+  return {shorts, shoetrack: stEls.length?{elements:stEls}:null, segments:runTallySegments(rows,maxLen,maxMD)};
+}
+/* OD/libraje/grado que trae la descripción de una fila: "5, 18, P-110 ICY W-463" o `5.5" 23# P-110` */
+function casingSpecFromDesc(d){
+  const m=d.match(/(\d+ 1\/2|\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)\s*,\s*([A-Z])-?(\d{2,3})/)
+    || d.match(/(\d+ 1\/2|\d+(?:\.\d+)?)\s*(?:"|´´|'')\s*(\d+(?:\.\d+)?)\s*#\s*([A-Z])-?(\d{2,3})/);
+  if(!m) return null;
+  return {od_in:m[1].includes("/")?parseInt(m[1],10)+0.5:+m[1], weight_ppf:+m[2], grade:m[3]+m[4]};
+}
+/* Tramos = caños normales (las piezas cortas no definen tramo) con distinta especificación, de boca a
+   zapato; el XO queda en el tramo de arriba. null si es una sola especificación o la fila no la trae. */
+function runTallySegments(rows, maxLen, maxMD){
+  const segs=[];
+  rows.filter(r=>r.length>=maxLen).sort((a,b)=>a.setd-b.setd).forEach(r=>{
+    const sp=casingSpecFromDesc(r.desc); if(!sp) return;
+    const last=segs.at(-1);
+    if(last && last.od_in===sp.od_in && last.weight_ppf===sp.weight_ppf && last.grade===sp.grade) return;
+    segs.push({top_md:round3(r.setd-r.length), bottom_md:null, ...sp});
+  });
+  if(segs.length<2) return null;
+  segs.forEach((s,i)=>{ s.bottom_md=segs[i+1]?.top_md??round3(maxMD); });
+  segs[0].top_md=0;
+  return segs;
 }
 /* Alternativa al tally PDF: un XLSX simple de UNA solapa con los mismos campos, para TODAS las fases.
    Dos tablas: (1) por fase → od_in/shoe_md/weight_ppf/grade/toc_md; (2) piezas cortas + shoetrack.
@@ -1993,39 +2116,76 @@ function fmtCasingStatus(c){
   if(!c) return "—";
   let s=`${c.od_in!=null?fmtOD(c.od_in):"?"} @ ${c.shoe_md!=null?Math.round(c.shoe_md):"?"}`;
   if(c.grade) s+=" "+c.grade;
+  if(c.segments?.length) s+=` · ${c.segments.length} tramos`;
   if(c.short_joints?.length) s+=` · ${c.short_joints.length} caño(s) corto(s)`;
   return s;
 }
-/* listado de caños cortos detectados en el tally de aislación: longitud, MD desde y detalle
-   (cañería/acero + generales). Solo lectura: el dato vive en cas.short_joints del tally. */
-function shortsList(c){
-  const sjs=c.short_joints||[]; if(!sjs.length) return "";
-  const rows=sjs.map((sj,k)=>`<tr><td class="num">${k+1}</td><td>${sj.xover?"xover":"casing corto"}</td>
-      <td class="num">${Math.round(sj.top_md)} m</td><td class="num">${sj.length_m!=null?sj.length_m.toFixed(2)+" m":"—"}</td>
-      <td class="dim">${escHtml(sj.desc||"—")}</td></tr>`).join("");
-  return `<div class="cc-list"><div class="cc-title">↳ ${sjs.length} caño(s) corto(s) detectados</div>
-    <table class="tbl cc-tbl"><tr><th>#</th><th>Tipo</th><th>MD desde</th><th>Longitud</th><th>Cañería / acero · detalle</th></tr>${rows}</table></div>`;
+/* Caños cortos de la aislación: del tally, de Corva o a mano. MD del tope + largo. */
+function shortsEditor(i,c){
+  const sjs=c.short_joints||[];
+  const a=(k,f)=>`data-w="${i}" data-sj="${k}" data-sjf="${f}"`;
+  const rows=sjs.map((sj,k)=>`<div class="inst-el">
+      <input type="number" step="any" ${a(k,"top")} value="${sj.top_md??""}" placeholder="tope MD">
+      <input type="number" step="any" ${a(k,"len")} value="${sj.length_m??""}" placeholder="largo m">
+      <input type="text" ${a(k,"desc")} value="${escAttr(sj.desc||"")}" placeholder="descripción" style="width:170px">
+      <label class="inst-chk" title="Es un crossover"><input type="checkbox" ${a(k,"xover")} ${sj.xover?"checked":""}>XO</label>
+      <button class="btn" data-w="${i}" data-sj="${k}" data-sjact="del">✕</button></div>`).join("");
+  return `<div class="cc-list cc-edit"><div class="cc-title">${sjs.length?`↳ ${sjs.length} caño(s) corto(s)`:"Caños cortos"}</div>${rows}
+    <button class="btn" data-w="${i}" data-sjact="add">+ caño corto</button></div>`;
 }
-/* tramos (telescopado) de una fase: desde/hasta MD + OD/peso/grado. Solo lectura (viene del tally xlsx). */
-function segmentsList(c){
-  const sg=c.segments||[]; if(sg.length<2) return "";
-  const rows=sg.map(s=>`<tr><td class="num">${s.top_md!=null?Math.round(s.top_md):"?"}–${s.bottom_md!=null?Math.round(s.bottom_md):"?"} m</td>
-      <td>${s.od_in!=null?fmtOD(s.od_in):"?"}</td><td class="num">${s.weight_ppf!=null?s.weight_ppf+" lb/ft":"—"}</td>
-      <td>${escHtml(s.grade||"—")}</td></tr>`).join("");
-  return `<div class="cc-list"><div class="cc-title">↳ ${sg.length} tramo(s) (telescopado)</div>
-    <table class="tbl cc-tbl"><tr><th>Desde–Hasta MD</th><th>OD</th><th>Peso</th><th>Acero</th></tr>${rows}</table></div>`;
+/* Tramos de una fase: cambios de libraje, grado o diámetro de boca a zapato. Con tramos, OD/lb/ft/
+   acero/zapato del bloque son un resumen que da el tramo más profundo (ver syncSegmentSummary). */
+function segmentsEditor(i,ph,c){
+  const sg=c.segments||[];
+  const a=(k,f)=>`data-w="${i}" data-ph="${ph}" data-sg="${k}" data-sgf="${f}"`;
+  const rows=sg.map((s,k)=>`<div class="inst-el">
+      <input type="number" step="any" ${a(k,"top")} value="${s.top_md??""}" placeholder="desde MD">
+      <input type="number" step="any" ${a(k,"bottom")} value="${s.bottom_md??""}" placeholder="hasta MD">
+      <select ${a(k,"od")} title="OD">${odOptions(s.od_in)}</select>
+      <select ${a(k,"wt")} title="lb/ft">${wtOptions(s.od_in,s.weight_ppf)}</select>
+      <select ${a(k,"gr")} title="Acero">${grOptions(s.grade)}</select>
+      <button class="btn" data-w="${i}" data-ph="${ph}" data-sg="${k}" data-sgact="del">✕</button></div>`).join("");
+  return `<div class="cc-list cc-edit"><div class="cc-title">${sg.length?`↳ ${sg.length} tramos · el más profundo define el resumen`:"Tramos"}</div>${rows}
+    <button class="btn" data-w="${i}" data-ph="${ph}" data-sgact="add">+ tramo</button></div>`;
+}
+function addSegment(cas){
+  const spec={od_in:cas.od_in??null, weight_ppf:cas.weight_ppf??null, grade:cas.grade??null};
+  if(!cas.segments?.length){ cas.segments=[{top_md:0,bottom_md:null,...spec},{top_md:null,bottom_md:cas.shoe_md??null,...spec}]; return; }
+  cas.segments.push({top_md:cas.segments.at(-1).bottom_md,bottom_md:null,...spec});
+}
+function delSegment(cas,k){
+  const sg=cas.segments; sg.splice(k,1);
+  if(sg[k]) sg[k].top_md=k>0?sg[k-1].bottom_md:0;       // siguen contiguos
+  if(sg.length<2) cas.segments=undefined;               // un solo tramo: vuelve al bloque simple
+}
+/* filas completas, de somera a profunda (sin "desde" = donde termina la anterior) */
+function completeSegments(segs){
+  let prev=0;
+  return (segs||[]).filter(s=>s.bottom_md!=null).sort((a,b)=>a.bottom_md-b.bottom_md)
+    .map(s=>{ const top_md=s.top_md??prev; prev=s.bottom_md; return {...s,top_md}; });
+}
+/* el resumen de la fase sigue al tramo más profundo; refleja el cambio sin re-renderizar (no pierde el foco) */
+function syncSegmentSummary(cas, row){
+  const deep=completeSegments(cas.segments).at(-1); if(!deep) return;
+  Object.assign(cas,{od_in:deep.od_in, weight_ppf:deep.weight_ppf, grade:deep.grade, shoe_md:deep.bottom_md});
+  const g=row?.querySelector(".cas-grid"); if(!g) return;
+  g.querySelector('[data-c="od"]').innerHTML=odOptions(cas.od_in);
+  g.querySelector('[data-c="wt"]').innerHTML=wtOptions(cas.od_in,cas.weight_ppf);
+  g.querySelector('[data-c="gr"]').innerHTML=grOptions(cas.grade);
+  g.querySelector('[data-c="md"]').value=cas.shoe_md??"";
 }
 function phaseBlock(i,ph,label,c){ c=c||{};
+  const lock=c.segments?.length?' disabled title="Lo define el tramo más profundo"':"";
   return `<div class="phase-row"><span class="tag">${label}</span>
     <span class="btn filebtn">Tally .pdf<input type="file" accept=".pdf" data-w="${i}" data-kind="tally" data-phase="${ph}"></span>
     <span class="st" data-st="tally-${ph}-${i}">${(c.od_in!=null||c.shoe_md!=null)?fmtCasingStatus(c):"—"}</span>
     <div class="cas-grid">
-      <label>OD<select data-w="${i}" data-ph="${ph}" data-c="od">${odOptions(c.od_in)}</select></label>
-      <label>lb/ft<select data-w="${i}" data-ph="${ph}" data-c="wt">${wtOptions(c.od_in,c.weight_ppf)}</select></label>
-      <label>Acero<select data-w="${i}" data-ph="${ph}" data-c="gr">${grOptions(c.grade)}</select></label>
-      <label>Zapato MD<input type="number" data-w="${i}" data-ph="${ph}" data-c="md" value="${c.shoe_md??""}"></label>
+      <label>OD<select data-w="${i}" data-ph="${ph}" data-c="od"${lock}>${odOptions(c.od_in)}</select></label>
+      <label>lb/ft<select data-w="${i}" data-ph="${ph}" data-c="wt"${lock}>${wtOptions(c.od_in,c.weight_ppf)}</select></label>
+      <label>Acero<select data-w="${i}" data-ph="${ph}" data-c="gr"${lock}>${grOptions(c.grade)}</select></label>
+      <label>Zapato MD<input type="number" data-w="${i}" data-ph="${ph}" data-c="md" value="${c.shoe_md??""}"${lock}></label>
       <label>TOC MD<input type="number" data-w="${i}" data-ph="${ph}" data-c="toc" value="${c.toc_md??""}"></label>
-    </div>${segmentsList(c)}${ph==="produccion"?shortsList(c):""}</div>`;
+    </div>${segmentsEditor(i,ph,c)}${ph==="produccion"?shortsEditor(i,c):""}</div>`;
 }
 /* Instalación (v0.6): lista de elementos, uno por fila, agregados con botones. Cada input lleva
    data-if = nombre del campo del elemento (mismo nombre que en el pad JSON). */
@@ -2058,7 +2218,9 @@ function instRow(i,w,el,k){
     case "TPNC": body=num("top_md","desde MD")+num("bottom_md","hasta MD")+num("volume_l","vol (L)")+cap; break;
     case "FLUIDO": body=txt("name","nombre",110)+num("density_gcm3","dens. g/cm³",92)
       +num("top_md","desde MD")+num("bottom_md","hasta MD")+num("volume_l","vol (L)")+cap; break;
-    case "CARTEL": body=num("md","MD (m)")+txt("text","texto del cartel",230); break;
+    case "CARTEL": body=num("md","MD (m)")
+      +`<textarea ${a("text")} rows="2" placeholder="texto del cartel (Enter = otra línea)" style="width:230px">${escHtml(el.text??"")}</textarea>`
+      +`<input type="color" class="inst-color" ${a("bg")} value="${instColor({color:el.bg})||"#ffffff"}" title="Color de fondo del cartel">`; break;
     case "BHA": body=num("md","MD (m)")+chk("mdf","MDF","Con motor de fondo"); break;
     default: body=num("md","MD (m)");                     // TPN · PKR · ANCLA · BBA
   }
@@ -2146,7 +2308,7 @@ function parseRange(str){ str=(str||"").trim(); if(!str) return null;
   if(/^\d+(?:\.\d+)?$/.test(str)){ const v=+str; return {from:v, to:v+1}; }   // 1 número ⇒ 1 m
   return null;
 }
-function fracFromRows(rows){
+function fracFromRows(rows, prev){
   const stages={}, order=[];
   for(const r of rows){ const st=parseInt(r.stage,10); if(!(st>=0)) continue;
     const rg=parseRange(r.range); if(!rg) continue;
@@ -2155,6 +2317,9 @@ function fracFromRows(rows){
     else stages[st].clusters.push({n:null, top_md:rg.from, bottom_md:rg.to, incl:null, shots:null, charge:null, phasing:null});
   }
   order.sort((a,b)=>a-b);
+  // editar tapones o punzados no borra lo planificado ni lo bombeado de la etapa
+  (prev?.stages||[]).forEach(o=>{ const st=stages[o.stage]; if(!st) return;
+    for(const k of ["plan","actual","plug_info"]) if(o[k]) st[k]=o[k]; });
   return {total_stages:order.length, lp_md:null, collar_md:null, horizontal_ext_m:null,
     planned_vs_actual:"planned", stages:order.map(s=>stages[s])};
 }
@@ -2215,6 +2380,22 @@ function onWellField(e){
     else if(f==="toc") cas.toc_md=v===""?null:parseFloat(v);
     return;
   }
+  if(t.dataset.sgf){ const cas=w.casings[t.dataset.ph], k=+t.dataset.sg, sg=cas?.segments?.[k]; if(!sg) return;
+    const f=t.dataset.sgf, v=t.value, n=v===""?null:parseFloat(v), row=t.closest(".inst-el");
+    if(f==="top") sg.top_md=n;
+    else if(f==="bottom"){ sg.bottom_md=n; const nx=cas.segments[k+1];       // el siguiente arranca donde termina este
+      if(nx){ nx.top_md=n; row.nextElementSibling.querySelector('[data-sgf="top"]').value=n??""; } }
+    else if(f==="od"){ sg.od_in=n; sg.weight_ppf=null; row.querySelector('[data-sgf="wt"]').innerHTML=wtOptions(n,null); }
+    else if(f==="wt") sg.weight_ppf=n;
+    else if(f==="gr") sg.grade=v||null;
+    syncSegmentSummary(cas,t.closest(".phase-row"));
+    return; }
+  if(t.dataset.sjf){ const sj=w.casings.produccion?.short_joints?.[+t.dataset.sj]; if(!sj) return; const f=t.dataset.sjf;
+    if(f==="xover") sj.xover=t.checked;
+    else if(f==="desc") sj.desc=t.value;
+    else { const v=parseFloat(t.value); if(f==="top") sj.top_md=isFinite(v)?v:null; else sj.length_m=isFinite(v)?v:null; }
+    sj.bottom_md=(sj.top_md!=null&&sj.length_m!=null)?round3(sj.top_md+sj.length_m):null;
+    return; }
   if(t.dataset.if){ const el=w.install.elements[+t.dataset.ie]; if(!el) return; const f=t.dataset.if;
     if(t.type==="checkbox") el[f]=t.checked;
     else if(INST_NUM_FIELDS.includes(f)){ const v=parseFloat(t.value); el[f]=isFinite(v)?v:null; }
@@ -2233,12 +2414,22 @@ function onWellField(e){
     if(t.dataset.ff==="type") el.type=t.value;
     else if(t.dataset.ff==="stage") el.stage=t.value===""?null:parseInt(t.value,10);
     else if(t.dataset.ff==="range") el.range=t.value;
-    w.frac=fracFromRows(w.fracRows);          // el 3D usa w.frac: se rearma al editar
+    w.frac=fracFromRows(w.fracRows,w.frac);          // el 3D usa w.frac: se rearma al editar
     return; }
 }
 document.getElementById("b-wells").addEventListener("input",onWellField);
 document.getElementById("b-wells").addEventListener("change",onWellField);
 document.getElementById("b-wells").addEventListener("click",e=>{
+  const tsg=e.target.closest("[data-sgact]"), tsj=e.target.closest("[data-sjact]");
+  if(tsg){ const w=ING.wells[+tsg.dataset.w]; if(!w) return; const ph=tsg.dataset.ph;
+    const cas=w.casings[ph]||(w.casings[ph]={});
+    if(tsg.dataset.sgact==="add") addSegment(cas); else delSegment(cas,+tsg.dataset.sg);
+    renderWellCards(); return; }
+  if(tsj){ const w=ING.wells[+tsj.dataset.w]; if(!w) return;
+    const cas=w.casings.produccion||(w.casings.produccion={});
+    if(tsj.dataset.sjact==="add") (cas.short_joints||(cas.short_joints=[])).push({desc:"Caño corto",xover:false,top_md:null,length_m:6,bottom_md:null});
+    else cas.short_joints.splice(+tsj.dataset.sj,1);
+    renderWellCards(); return; }
   const ti=e.target.closest("[data-iact]"), ts=e.target.closest("[data-sact]");
   if(ti){ const i=+ti.dataset.w, w=ING.wells[i]; if(!w) return; const act=ti.dataset.iact;
     if(act==="enable"){ w.install.enabled=e.target.checked;
@@ -2274,8 +2465,8 @@ document.getElementById("b-wells").addEventListener("click",e=>{
       const body=tf.closest(".inst-wrap").querySelector(".inst-body");
       if(body) body.classList.toggle("disabled",!e.target.checked); return; }
     if(act==="add-PERF"||act==="add-TPN"){ w.fracRows.push({type:act.slice(4), stage:null, range:""});
-      w.frac=fracFromRows(w.fracRows); refillFrac(i); return; }
-    if(act==="del"){ w.fracRows.splice(+tf.dataset.fe,1); w.frac=fracFromRows(w.fracRows); refillFrac(i); return; }
+      w.frac=fracFromRows(w.fracRows,w.frac); refillFrac(i); return; }
+    if(act==="del"){ w.fracRows.splice(+tf.dataset.fe,1); w.frac=fracFromRows(w.fracRows,w.frac); refillFrac(i); return; }
     return;
   }
   // colapsar/expandir bloques (instalación / shoetrack / fracplan) al hacer click en el encabezado
@@ -2318,6 +2509,7 @@ document.getElementById("b-wells").addEventListener("change",async e=>{
       const wt=nearestWT(cas.od_in, c.weight_ppf); if(wt!=null) cas.weight_ppf=wt;
       if(c.grade) cas.grade=c.grade;
       if(c.shoe_md!=null) cas.shoe_md=c.shoe_md;
+      cas.segments = c.segments?.length ? c.segments : undefined;
       cas.short_joints = c.short_joints?.length ? c.short_joints : undefined;
       // shoetrack autodetectado → estado editable a mano
       if(c.shoetrack?.elements?.length){
@@ -2467,10 +2659,16 @@ function assemblePad(){
       if(!c || !(c.od_in!=null||c.shoe_md!=null||c.weight_ppf!=null||c.grade||c.toc_md!=null)) return;
       const cas={phase:ph, od_in:c.od_in??null, shoe_md:c.shoe_md??null, toc_md:c.toc_md??null,
         weight_ppf:c.weight_ppf??null, grade:c.grade??null};
-      if(c.segments?.length) cas.segments=c.segments;
-      if(c.short_joints?.length) cas.short_joints=c.short_joints;
+      const segs=completeSegments(c.segments);
+      if(segs.some(s=>s.top_md>=s.bottom_md)){ toast(`Tramos de ${ph} del pozo ${w.id||i+1}: "desde" debe ser menor que "hasta"`); err=1; return; }
+      if(segs.length>1){ const deep=segs.at(-1); cas.segments=segs;
+        Object.assign(cas,{od_in:deep.od_in, weight_ppf:deep.weight_ppf, grade:deep.grade, shoe_md:deep.bottom_md}); }
+      const shorts=(c.short_joints||[]).filter(j=>j.top_md!=null).sort((a,b)=>a.top_md-b.top_md)
+        .map(j=>({...j, bottom_md:j.bottom_md??(j.length_m!=null?round3(j.top_md+j.length_m):j.top_md)}));
+      if(shorts.length) cas.short_joints=shorts;
       casings.push(cas);
     });
+    if(err) return;
     // shoetrack (manual o autodetectado) → va en la aislación (produccion)
     if(w.shoetrack?.enabled){
       const els=(w.shoetrack.elements||[]).filter(el=>el.top_md!=null).map(el=>({
@@ -2547,7 +2745,7 @@ function instSummaryRows(w){
       case "ANCLA": det="ancla"; break;
       case "BBA": det="bomba"; break;
       case "BHA": det=el.mdf?"con motor de fondo (MDF)":"fresa"; break;
-      case "CARTEL": det=el.text||""; break;
+      case "CARTEL": det=(el.text||"").replace(/\n+/g," · "); break;
     }
     return {name:INST_LABEL[el.type]||el.type, od, where, det};
   });
@@ -2870,6 +3068,6 @@ export {
   normInstallation, instVolume, volBetween, capacityAt, fmtVol, fmtDec, vbDiamLabel, INST_LABEL,
   INST_DEFCOLOR, instColor,
   setDiamExagForExport, parseStages,
-  escHtml, escAttr, onResize,
+  escHtml, escAttr, onResize, loadRemotePad, show, casingSegAt, setIsoMode,
   WELL_COLORS, OD_IN, CASING_COLOR, PHASE_LABEL, PERF_LIGHT, PERF_DARK,
 };

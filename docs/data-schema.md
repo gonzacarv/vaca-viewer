@@ -32,6 +32,7 @@ los archivos de origen adjuntos para trazabilidad).
     "field": "Bloque Ejemplo",
     "operator": "Operadora Ejemplo",
     "campaign": 2,             // W del código de pozo
+    "source": { "provider": "corva", "pad_id": "12345" }, // OPCIONAL: pad traído de Corva (docs/corva.md)
     "surface": {
       // separación estándar entre bocas: 10 m, línea O→E ascendente
       "wellhead_spacing_m": 10,
@@ -79,14 +80,15 @@ los archivos de origen adjuntos para trazabilidad).
       "toc_md": null,              // tope de cemento (MD), si se conoce
       "weight_ppf": 21.4,          // libraje "resumen" (tramo del zapato)
       "grade": "P110",             // acero "resumen" (tramo del zapato)
-      "segments": [               // OPCIONAL: casing telescopado (mismo OD, distinto peso/grado por tramo).
-        // Solo si hay >1 tramo. La app marca cada XOVER en 3D. shoe/od/peso/grado "resumen" = tramo más profundo.
+      "segments": [               // OPCIONAL: tramos de la columna (cambia libraje, grado o diámetro).
+        // Solo si hay >1 tramo. La app marca cada XO y dibuja el OD de cada tramo. shoe/od/peso/grado "resumen" = tramo más profundo.
         { "top_md": 0,    "bottom_md": 3200,   "od_in": 5.0, "weight_ppf": 18.4, "grade": "N80" },
         { "top_md": 3200, "bottom_md": 6643.1, "od_in": 5.0, "weight_ppf": 21.4, "grade": "P110" }
       ],
       "short_joints": [           // caños cortos (<10 m) del TRAMO MEDIO. Solo en la aislación.
         // casing corto o XOVER; se ignoran los primeros y últimos 150 m (cabezal y shoetrack).
         // La app los dibuja como banda amarilla, capa "Caños cortos". `xover:true` si es un crossover.
+        // `source` (opcional) = de dónde salió en Corva: "tally" | "ccl" | "componentes".
         { "desc": "CSG W-463 CORTO R1", "xover": false, "length_m": 6.0, "top_md": 514.0, "bottom_md": 520.0 }
         // ...
       ],
@@ -128,7 +130,20 @@ los archivos de origen adjuntos para trazabilidad).
           "fluid_int_m3m": 33.7,    // Fluid Intensity (m³/m)
           "length_m": 105.15,       // Frac Length / longitud de etapa (m)
           "wl": "Gun 3 1/8\" · 2 spf · EHO 45"  // detalle de cañón (reformateado del Resumen)
-        }
+        },
+        // "actual" (OPCIONAL, hoy solo desde Corva): lo bombeado. Habilita la vista de pozo "Frac real".
+        // Todo puede ser null: sin dato, o descartado por dudoso (ver docs/corva.md).
+        "actual": {
+          "sand_t": 309.7, "fluid_m3": 1844.8,
+          "prop_int_lbft": 1981.7,  // con la misma longitud de etapa que "plan"
+          "fluid_int_m3m": 17.57,
+          "tp_avg_psi": 10391, "tp_max_psi": 10930,   // presión de tratamiento
+          "rate_avg_bpm": 90, "rate_max_bpm": null,   // caudal
+          "isip_psi": 6248, "pump_time_min": 144,
+          "skipped": true, "screenout": true          // solo si corresponde
+        },
+        // "plug_info" (OPCIONAL, hoy solo desde Corva): datos del tapón de esta etapa
+        "plug_info": { "type": "Composite", "make": "Yellow Jacket", "model": "M1", "od_in": 3.6 }
       }
       // ...
     ],
@@ -155,7 +170,7 @@ los archivos de origen adjuntos para trazabilidad).
         "color": "#3a8ee6", "density_gcm3": 1.15,           // color del gráfico · densidad opcional
         "volume_l": 30122 },
       { "type": "BHA", "md": 5200, "mdf": true },           // fresa; mdf = con motor de fondo
-      { "type": "CARTEL", "md": 1200, "text": "Nivel dinámico" }   // cartel libre con flecha al MD
+      { "type": "CARTEL", "md": 1200, "text": "Nivel dinámico\nmedido en junio", "bg": "#fff3c4" }   // cartel libre con flecha al MD; `\n` = otra línea, `bg` = fondo (opcional)
     ]
   }
 }
@@ -183,9 +198,11 @@ los archivos de origen adjuntos para trazabilidad).
   catálogo (desc, size, grade). Sección "2.2 Run Tally" = filas con
   N°, N° Tally, Longitud, Cum.Length, Set Depth, centralizador, Desc.
   Filtrar cabeceras repetidas y pies "OpenWells". El zapato = Set Depth mayor.
+  Set Depth = MD del **fondo** de la pieza (la primera fila, el zapato, da el total corrido).
   Los **caños cortos** (`short_joints`) salen de esta tabla: son las filas con Longitud
-  muy por debajo de la mediana de tiros (pup joints de pocos metros). Solo se registran
-  para la fase de aislación.
+  menor a 10 m. Solo se registran para la fase de aislación. Los **tramos** (`segments`) salen
+  de la descripción de los caños normales cuando trae la especificación
+  (`5, 18, P-110 …` o `5.5" 23# P-110`); si no la trae, se cargan a mano.
 - **Fracplan XLS (hoja "Punzados"):** cabecera con LP, collar, ext. horizontal,
   total etapas. Tabla desde fila ~13: # Cluster, Tope MD, Fondo MD, Incl,
   Número etapa (solo en la 1ra fila de cada etapa), separación, altura, tiros,

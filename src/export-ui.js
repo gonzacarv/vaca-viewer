@@ -107,6 +107,13 @@ function populateWells(){
   if(wells.some(w=>w.id===prev)) sel.value=prev;
 }
 function currentWell(){ const id=$("ex2d-well")?.value; return V.PAD?.pad?.wells?.find(w=>w.id===id)||null; }
+/* cajas eliminadas (por pozo): duran hasta que cambia el pad, es decir "Generar y ver pad" o cualquier carga */
+const HIDDEN=new Map(); let hiddenPad=null;
+function hiddenFor(id){
+  if(hiddenPad!==V.PAD){ HIDDEN.clear(); hiddenPad=V.PAD; }
+  if(!HIDDEN.has(id)) HIDDEN.set(id,new Set());
+  return HIDDEN.get(id);
+}
 function read2DOpts(){
   const el=k=>document.querySelector(`[data-ex2d-el="${k}"]`)?.checked;
   return { cx:parseFloat($("ex2d-cx").value), cy:parseFloat($("ex2d-cy").value),
@@ -115,12 +122,12 @@ function read2DOpts(){
     font:parseFloat($("ex2d-font").value), perfStages:$("ex2d-perfstages").value,
     from: $("ex2d-from").value===""?null:parseFloat($("ex2d-from").value),
     to: $("ex2d-to").value===""?null:parseFloat($("ex2d-to").value),
-    theme: $("ex2d-theme").value,
+    theme: $("ex2d-theme").value, hiddenLabels:hiddenFor($("ex2d-well")?.value),
     els:{ casings:el("casings"), cement:el("cement"), shoes:el("shoes"), plugs:el("plugs"),
       tbg:el("tbg"), instel:el("instel"), stages:el("stages"), perf:el("perf"),
-      shorts:el("shorts"), shoetrack:el("shoetrack"), ruler:el("ruler"), extruler:el("extruler"),
+      shorts:el("shorts"), xovers:el("xovers"), shoetrack:el("shoetrack"), ruler:el("ruler"), extruler:el("extruler"),
       labels:el("labels"), fluids:el("fluids"), cemplug:el("cemplug"), rods:el("rods"),
-      bha:el("bha"), notes:el("notes") } };
+      bha:el("bha"), notes:el("notes"), schem:el("schem") } };
 }
 function render2D(){
   const w=currentWell(); const box=$("ex2d-box"); if(!box) return;
@@ -219,10 +226,20 @@ function wireZoom(boxId){
 }
 
 /* ---- cajas de etiqueta arrastrables: mouse-over muestra el puntero, drag las mueve y el líder sigue.
-   El shoetrack es UNA caja (lista sus componentes), así que el pack se mueve entero con este drag. ---- */
+   El shoetrack es UNA caja (lista sus componentes), así que el pack se mueve entero con este drag.
+   Mientras se arrastra aparece un círculo con una X: soltar la caja ahí la elimina. Es HTML, fuera del
+   SVG, así que nunca llega a la imagen exportada. ---- */
 function wireBoxDrag(boxId){
   const box=$(boxId); if(!box) return;
-  let drag=null;
+  let drag=null, trash=null;
+  const overTrash=e=>{ if(!trash) return false; const r=trash.getBoundingClientRect();
+    return Math.hypot(e.clientX-(r.left+r.width/2), e.clientY-(r.top+r.height/2))<r.width*0.75; };
+  const showTrash=()=>{ const r=box.getBoundingClientRect();
+    trash=document.createElement("div"); trash.className="ex-trash"; trash.textContent="✕";
+    trash.style.left=(Math.max(r.left,0)+Math.min(r.right,innerWidth))/2+"px";
+    trash.style.top=(Math.min(r.bottom,innerHeight)-78)+"px";
+    document.body.appendChild(trash); };
+  const hideTrash=()=>{ trash?.remove(); trash=null; };
   box.addEventListener("pointerdown",e=>{
     const g=e.target.closest(".vbox"); if(!g) return;
     const svg=box.querySelector("svg"); if(!svg) return;
@@ -238,6 +255,8 @@ function wireBoxDrag(boxId){
     if(!drag) return;
     const p=drag.toSvg(e.clientX,e.clientY);
     const tx=drag.tx0+p.x-drag.p0.x, ty=drag.ty0+p.y-drag.p0.y;
+    if(!trash && Math.hypot(p.x-drag.p0.x, p.y-drag.p0.y)>3) showTrash();
+    trash?.classList.toggle("over", overTrash(e));
     drag.g.dataset.tx=tx; drag.g.dataset.ty=ty;
     drag.g.setAttribute("transform",`translate(${tx.toFixed(1)} ${ty.toFixed(1)})`);
     const lead=drag.svg.querySelector(`.vlead[data-vb="${drag.g.dataset.vb}"]`);
@@ -249,7 +268,15 @@ function wireBoxDrag(boxId){
       lead.setAttribute("y2", (by+bh/2).toFixed(1));
     }
   });
-  box.addEventListener("pointerup",()=>{ drag=null; });
+  box.addEventListener("pointerup",e=>{
+    if(drag && overTrash(e)){
+      if(drag.g.dataset.key) hiddenFor($("ex2d-well")?.value).add(drag.g.dataset.key);
+      drag.svg.querySelector(`.vlead[data-vb="${drag.g.dataset.vb}"]`)?.remove();
+      drag.g.remove();
+    }
+    drag=null; hideTrash();
+  });
+  box.addEventListener("pointercancel",()=>{ drag=null; hideTrash(); });
 }
 function syncRangePlaceholders(){
   const w=currentWell(); if(!w) return;

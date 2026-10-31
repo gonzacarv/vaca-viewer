@@ -6,7 +6,7 @@
 
 *Navegá el subsuelo de tu pad a escala real, prendé y apagá lo que querés ver, y exportá esquemas listos para informes y correos.*
 
-[![Estado](https://img.shields.io/badge/estado-v0.6_en_desarrollo-4ea1d3)]()
+[![Estado](https://img.shields.io/badge/versión-v1.1-4ea1d3)]()
 [![Web](https://img.shields.io/badge/100%25-web-3fb950)]()
 [![Offline](https://img.shields.io/badge/sin_servidor-offline-6cc04a)]()
 [![Datos privados](https://img.shields.io/badge/datos-nunca_salen_del_equipo-e5484d)]()
@@ -18,11 +18,12 @@
 
 ## Qué es
 
-**Vaca Viewer** es una app web para visualizar la geometría de subsuelo de pozos horizontales de fractura (plug-and-perf). Corre **en el navegador**, funciona **offline** y los datos operativos **nunca se suben a ningún servidor**: todo se procesa en tu máquina.
+**Vaca Viewer** es una app web para visualizar la geometría de subsuelo de pozos horizontales de fractura (plug-and-perf). Corre **en el navegador**, funciona **offline** y los datos operativos **nunca se suben a ningún servidor**: todo se procesa en tu máquina. La única función que usa la red es, si la activás, traer pads de **Corva**: el navegador habla directo con Corva, solo para leer ([detalle](docs/corva.md)).
 
 Está pensada para el flujo real de campo —survey de geonavegación, tally de entubado y fracplan de punzados/tapones— los formatos que ya exportás de OpenWells y Excel.
 
 ![captura](img/vv.png)
+
 
 ---
 
@@ -33,11 +34,38 @@ Está pensada para el flujo real de campo —survey de geonavegación, tally de 
 | 🧭 | **Vista 3D** | El pad completo a escala real 1:1. Orbitás, hacés zoom y desplazás como en un CAD; prendés/apagás capas por pozo y por elemento (trayectoria, cañerías, punzados, tapones, etapas, dogleg). Medís distancias entre puntos. |
 | 🖼️ | **Exportar** | Imágenes de fondo blanco para documentos. **Vista 3D** (isométrica o la vista actual) y **corte de pozo 2D** (esquema oil&gas de manual: cañerías, cemento, zapatos, tapones, punzados por etapa y toda la instalación —TBG, packers, anclas, varillas, bomba, fluidos, tapones de cemento, BHA y carteles—). Todo a **PNG / JPG / PDF**, en color o blanco y negro. |
 | ✏️ | **Datos** | Importás survey (`.xlsx`), tally (`.pdf` o `.xlsx`) y fracplan (`.xlsx`), o cargás/editás a mano. Cada pozo lleva su nombre editable y se colapsa para trabajar cómodo; el tally de aislación lista los caños cortos detectados. La **instalación** se arma elemento por elemento, con cálculo de volúmenes. La tabla del pad se exporta a `.xlsx` o imagen, y el pad se guarda sobre el mismo `pad.vvwp` abierto (Guardar / Guardar como / Exportar copia). |
-| ⚙️ | **Configuración** | Exageración vertical, diámetros, radios de punzado, formato de etiquetas y demás preferencias de vista. |
+| ⚙️ | **Configuración** | Exageración vertical, diámetros, extensión de las fracturas, formato de etiquetas y demás preferencias de vista. |
 
 ---
 
-## Novedades (v0.6)
+## Novedades (v1.1)
+
+**Datos desde Corva**
+- Nueva solapa **Datos → Corva**: elegís un PAD de tu cuenta y la app lo arma con survey, cañerías y fractura, solo leyendo ([detalle](docs/corva.md)).
+- **Frac plan y frac real**: Vista de pozo propia para cada uno, picklist *Mostrar* en la solapa, y el cursor frac los muestra en dos sub-carteles de color.
+- Corva no tiene una profundidad real de tapón que se pueda usar: los tapones son los del diseño, con tipo, marca y OD.
+
+**Cañerías**
+- **Tramos**: cada fase admite varios tramos por libraje, grado o diámetro (5" y 5½"), desde el tally, Corva o el botón *+ tramo*. Se ven en 3D y en el corte, y los volúmenes usan el ID de cada tramo.
+- **Caños cortos editables**: se cargan del tally, de Corva cuando los tiene, o a mano.
+- **Fix de tally PDF**: *Set Depth* es el fondo de la pieza, no el tope. Los pads ya guardados conservan los cortos corridos (cerca de 6 m) hasta volver a cargar el tally.
+
+**Corte 2D**
+- Las cañerías nunca se tocan, y las líneas de los carteles salen bien de los zapatos en la curva.
+- **La instalación se ve como es**: lo que está muy junto, es muy corto o cae en la curva se separa y pasa al tramo vertical. Los cuadros muestran el dato real y la regla acompaña (checkbox *Separar instalación*).
+- La bomba es más chica y va siempre hacia abajo; la cola de TBG más fino se distingue.
+- **Carteles** con varias líneas, color de fondo y siempre por encima; en el mismo MD que un elemento puntual, reemplazan su etiqueta.
+- Al arrastrar una caja aparece un círculo con una X: soltarla ahí la elimina hasta el próximo *Generar y ver pad* o carga de datos.
+
+**Vista 3D**
+- Los **punzados toman el color de la intensidad de arena** en las vistas Fracplan y Frac real, y su intensidad cae con la distancia al pozo.
+- **Extensión de las fracturas**: de 80 a 250 m, 120 m por defecto.
+- **Más contraste en la rampa de arena**: ignora el 5% extremo de cada lado, para que una etapa atípica no aplaste al resto. El panel muestra la escala en lb/ft.
+
+<details>
+<summary><b>Versiones anteriores</b></summary>
+
+### Novedades (v0.6)
 
 **Instalación por elementos** (sección *Datos* → pozo → *Instalación*): en vez de una única sarta de TBG desde boca de pozo, ahora la instalación es una lista de elementos que se agregan con botones:
 
@@ -52,7 +80,7 @@ Está pensada para el flujo real de campo —survey de geonavegación, tally de 
 | **BBA** | MD | bomba: tramo corto del Ø del TBG con anillos transversales |
 | **VB** | desde / hasta MD, Ø (3/4", 7/8", 1", 1,5", vástago), **CC** | varillas de bombeo: línea fina (apenas más gruesa a mayor Ø); con CC, centralizadores |
 | **BHA** | MD, **MDF** | fresa; con MDF, fresa + motor de fondo. Apunta hacia donde avanza el MD (acostado en la rama) |
-| **Cartel** | MD + texto | cartel libre con flecha al MD |
+| **Cartel** | MD + texto (admite varias líneas) + color de fondo | cartel libre con flecha al MD, por encima de los demás. En el mismo MD que un elemento puntual, reemplaza su etiqueta |
 
 - **Volúmenes**: TPN cemento y fluidos usan el ID de la cañería en la que están (OD + libraje, respeta el telescopado). Desde + hasta → calcula el volumen; desde + volumen → ajusta el hasta.
 - **Color por elemento**: cada fila tiene su selector de color (corte 2D y Vista 3D). Sin tocarlo, cada vista usa su color por defecto; en blanco y negro todo vuelve a tinta y grises.
@@ -60,7 +88,7 @@ Está pensada para el flujo real de campo —survey de geonavegación, tally de 
 - **Vista 3D y tabla del pad**: todos los elementos de la instalación aparecen en la escena (capa *Instalación*) y en la tabla resumen, con sus volúmenes.
 - **Compatibilidad**: los pads v0.5 (TBG único desde superficie) se abren igual y se convierten solos al formato nuevo.
 
-## Novedades (v0.5)
+### Novedades (v0.5)
 
 - **Vista de pozo → "Fracplan"**: colorea cada etapa de verde a rojo según la **intensidad de arena** planificada (lb/ft), auto-normalizada a los pozos visibles del pad. Toma los datos de la hoja *Resumen* del fracplan.
 - **Cursor frac**: además del MD/TVD/dogleg al hacer hover, muestra los datos planificados de la etapa — arena (t), fluido (m³), longitud, intensidades de arena y fluido, y el detalle de cañón (`Gun 3 1/8" · 2 spf · EHO 45`). Depende del "cursor slim".
@@ -70,7 +98,7 @@ Está pensada para el flujo real de campo —survey de geonavegación, tally de 
 - **Planos envolventes adaptativos**: la grilla de profundidad se ubica siempre en la "espalda" de los pozos según su orientación dominante (N↔S o E↔O).
 - **Distribución 100% offline**: `build_dist.py` genera un único `dist/vaca-viewer.html` con todo embebido (three, SheetJS, pdf.js, jsPDF) — se abre con **doble-click**, sin servidor ni internet.
 
-## Novedades (v0.4)
+### Novedades (v0.4)
 
 **Vista 3D:**
 
@@ -91,12 +119,13 @@ Está pensada para el flujo real de campo —survey de geonavegación, tally de 
 **Sección Datos, renovada:**
 
 - **Pozos con nombre**: cada pozo del constructor se titula `1. Nombre del pozo` — el nombre se edita clickeándolo. Los pozos se **colapsan** uno a uno (click en la cabecera) o todos juntos con el botón *Colapsar pozos*.
-- **Caños cortos a la vista**: al cargar el tally de aislación aparece un listado debajo de sus detalles con tipo (casing corto / xover), MD desde, longitud y detalle de cañería/acero.
 - **Tabla del pad exportable**: la tarjeta *Pad cargado* se colapsa, y la tabla se descarga como **planilla `.xlsx`** o como **imagen PNG de fondo blanco** lista para pegar en informes.
 - **Guardar de verdad**: tres acciones — **Guardar** (escribe sobre el mismo `.vvwp` que abriste; si el pad es nuevo, se comporta como *Guardar como*), **Guardar como…** (elegís destino) y **Exportar copia** (descarga clásica). Usa la File System Access API (Chrome/Edge); en navegadores sin soporte cae a descarga.
 - **Espacio optimizado**: la sección usa todo el ancho de la ventana y se quitaron los textos introductorios.
 
 **Fix de ingesta**: el parser del run tally descartaba mal las columnas numéricas extra del PDF (peso acumulado) y las metía en la descripción de los caños cortos (p. ej. `142.5752 5, 18, P-110…`). Ahora la descripción sale limpia (`5, 18, P-110 ICY W-463 CASING MARCA`), tanto en el parser del navegador como en `build_pad.py`. Los pads guardados antes del fix conservan el texto viejo: basta recargar el tally de aislación.
+
+</details>
 
 ---
 
@@ -106,7 +135,8 @@ Está pensada para el flujo real de campo —survey de geonavegación, tally de 
 
 > ⤓ **Descargar la última versión:** entrá a [`dist/vaca-viewer.html`](dist/vaca-viewer.html) acá en
 > GitHub y tocá el botón **"Download raw file"** (ícono ⤓, arriba a la derecha del archivo). Guardalo
-> donde quieras y abrilo con doble-click (Chrome o Edge).
+> donde quieras y abrilo con doble-click (Chrome o Edge). No hace falta nada más: internet solo se usa
+> si traés datos de Corva.
 
 Para regenerarlo después de cambiar el código:
 
@@ -140,13 +170,14 @@ python3 build_dist.py
 ```
 vaca-viewer/
 ├── index.html       → shell HTML (markup + libs CDN en dev)
-├── src/             → módulos ES: viewer, export3d, export2d, export-ui, util, main + styles.css
+├── src/             → módulos ES: viewer, export3d, export2d, export-ui, corva, corva-ui, util, main + styles.css
 ├── build.py         → dist/index.html (single-file, libs por CDN)
 ├── build_dist.py    → dist/vaca-viewer.html (single-file 100% offline; libs en vendor/)
 ├── dist/vaca-viewer.html → la app lista para descargar y usar (versionada en cada release)
 ├── build_pad.py     → parsers de survey/tally/fracplan en Python
 └── docs/
     ├── data-schema.md      → formato JSON del pad
+    ├── corva.md            → integración con Corva: rutas, mapeo al pad y límites
     ├── archivos-input.md   → qué debe cumplir cada .xlsx/.pdf de ingesta
     └── plantillas/         → .xlsx modelo + gen_plantillas.py
 ```
