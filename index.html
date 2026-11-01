@@ -202,6 +202,9 @@
                 <label class="row">Compresión Y
                   <input type="range" id="ex2d-cy" min="0.25" max="2.5" step="0.05" value="1" style="flex:1; accent-color:var(--accent)">
                   <span class="meta" id="ex2d-cy-val">1.0×</span></label>
+                <label class="row" title="Cuán cerrada se dibuja la curva. En 50 % su alto coincide con la TVD real; el ángulo dibujado sigue la inclinación del survey en cualquier posición.">Curva agresiva
+                  <input type="range" id="ex2d-curve" min="0" max="100" step="5" value="50" style="flex:1; accent-color:var(--accent)">
+                  <span class="meta" id="ex2d-curve-val">50 %</span></label>
                 <label class="row">Margen blanco
                   <input type="range" id="ex2d-margin" min="0" max="200" step="10" value="0" style="flex:1; accent-color:var(--accent)">
                   <span class="meta" id="ex2d-margin-val">0 px</span></label>
@@ -253,6 +256,7 @@
                 <label class="row"><input type="checkbox" data-ex2d-el="ruler" checked> Regla de profundidad</label>
                 <label class="row"><input type="checkbox" data-ex2d-el="extruler"> Regla de extensión (MD)</label>
                 <label class="row"><input type="checkbox" data-ex2d-el="labels" checked> Etiquetas de texto</label>
+                <label class="row"><input type="checkbox" data-ex2d-el="incl"> Inclinación en las cajas</label>
                 <label class="row" title="Estira el esquema donde hay elementos de instalación muy juntos o muy cortos y saca de la curva los que caen en ella. Los cuadros siempre muestran el dato real."><input type="checkbox" data-ex2d-el="schem" checked> Separar instalación (no a escala)</label>
               </div>
               <div class="card"><h4>Exportar</h4>

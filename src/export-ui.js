@@ -116,7 +116,7 @@ function hiddenFor(id){
 }
 function read2DOpts(){
   const el=k=>document.querySelector(`[data-ex2d-el="${k}"]`)?.checked;
-  return { cx:parseFloat($("ex2d-cx").value), cy:parseFloat($("ex2d-cy").value),
+  return { cx:parseFloat($("ex2d-cx").value), cy:parseFloat($("ex2d-cy").value), curve:parseFloat($("ex2d-curve").value),
     diam:parseFloat($("ex2d-diam").value), elw:parseFloat($("ex2d-elw").value),
     shoe:parseFloat($("ex2d-shoe").value), margin:parseFloat($("ex2d-margin").value),
     font:parseFloat($("ex2d-font").value), perfStages:$("ex2d-perfstages").value,
@@ -127,7 +127,7 @@ function read2DOpts(){
       tbg:el("tbg"), instel:el("instel"), stages:el("stages"), perf:el("perf"),
       shorts:el("shorts"), xovers:el("xovers"), shoetrack:el("shoetrack"), ruler:el("ruler"), extruler:el("extruler"),
       labels:el("labels"), fluids:el("fluids"), cemplug:el("cemplug"), rods:el("rods"),
-      bha:el("bha"), notes:el("notes"), schem:el("schem") } };
+      bha:el("bha"), notes:el("notes"), schem:el("schem"), incl:el("incl") } };
 }
 function render2D(){
   const w=currentWell(); const box=$("ex2d-box"); if(!box) return;
@@ -144,6 +144,7 @@ function wire2D(){
   ["ex2d-cx","ex2d-cy","ex2d-diam","ex2d-shoe"].forEach(id=>$(id)?.addEventListener("input",e=>{
     $(id+"-val").textContent=parseFloat(e.target.value).toFixed(id==="ex2d-diam"||id==="ex2d-shoe"?1:2)+"×"; render2D();
   }));
+  $("ex2d-curve")?.addEventListener("input",e=>{ $("ex2d-curve-val").textContent=e.target.value+" %"; render2D(); });
   $("ex2d-elw")?.addEventListener("input",e=>{ $("ex2d-elw-val").textContent=e.target.value+" px"; render2D(); });
   $("ex2d-margin")?.addEventListener("input",e=>{ $("ex2d-margin-val").textContent=e.target.value+" px"; render2D(); });
   $("ex2d-font")?.addEventListener("input",e=>{ $("ex2d-font-val").textContent=e.target.value+" px"; render2D(); });
@@ -280,6 +281,6 @@ function wireBoxDrag(boxId){
 }
 function syncRangePlaceholders(){
   const w=currentWell(); if(!w) return;
-  const td=w.survey?.stations?.at(-1)?.md;
+  const td=V.wellEnd(w);
   if(td!=null){ $("ex2d-to").placeholder=String(Math.round(td)); $("ex2d-from").placeholder="0"; }
 }

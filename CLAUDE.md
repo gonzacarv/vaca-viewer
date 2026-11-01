@@ -118,15 +118,21 @@ es la del diseño en todas las fuentes: el doc explica por qué.
 ## Corte 2D (export2d.js) — REGLAS DE DISEÑO (no romper)
 
 El usuario rechazó explícitamente seguir el survey real. Ver [[corte-2d-estilo-canonico]] en memoria.
-- **Camino CANÓNICO** parametrizado por MD: tronco vertical + **cuarto de círculo agresivo** (radio
-  Rm = clamp(8% TVD landing, 120–300 m), arranca donde TVD = tvdLand−Rm) + lateral horizontal. NO se
-  sigue la trayectoria punto a punto. Sin líneas de "juntas" en el arco.
+- **Camino CANÓNICO** parametrizado por MD: tronco vertical + **cuarto de círculo** + lateral horizontal.
+  NO se sigue la trayectoria punto a punto. Sin líneas de "juntas" en el arco. El arco va del KOP (`findKick`:
+  último mínimo de inclinación en los 1000 m previos al landing; un pozo en S no adelanta la curva) al landing
+  (`findLanding`: cuando alcanza la inclinación del lateral, tope 88°). Dentro del arco la posición sigue la
+  **inclinación real** (`arcFrac`), así el ángulo dibujado coincide con el del pozo: nada que esté a 60° se ve
+  horizontal. El slider `curve` solo cambia el radio: 50 = TVD real de la curva, 100 = lo mínimo donde entran las
+  cañerías (`arcOuter`), 0 = más suave. La regla sigue al camino: cada tick queda a la altura de esa TVD en el pozo.
+  El camino llega hasta `wellEnd` (viewer.js: survey o zapato, el más profundo): el último survey suele quedar antes
+  del zapato, y `surveyToEnd` prolonga ese tramo con la última dirección medida. La Vista 3D y el cursor usan lo mismo.
 - **Holguras:** los semianchos se calculan de adentro hacia afuera (`halves`): el mínimo de cada fase deja
   `WALL_CLEAR` sobre el máximo de la interna, en cualquier tramo y con cualquier Ø del slider. Si no entra, crece la externa.
 - **Ajuste esquemático** (`els.schem`, checkbox "Separar instalación"): la instalación importa más que la regla.
   Cada elemento pide su lugar en px (`evs`: extensión hacia arriba/abajo + `SCHEM_GAP`; rangos cortos, `SCHEM_MIN_LEN`:
   una cola de 2 TBG siempre se ve). Lo que falta se agrega **estirando el camino** (`stretch`/`extraAt`), el lienzo crece
-  y nada se comprime. Lo que cae en el arco corre el inicio de la curva (`arcStart`) y queda en el tronco; los zapatos NO
+  y nada se comprime. Lo que cae en el arco hasta 45° corre el inicio de la curva (`arcStart`) y queda en el tronco; los zapatos NO
   piden lugar, siguen en la curva salvo que algo más profundo la corra. El orden entre elementos nunca cambia. La regla
   usa el mismo mapeo (`rulerY`), así que los números siguen siendo ciertos, con ticks más separados. Sin instalación no hay ajuste.
 - Cañerías: paredes negras gruesas + interior blanco (telescopio). Cemento: patrón punteado del
@@ -139,9 +145,10 @@ El usuario rechazó explícitamente seguir el survey real. Ver [[corte-2d-estilo
   lienzo crece para contenerlas (incluye corrimiento anti-desborde superior vía `<g translate>`).
 - Preview: zoom rubber-band (arrastrar rect / click resetea) y cajas arrastrables (el export usa el
   SVG del DOM para conservar cajas movidas).
-- Sliders/opts: cx/cy (aspecto), margin (borde blanco extra alrededor), diam (Ø cañería), elw (ancho
+- Sliders/opts: cx/cy (aspecto), curve (radio del arco), margin (borde blanco extra alrededor), diam (Ø cañería), elw (ancho
   tpn/pkr), shoe (tamaño zapato), font, perfStages (filtro de etapas a punzar), rango desde/hasta,
-  tema color|dogleg|bw, checkboxes por elemento.
+  tema color|dogleg|bw, checkboxes por elemento. `els.incl` agrega `Incl: xx°` a las cajas (no a carteles,
+  fluidos ni TPN de cemento, que son rangos); la clave para ocultar una caja se calcula sin ese texto.
 - Temas: `color` = banda de etapa + N° blanco; `dogleg` = interior pintado por DLS (rampa verde→
   amarillo→rojo de la Vista 3D, auto-normalizada al máx del rango visible, con leyenda de escala) y
   etapas SOLO N° con halo blanco (sin banda); `bw` = solo N° en tinta. Punzados: misma geometría en
@@ -186,7 +193,7 @@ Grotesk, minúsculas). Sistema completo en `docs/brand-kit.md` y en un proyecto 
 ## Cómo trabajar / verificar
 
 - **No hay navegador headless** en este entorno. Verificar con: `node --check` de cada módulo y del
-  bundle; y un harness node que stubbea `./viewer.js` (con `interpAtMD`, `escHtml`, `fmtOD`,
+  bundle; y un harness node que stubbea `./viewer.js` (con `interpAtMD`, `surveyToEnd`, `escHtml`, `fmtOD`,
   `plugCountInverted`, `parseStages`, `casingSegAt`) para ejecutar `buildWellSVG` contra un pad y chequear que el SVG
   sea XML bien formado, sin `NaN/undefined`, y que cajas/etiquetas no se salgan del lienzo.
 - Tras cambios: `python3 build.py` y confirmar que el bundle pasa `node --check`. Para release offline:

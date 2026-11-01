@@ -320,6 +320,16 @@ function updateLabels(){
 }
 let SHOW_TPN_LABELS=false, SHOW_STAGE_LABELS=true, SHOW_SHOE_LABELS=false, SHOW_SHORT_LABELS=false, SHOW_INSTALL_LABELS=false, SHOW_SHOETRACK_LABELS=false, SHOW_TOC_LABELS=false, SHOW_CURSOR_TIP=true, SHOW_CURSOR_FRAC=false, SHOW_GRIDNUMS=false;
 
+/* MD donde termina el pozo: el último survey suele quedar antes del zapato de la aislación */
+const wellEnd=w=>{ const m=w.survey?.stations?.at(-1)?.md;
+  return m==null?null:Math.max(m,...(w.casings||[]).map(c=>c.shoe_md).filter(x=>x!=null)); };
+/* survey hasta wellEnd, sin tocar el del pozo: lo que falta sigue en línea recta con la última dirección medida */
+function surveyToEnd(w){
+  const st=w.survey?.stations||[], end=wellEnd(w), z=st.at(-1), y=st.at(-2);
+  if(!y||end<=z.md) return st;
+  const k=(end-z.md)/((z.md-y.md)||1), along=f=>(z[f]||0)+((z[f]||0)-(y[f]||0))*k;
+  return [...st,{...z,md:end,tvd:along("tvd"),ew:along("ew"),ns:along("ns")}];
+}
 /* interpola X,Y,TVD (coords locales del pad) a un MD dado desde las stations */
 function interpAtMD(st, md, wx){
   if(md<=st[0].md) return {x:wx+(st[0].ew||0), y:st[0].ns||0, tvd:st[0].tvd};
@@ -495,7 +505,7 @@ function buildPad(pad){
 
   wells.forEach((w,idx)=>{
     const color=WELL_COLORS[idx%WELL_COLORS.length];
-    const wx=w.wellhead.x||0, st=w.survey.stations;
+    const wx=w.wellhead.x||0, st=surveyToEnd(w);
     const g=new THREE.Group(); g.userData.well=w.id;
 
     const pts=st.map(s=>toThree(wx+(s.ew||0), s.ns||0, s.tvd));
@@ -1299,7 +1309,7 @@ function stageAtMD(w, md){
 }
 function mdFromPoint(wellId, pt){
   const w=PAD?.pad.wells.find(x=>x.id===wellId); if(!w) return null;
-  const st=w.survey.stations, wx=w.wellhead.x||0;
+  const st=surveyToEnd(w), wx=w.wellhead.x||0;
   let best=Infinity, bestMD=null, bestTVD=null, bestDLS=null;
   for(let i=1;i<st.length;i++){
     const a=st[i-1], b=st[i];
@@ -3064,7 +3074,7 @@ export {
   PAD, isoMode, vexag, diamExag, plugCountInverted, odFormat,
   SHOW_TPN_LABELS, SHOW_STAGE_LABELS, SHOW_SHOE_LABELS, SHOW_SHORT_LABELS,
   SHOW_INSTALL_LABELS, SHOW_SHOETRACK_LABELS, SHOW_TOC_LABELS,
-  buildPad, setView, frameAll, toThree, interpAtMD, fmtOD, casingRadius,
+  buildPad, setView, frameAll, toThree, interpAtMD, surveyToEnd, wellEnd, fmtOD, casingRadius,
   normInstallation, instVolume, volBetween, capacityAt, fmtVol, fmtDec, vbDiamLabel, INST_LABEL,
   INST_DEFCOLOR, instColor,
   setDiamExagForExport, parseStages,

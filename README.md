@@ -52,6 +52,8 @@ Está pensada para el flujo real de campo —survey de geonavegación, tally de 
 
 **Corte 2D**
 - Las cañerías nunca se tocan, y las líneas de los carteles salen bien de los zapatos en la curva.
+- **La curva sigue la inclinación real**: lo que está a 60° se dibuja a unos 60°. El slider *Curva agresiva* ajusta cuán cerrada se ve, y la casilla *Inclinación en las cajas* suma `Incl: xx°`.
+- **Zapato de aislación siempre visible**: si el último survey termina antes, el pozo se prolonga hasta el zapato con la última dirección medida. También en la Vista 3D.
 - **La instalación se ve como es**: lo que está muy junto, es muy corto o cae en la curva se separa y pasa al tramo vertical. Los cuadros muestran el dato real y la regla acompaña (checkbox *Separar instalación*).
 - La bomba es más chica y va siempre hacia abajo; la cola de TBG más fino se distingue.
 - **Carteles** con varias líneas, color de fondo y siempre por encima; en el mismo MD que un elemento puntual, reemplazan su etiqueta.

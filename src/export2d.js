@@ -4,8 +4,8 @@
   ESTRATEGIA: camino CANÓNICO parametrizado por MD (no se sigue el survey punto a punto).
   El dibujo es ideal —tronco perfectamente vertical + cuarto de círculo de 90° + lateral
   perfectamente horizontal— y los DATOS definen dónde cae cada elemento sobre ese camino:
-  el tronco se ubica por TVD, el arco entre kick-off y landing (detectados del survey), y el
-  lateral se recorre por MD. Look "de manual": cañerías de paredes negras gruesas con interior
+  el tronco se ubica por TVD, el arco entre kick-off y landing (detectados del survey) según la
+  inclinación real, y el lateral se recorre por MD. Look "de manual": cañerías de paredes negras gruesas con interior
   blanco, cemento punteado (TOC→zapato), zapatos = triángulos macizos hacia afuera, tapones =
   bloque negro, packers = bloques por fuera del TBG, punzados = rayos hacia la formación.
   Instalación (v0.6): TBG/VB por rango, fluidos (solapados = rayado alternado), TPN de cemento
@@ -27,6 +27,11 @@ const WALL_CLEAR = 7.2;
    y lo que cae en el arco baja la curva para quedar en el tronco. La regla sigue al mismo mapeo. */
 const BBA_PX = 18;                     // largo de la bomba, siempre desde su MD hacia abajo
 const SCHEM_GAP = 14, SCHEM_GAP_BARE = 6, SCHEM_ARC_CLEAR = 18;
+const SCHEM_ARC_MAX_INCL = 45;         // más inclinado que esto, un elemento se queda en la curva
+/* CURVA: va del último mínimo de inclinación antes de construir (el KOP) hasta llegar al lateral */
+const KICK_WINDOW = 1000, LAND_INCL_MIN = 85, LAND_INCL_MAX = 88;
+const ARC_MD_BLEND = 0.1;              // algo de MD en el arco: una inclinación que no sube no apila todo en un punto
+const ARC_SOFT_GAIN = 0.6, ARC_CLEAR = 6;
 const SCHEM_MIN_LEN = { TBG:34, VB:10, TPNC:16, FLUIDO:12 };
 /* varillas de bombeo: trazo fino, apenas (casi imperceptiblemente) más grueso cuanto mayor el Ø */
 const VB_W = { "3/4":1.7, "7/8":1.8, "1":1.9, "1.5":2.05, vastago:2.2 };
@@ -51,8 +56,20 @@ const f1 = n => Math.round(n*10)/10;
 
 function sampleMD(st, md){ const p = V.interpAtMD(st, md, 0); return { tvd:p.tvd, h:Math.hypot(p.x, p.y) }; }
 
-/* landing: donde el avance pasa a ser más horizontal que vertical (lateral) */
-function findLanding(st){
+/* inclinación de cada estación: la del survey o, si no viene, la que sale de la trayectoria */
+function stationIncl(st){
+  return st.map((s,i)=>{ if(s.incl!=null) return s.incl; if(!i) return 0; const a=st[i-1];
+    return Math.atan2(Math.hypot((s.ew||0)-(a.ew||0), (s.ns||0)-(a.ns||0)), (s.tvd||0)-(a.tvd||0))*180/Math.PI; });
+}
+/* landing: donde el pozo alcanza la inclinación de su lateral. Sin lateral (nunca llega a LAND_INCL_MIN):
+   donde el avance pasa a ser más horizontal que vertical */
+function findLanding(st, incl){
+  const first=incl.findIndex(v=>v>=LAND_INCL_MIN);
+  if(first>=0){
+    const lat=incl.slice(first).sort((a,b)=>a-b), target=Math.min(LAND_INCL_MAX, lat[lat.length>>1]-0.5);
+    const i=incl.findIndex(v=>v>=target); if(!i) return st[0].md;
+    return st[i-1].md+(st[i].md-st[i-1].md)*(target-incl[i-1])/((incl[i]-incl[i-1])||1);
+  }
   const tvd=i=>st[i].tvd||0, h=i=>Math.hypot(st[i].ew||0, st[i].ns||0);
   for(let i=1;i<st.length;i++){
     const dTvd=tvd(i)-tvd(i-1), dH=h(i)-h(i-1);
@@ -60,44 +77,35 @@ function findLanding(st){
   }
   return st.at(-1).md;
 }
-/* kick-off canónico: el arco es un cuarto de círculo "agresivo" de radio Rm (en metros TVD).
-   Empieza recién donde la TVD alcanza tvdLand−Rm, así el KOP dibujado no se adelanta por el
-   drift/tortuosidad del survey y los zapatos someros quedan claramente en el tramo vertical. */
-function findKick(st, landingMD, tvdLand, Rm){
-  const target=tvdLand-Rm;
-  let prev=st[0];
-  for(const s of st){
-    if(s.md>=landingMD) break;
-    if((s.tvd||0)>=target){
-      const t=(target-(prev.tvd||0))/(((s.tvd||0)-(prev.tvd||0))||1);
-      return prev.md+(s.md-prev.md)*t;
-    }
-    prev=s;
-  }
-  return Math.max(0, landingMD-1);
+/* kick-off: el último mínimo de inclinación antes del landing. Buscarlo cerca del landing evita tomar
+   por curva el nudge o la tangente de un pozo en S, que vuelve a casi vertical antes de construir. */
+function findKick(st, incl, landingMD){
+  const idx=st.map((_,i)=>i).filter(i=>st[i].md<landingMD && st[i].md>=landingMD-KICK_WINDOW);
+  if(!idx.length) return Math.max(0, landingMD-1);
+  const low=Math.min(...idx.map(i=>incl[i]));
+  return st[idx.findLast(i=>incl[i]<=low+1.5)].md;
 }
 
 /* ============ construcción del SVG ============ */
 export function buildWellSVG(w, opts={}){
-  const o = { cx:1, cy:1, diam:1, elw:6, shoe:1, font:10.5, margin:0, perfStages:"", from:null, to:null, theme:"color",
+  const o = { cx:1, cy:1, curve:50, diam:1, elw:6, shoe:1, font:10.5, margin:0, perfStages:"", from:null, to:null, theme:"color",
     els:{ casings:true, cement:true, shoes:true, plugs:true, tbg:true, instel:true, stages:true,
           perf:true, shorts:false, xovers:true, shoetrack:false, ruler:true, extruler:false, labels:true,
-          fluids:true, cemplug:true, rods:true, bha:true, notes:true, schem:true }, ...opts };
+          fluids:true, cemplug:true, rods:true, bha:true, notes:true, schem:true, incl:false }, ...opts };
   const bw = o.theme==="bw";
   const dg = o.theme==="dogleg";
   const FS = Math.max(6, o.font||10.5);                  // tamaño de letra base (px)
   const stageFilter = V.parseStages(o.perfStages);       // null = todas las etapas punzadas
-  const st = w.survey?.stations || [];
+  const st = V.surveyToEnd(w);
   if(st.length<2) return emptySVG(`Sin survey para ${esc(w.id)}`);
 
   const TD = st.at(-1).md;
   const hMaxFull = Math.max(...st.map(s=>Math.hypot(s.ew||0,s.ns||0)));
   const isVerticalWell = (w.architecture==="vertical") || hMaxFull<40;
-  const landingMD = isVerticalWell ? TD : findLanding(st);
-  // radio del arco esquemático (m TVD): ~8% de la TVD de landing, acotado — curva "agresiva"
+  const inclSt = stationIncl(st);
+  const landingMD = isVerticalWell ? TD : findLanding(st, inclSt);
   const tvdLandFull = isVerticalWell ? 0 : sampleMD(st, landingMD).tvd;
-  const Rm = Math.min(300, Math.max(120, tvdLandFull*0.08));
-  const kickMD = isVerticalWell ? TD : findKick(st, landingMD, tvdLandFull, Rm);
+  const kickMD = isVerticalWell ? TD : findKick(st, inclSt, landingMD);
   const fromMD = Math.max(0, Math.min(o.from==null?0:o.from, TD-1));
   const toMD   = Math.max(fromMD+1, Math.min(o.to==null?TD:o.to, TD));
 
@@ -134,8 +142,10 @@ export function buildWellSVG(w, opts={}){
     }
     return st.at(-1).dls||0;
   };
+  const inclAt = md => { if(md<=st[0].md) return inclSt[0];
+    for(let i=1;i<st.length;i++) if(md<=st[i].md) return inclSt[i-1]+(inclSt[i]-inclSt[i-1])*(md-st[i-1].md)/((st[i].md-st[i-1].md)||1);
+    return inclSt.at(-1); };
   const tvdFrom = tvdAt(fromMD);
-  const tvdKick = tvdAt(Math.min(kickMD, toMD));
   const tvdLand = tvdAt(Math.min(landingMD, toMD));
 
   // --- escalas: auto-fit del rango visible, moduladas por sliders ---
@@ -182,9 +192,9 @@ export function buildWellSVG(w, opts={}){
         else if(t==="FLUIDO"&&o.els.fluids&&el.bottom_md<=kickMD&&trunkRealPx(el.top_md,el.bottom_md)<SCHEM_MIN_LEN.FLUIDO) addRange(el);
       }
     });
-    // lo que cae dentro del arco baja la curva y queda en el tronco
+    // lo que cae al principio del arco baja la curva y queda en el tronco
     if(!isVerticalWell && evs.length){
-      const inArc=evs.filter(e=>e.md>kickMD&&e.md<landingMD).map(e=>e.md);
+      const inArc=evs.filter(e=>e.md>kickMD&&e.md<landingMD&&inclAt(e.md)<=SCHEM_ARC_MAX_INCL).map(e=>e.md);
       if(inArc.length) arcStart=Math.min(Math.max(...inArc)+2, landingMD-0.25);
       add(arcStart,SCHEM_ARC_CLEAR,0);
     }
@@ -212,13 +222,29 @@ export function buildWellSVG(w, opts={}){
   };
 
   // --- camino canónico (coords "crudas", luego se trasladan) ---
-  // tronco: x=0, y=tvd*yScale. arco: cuarto de círculo de radio R (px) = build TVD * yScale.
-  // lateral: y=cte, x avanza por MD.
+  // tronco: x=0, y=tvd*yScale. lateral: y=cte, x avanza por MD.
+  // arco: cuarto de círculo. Con el slider en 50 su radio R (px) = TVD real de la curva * yScale; más agresiva
+  // lo cierra hasta donde entran las cañerías, más suave lo abre.
   // Con ajuste esquemático, el tronco llega hasta arcStart (TVD real + lo estirado) y el arco sigue desde ahí.
-  const R = isVerticalWell ? 0 : Math.max((tvdLand-tvdKick)*yScale, 24);
+  const arcOuter = () => { const c=covering(arcStart)[0]; if(!c) return prodHalf; const i=PHASE_ORDER.indexOf(c.phase);
+    return Math.max(maxHalfOf(c), i>0 ? HW(PHASE_ORDER[i-1]) : maxHalfOf(c)+12*o.diam); };   // incluye el cemento
+  const arcRadius = () => { const min=Math.max(24, arcOuter()+ARC_CLEAR), real=Math.max(min, (tvdLandFull-tvdAt(arcStart))*yScale), k=(o.curve-50)/50;
+    return k>0 ? real+(min-real)*k : real*(1-k*ARC_SOFT_GAIN); };
+  const R = isVerticalWell ? 0 : arcRadius();
   const Ykick = tvdAt(arcStart)*yScale+extraAt(arcStart), Yland = Ykick+R;
   const Xland = R;
   const extraLand = extraAt(landingMD);
+  // fracción del arco en un MD: sigue la inclinación real, así el ángulo dibujado es el del pozo.
+  // La inclinación se toma creciente: un pozo que baja un poco no hace retroceder el dibujo.
+  const arcFrac = (() => { if(isVerticalWell) return ()=>0;
+    const ms=[arcStart, ...st.map(s=>s.md).filter(m=>m>arcStart&&m<landingMD), landingMD];
+    let run=-Infinity; const inc=ms.map(m=>run=Math.max(run,inclAt(m)));
+    const span=inc.at(-1)-inc[0], len=Math.max(landingMD-arcStart,1e-3);
+    return md=>{ const lin=(md-arcStart)/len; if(span<1) return lin;
+      let i=1; while(i<ms.length-1&&md>ms[i]) i++;
+      const v=inc[i-1]+(inc[i]-inc[i-1])*(md-ms[i-1])/((ms[i]-ms[i-1])||1);
+      return (1-ARC_MD_BLEND)*(v-inc[0])/span+ARC_MD_BLEND*lin; };
+  })();
   const pos = md => {
     if(md<=arcStart || isVerticalWell){
       return { x:0, y:tvdAt(md)*yScale+extraAt(md), tx:0, ty:1, nx:-1, ny:0 };
@@ -226,7 +252,7 @@ export function buildWellSVG(w, opts={}){
     if(md>=landingMD){
       return { x:Xland+(md-landingMD)*xScale+extraAt(md)-extraLand, y:Yland, tx:1, ty:0, nx:0, ny:1 };
     }
-    const t=(md-arcStart)/Math.max(landingMD-arcStart,1e-3);
+    const t=arcFrac(md);
     const phi=Math.PI - (Math.PI/2)*t;                    // 180° → 90°
     const cx=R, cy=Ykick;                                 // centro del arco
     const x=cx+R*Math.cos(phi), y=cy+R*Math.sin(phi);
@@ -261,8 +287,8 @@ export function buildWellSVG(w, opts={}){
     for(const s of st){ if((s.tvd||0)>=d) return p.md+(s.md-p.md)*(d-(p.tvd||0))/(((s.tvd||0)-(p.tvd||0))||1); p=s; }
     return TD; };
   const rulerY = d => d<=tvdArc ? d*yScale+extraAt(mdAtTvd(d))
-    : tvdLand>tvdArc && d<=tvdLand ? Ykick+(Yland-Ykick)*(d-tvdArc)/(tvdLand-tvdArc)
-    : (tvdLand>tvdArc ? Yland+(d-tvdLand)*yScale : Ykick+(d-tvdArc)*yScale);
+    : d<=tvdLandFull ? pos(mdAtTvd(d)).y
+    : Yland+(d-tvdLandFull)*yScale;
 
   const S=[];                                            // fragmentos SVG
   const boxes=[];                                        // cajas de etiqueta (tronco/arco)
@@ -279,7 +305,7 @@ export function buildWellSVG(w, opts={}){
 
   // banda (polígono cerrado) entre offsets ±w a lo largo del camino [a..b]
   // el arco siempre bien muestreado: con muestras parejas por MD, una curva cerrada queda poligonal
-  const ARC_N=48;
+  const ARC_N=96;
   const bandPts=(a,b,n=90)=>{ const ms=[]; for(let i=0;i<=n;i++) ms.push(a+(b-a)*i/n);
     const p=Math.max(a,arcStart), q=Math.min(b,landingMD);
     if(!isVerticalWell && q>p){ const k=Math.max(2,Math.round(ARC_N*(q-p)/Math.max(landingMD-arcStart,1e-3)));
@@ -444,7 +470,7 @@ export function buildWellSVG(w, opts={}){
     if(o.els.labels) fl.forEach(el=>{
       const [a,b]=clipR(el), m=(a+b)/2, v=V.instVolume(w,el);
       queueLabel(P(m), [[el.name||"Fluido", el.density_gcm3!=null?`${V.fmtDec(el.density_gcm3)} g/cm³`:null].filter(Boolean).join(" · "),
-        [rngTxt(el), v!=null?V.fmtVol(v):null].filter(Boolean).join(" · ")], INK, innerHalf(m), m, {swatch:colOf(el)});
+        [rngTxt(el), v!=null?V.fmtVol(v):null].filter(Boolean).join(" · ")], INK, innerHalf(m), m, {swatch:colOf(el), noIncl:true});
     });
   }
 
@@ -457,7 +483,7 @@ export function buildWellSVG(w, opts={}){
       S.push(`<line x1="${f1(f.x+f.nx*h)}" y1="${f1(f.y+f.ny*h)}" x2="${f1(f.x-f.nx*h)}" y2="${f1(f.y-f.ny*h)}" stroke="${edge}" stroke-width="1.4"/>`); }
     if(o.els.labels){ const m=(a+b)/2, v=V.instVolume(w,el);
       queueLabel(P(m), ["TPN cemento", [rngTxt(el), v!=null?V.fmtVol(v):null].filter(Boolean).join(" · ")],
-        "#444", innerHalf(m), m, {swatch:fill}); }
+        "#444", innerHalf(m), m, {swatch:fill, noIncl:true}); }
   });
   if(cemPats.size) S.push(`<defs>${[...cemPats.values()].join("")}</defs>`);
 
@@ -697,6 +723,10 @@ export function buildWellSVG(w, opts={}){
   function queueLabel(f, lines, color, half=maxHalf, md=null, extra={}){
     const key=lines.join("|");                           // identifica la caja si el usuario la elimina
     if(o.hiddenLabels?.has(key)) return;
+    if(o.els.incl && md!=null && !extra.note && !extra.noIncl){
+      const t=`Incl: ${Math.round(inclAt(md))}°`;      // en una caja que lista piezas, en su propia línea
+      lines = lines.length>2 ? [...lines, t] : [...lines.slice(0,-1), `${lines.at(-1)} · ${t}`];
+    }
     boxes.push({ f, lines, color, half, key, ...extra,
       lateral: !isVerticalWell && (md!=null ? md>=landingMD : Math.abs(f.tx)>Math.abs(f.ty)) });
   }
