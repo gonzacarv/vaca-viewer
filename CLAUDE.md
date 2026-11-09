@@ -202,6 +202,11 @@ Grotesk, minúsculas). Sistema completo en `docs/brand-kit.md` y en un proyecto 
   (round-trip). La verificación **visual** siempre la hace el usuario en el navegador (`python3 -m http.server`).
 - Convenciones: mantener todo **self-contained/offline**; reusar los helpers exportados por viewer.js
   en vez de reimplementar; respetar las reglas del corte 2D de arriba.
+- Commits: una línea corta que nombre las funcionalidades nuevas (ej. `v1.1: Corva, frac real, tramos de cañería`), sin
+  cuerpo con tareas internas. Como el repo es público, el mensaje no dice qué dato sensible se quitó. Antes de cada
+  commit, revisar también `dist/vaca-viewer.html`, que conserva los comentarios.
+- Pruebas contra Corva real: con el `dev/corva.py` del repo hermano del portal, en `../` (solo GET, sus credenciales y su
+  `.env`, no imprime tokens). Las muestras van al scratchpad o a `samples/`, nunca a git.
 
 ## Cómo pedir cambios (subsistemas)
 
